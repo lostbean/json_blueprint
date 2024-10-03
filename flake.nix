@@ -1,5 +1,5 @@
 {
-  description = "Go development environment";
+  description = "Gleam development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -22,6 +22,8 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gleam
+            erlang_27
+            nodejs
           ];
 
           shellHook = ''
