@@ -164,9 +164,9 @@ pub fn union_type_decoder(
   #(
     enum_decoder,
     list.map(decoders, fn(field_dec) {
-      let #(_name, dec) = field_dec
+      let #(name, dec) = field_dec
       jsch.Object(
-        [#("type", jsch.Type(jsch.StringType)), #("data", dec.1)],
+        [#("type", jsch.Enum([json.string(name)])), #("data", dec.1)],
         Some(False),
         Some(["type", "data"]),
       )

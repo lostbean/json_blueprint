@@ -1,4 +1,3 @@
-import gleam/dynamic
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -22,8 +21,8 @@ pub type Schema {
 pub type SchemaDefinition {
   // Type constraints
   Type(type_: SchemaType)
-  Enum(values: List(dynamic.Dynamic))
-  Const(value: dynamic.Dynamic)
+  Enum(values: List(json.Json))
+  Const(value: json.Json)
 
   // Not required
   Nullable(schema: SchemaDefinition)
@@ -232,9 +231,9 @@ fn schema_definition_to_json_fields(
   case def {
     Type(type_) -> [#("type", schema_type_to_json(type_))]
 
-    Enum(values) -> [#("enum", json.array(values, todo))]
+    Enum(values) -> [#("enum", json.preprocessed_array(values))]
 
-    Const(value) -> [#("const", todo)]
+    Const(value) -> [#("const", value)]
 
     Nullable(schema) -> schema_definition_to_json_fields(schema)
 

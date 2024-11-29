@@ -1,5 +1,4 @@
 import blueprint
-import gleam/dynamic
 import gleam/io
 import gleam/json
 import gleam/option.{type Option, None, Some}
@@ -314,7 +313,7 @@ pub fn constructor_type_decoder_test() {
   let schema = blueprint.generate_json_schema(shape_decoder)
 
   let expected_schema_str =
-    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"oneOf\":[{\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\"},\"data\":{\"required\":[\"radius\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"radius\":{\"type\":\"number\"}}}}},{\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\"},\"data\":{\"required\":[\"width\",\"height\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"}}}}}]}"
+    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"oneOf\":[{\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"circle\"]},\"data\":{\"required\":[\"radius\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"radius\":{\"type\":\"number\"}}}}},{\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"rectangle\"]},\"data\":{\"required\":[\"width\",\"height\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"}}}}}]}"
 
   schema
   |> json.to_string
