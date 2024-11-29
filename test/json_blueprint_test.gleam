@@ -1,9 +1,9 @@
-import blueprint
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleeunit
 import gleeunit/should
-import json_schema
+import json/blueprint
+import json/blueprint/schema as json_schema
 
 pub fn main() {
   gleeunit.main()
@@ -242,7 +242,7 @@ pub fn json_schema_string_format_test() {
   |> json.to_string
   |> should.equal(
     json.object([
-      #("$schema", json.string(json_schema.json_schema_version)),
+      get_schema_header(),
       #("format", json.string("email")),
       #("maxLength", json.int(100)),
       #("minLength", json.int(5)),
@@ -268,7 +268,7 @@ pub fn json_schema_number_constraint_test() {
   |> json.to_string
   |> should.equal(
     json.object([
-      #("$schema", json.string(json_schema.json_schema_version)),
+      get_schema_header(),
       #("multipleOf", json.float(0.5)),
       #("maximum", json.float(100.0)),
       #("minimum", json.float(0.0)),

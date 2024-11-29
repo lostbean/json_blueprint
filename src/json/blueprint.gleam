@@ -3,7 +3,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import json_schema.{type SchemaDefinition, Type} as jsch
+import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
 pub type Decoder(t) =
   #(dynamic.Decoder(t), SchemaDefinition)

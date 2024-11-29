@@ -1,24 +1,24 @@
-# blueprint
+# json_blueprint
 
-Blueprint is a Gleam library that simplifies JSON encoding and decoding while automatically generating JSON schemas for your data types.
+json_blueprint is a Gleam library that simplifies JSON encoding and decoding while automatically generating JSON schemas for your data types.
 
-[![Package Version](https://img.shields.io/hexpm/v/blueprint)](https://hex.pm/packages/blueprint)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/blueprint/)
+[![Package Version](https://img.shields.io/hexpm/v/json_blueprint)](https://hex.pm/packages/json_blueprint)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
 
 ```sh
-gleam add blueprint
+gleam add json_blueprint
 ```
 
 ## Usage
 
-Blueprint provides utilities for encoding and decoding JSON data, with special support for union types.
+json_blueprint provides utilities for encoding and decoding JSON data, with special support for union types.
 
 ### Encoding Union Types
 
 Here's an example of encoding a union type to JSON:
 
 ```gleam
-import blueprint
+import json/blueprint
 import gleam/json
 import gleam/io
 import gleeunit/should
@@ -148,7 +148,7 @@ This will encode your union types into a standardized JSON format with `type` an
 - 📋 Automatic JSON schema generation
 - ✨ Clean and intuitive API
 
-Further documentation can be found at <https://hexdocs.pm/blueprint>.
+Further documentation can be found at <https://hexdocs.pm/json_blueprint>.
 
 ## Development
 
