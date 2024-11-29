@@ -177,6 +177,11 @@ pub fn union_type_decoder(
   )
 }
 
+pub fn map(decoder decoder: Decoder(a), over foo: fn(a) -> b) -> Decoder(b) {
+  let #(dyn_dec, schema) = decoder
+  #(fn(input) { result.map(dyn_dec(input), foo) }, schema)
+}
+
 pub fn tuple2(
   first decode1: Decoder(a),
   second decode2: Decoder(b),
