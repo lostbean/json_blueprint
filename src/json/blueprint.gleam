@@ -349,3 +349,207 @@ pub fn decode3(
     create_object_schema([schema1, schema2, schema3]),
   )
 }
+
+pub fn decode4(
+  constructor: fn(t1, t2, t3, t4) -> t,
+  t1: FieldDecoder(t1),
+  t2: FieldDecoder(t2),
+  t3: FieldDecoder(t3),
+  t4: FieldDecoder(t4),
+) -> Decoder(t) {
+  let #(decoder1, schema1) = t1
+  let #(decoder2, schema2) = t2
+  let #(decoder3, schema3) = t3
+  let #(decoder4, schema4) = t4
+  #(
+    dynamic.decode4(constructor, decoder1, decoder2, decoder3, decoder4),
+    create_object_schema([schema1, schema2, schema3, schema4]),
+  )
+}
+
+pub fn decode5(
+  constructor: fn(t1, t2, t3, t4, t5) -> t,
+  t1: FieldDecoder(t1),
+  t2: FieldDecoder(t2),
+  t3: FieldDecoder(t3),
+  t4: FieldDecoder(t4),
+  t5: FieldDecoder(t5),
+) -> Decoder(t) {
+  let #(decoder1, schema1) = t1
+  let #(decoder2, schema2) = t2
+  let #(decoder3, schema3) = t3
+  let #(decoder4, schema4) = t4
+  let #(decoder5, schema5) = t5
+  #(
+    dynamic.decode5(
+      constructor,
+      decoder1,
+      decoder2,
+      decoder3,
+      decoder4,
+      decoder5,
+    ),
+    create_object_schema([schema1, schema2, schema3, schema4, schema5]),
+  )
+}
+
+pub fn decode6(
+  constructor: fn(t1, t2, t3, t4, t5, t6) -> t,
+  t1: FieldDecoder(t1),
+  t2: FieldDecoder(t2),
+  t3: FieldDecoder(t3),
+  t4: FieldDecoder(t4),
+  t5: FieldDecoder(t5),
+  t6: FieldDecoder(t6),
+) -> Decoder(t) {
+  let #(decoder1, schema1) = t1
+  let #(decoder2, schema2) = t2
+  let #(decoder3, schema3) = t3
+  let #(decoder4, schema4) = t4
+  let #(decoder5, schema5) = t5
+  let #(decoder6, schema6) = t6
+  #(
+    dynamic.decode6(
+      constructor,
+      decoder1,
+      decoder2,
+      decoder3,
+      decoder4,
+      decoder5,
+      decoder6,
+    ),
+    create_object_schema([schema1, schema2, schema3, schema4, schema5, schema6]),
+  )
+}
+
+pub fn decode7(
+  constructor: fn(t1, t2, t3, t4, t5, t6, t7) -> t,
+  t1: FieldDecoder(t1),
+  t2: FieldDecoder(t2),
+  t3: FieldDecoder(t3),
+  t4: FieldDecoder(t4),
+  t5: FieldDecoder(t5),
+  t6: FieldDecoder(t6),
+  t7: FieldDecoder(t7),
+) -> Decoder(t) {
+  let #(decoder1, schema1) = t1
+  let #(decoder2, schema2) = t2
+  let #(decoder3, schema3) = t3
+  let #(decoder4, schema4) = t4
+  let #(decoder5, schema5) = t5
+  let #(decoder6, schema6) = t6
+  let #(decoder7, schema7) = t7
+  #(
+    dynamic.decode7(
+      constructor,
+      decoder1,
+      decoder2,
+      decoder3,
+      decoder4,
+      decoder5,
+      decoder6,
+      decoder7,
+    ),
+    create_object_schema([
+      schema1,
+      schema2,
+      schema3,
+      schema4,
+      schema5,
+      schema6,
+      schema7,
+    ]),
+  )
+}
+
+pub fn decode8(
+  constructor: fn(t1, t2, t3, t4, t5, t6, t7, t8) -> t,
+  t1: FieldDecoder(t1),
+  t2: FieldDecoder(t2),
+  t3: FieldDecoder(t3),
+  t4: FieldDecoder(t4),
+  t5: FieldDecoder(t5),
+  t6: FieldDecoder(t6),
+  t7: FieldDecoder(t7),
+  t8: FieldDecoder(t8),
+) -> Decoder(t) {
+  let #(decoder1, schema1) = t1
+  let #(decoder2, schema2) = t2
+  let #(decoder3, schema3) = t3
+  let #(decoder4, schema4) = t4
+  let #(decoder5, schema5) = t5
+  let #(decoder6, schema6) = t6
+  let #(decoder7, schema7) = t7
+  let #(decoder8, schema8) = t8
+  #(
+    dynamic.decode8(
+      constructor,
+      decoder1,
+      decoder2,
+      decoder3,
+      decoder4,
+      decoder5,
+      decoder6,
+      decoder7,
+      decoder8,
+    ),
+    create_object_schema([
+      schema1,
+      schema2,
+      schema3,
+      schema4,
+      schema5,
+      schema6,
+      schema7,
+      schema8,
+    ]),
+  )
+}
+
+pub fn decode9(
+  constructor: fn(t1, t2, t3, t4, t5, t6, t7, t8, t9) -> t,
+  t1: FieldDecoder(t1),
+  t2: FieldDecoder(t2),
+  t3: FieldDecoder(t3),
+  t4: FieldDecoder(t4),
+  t5: FieldDecoder(t5),
+  t6: FieldDecoder(t6),
+  t7: FieldDecoder(t7),
+  t8: FieldDecoder(t8),
+  t9: FieldDecoder(t9),
+) -> Decoder(t) {
+  let #(decoder1, schema1) = t1
+  let #(decoder2, schema2) = t2
+  let #(decoder3, schema3) = t3
+  let #(decoder4, schema4) = t4
+  let #(decoder5, schema5) = t5
+  let #(decoder6, schema6) = t6
+  let #(decoder7, schema7) = t7
+  let #(decoder8, schema8) = t8
+  let #(decoder9, schema9) = t9
+  #(
+    dynamic.decode9(
+      constructor,
+      decoder1,
+      decoder2,
+      decoder3,
+      decoder4,
+      decoder5,
+      decoder6,
+      decoder7,
+      decoder8,
+      decoder9,
+    ),
+    create_object_schema([
+      schema1,
+      schema2,
+      schema3,
+      schema4,
+      schema5,
+      schema6,
+      schema7,
+      schema8,
+      schema9,
+    ]),
+  )
+}
