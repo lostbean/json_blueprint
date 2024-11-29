@@ -2,7 +2,8 @@ import gleam/dynamic
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
+
+pub const json_schema_version = "http://json-schema.org/draft-07/schema#"
 
 /// Represents a complete JSON Schema document
 pub type Schema {
@@ -60,7 +61,11 @@ pub type SchemaDefinition {
   )
 
   // Object constraints
-  Object(properties: Option(List(#(String, SchemaDefinition))))
+  Object(
+    properties: List(#(String, SchemaDefinition)),
+    additional_properties: Option(Bool),
+    required: Option(List(String)),
+  )
 
   // Object constraints
   DetailedObject(
@@ -182,23 +187,17 @@ pub fn to_json_string(schema: Schema) -> String {
 pub fn to_json(schema: Schema) -> json.Json {
   // Add optional top-level fields
   let fields =
-    [
-      Ok(#(
-        "$schema",
-        json.string("https://json-schema.org/draft/2020-12/schema"),
-      )),
-      optional_field(schema.vocabulary, "$vocabulary", fn(vocab) {
-        json.array(vocab, json.string)
-      }),
-      optional_field(schema.id, "$id", json.string),
-      optional_field(schema.comment, "$comment", json.string),
-      optional_field(schema.defs, "$defs", fn(defs) {
-        json.object(
-          list.map(defs, fn(def) { #(def.0, schema_definition_to_json(def.1)) }),
-        )
-      }),
-    ]
-    |> list.filter_map(fn(x) { x })
+    [#("$schema", json.string(json_schema_version))]
+    |> prepend_option(schema.vocabulary, "$vocabulary", fn(vocab) {
+      json.array(vocab, json.string)
+    })
+    |> prepend_option(schema.id, "$id", json.string)
+    |> prepend_option(schema.comment, "$comment", json.string)
+    |> prepend_option(schema.defs, "$defs", fn(defs) {
+      json.object(
+        list.map(defs, fn(def) { #(def.0, schema_definition_to_json(def.1)) }),
+      )
+    })
 
   // Add the main schema definition
   let schema_fields = schema_definition_to_json_fields(schema.schema)
@@ -212,16 +211,17 @@ fn schema_definition_to_json(def: SchemaDefinition) -> json.Json {
   json.object(schema_definition_to_json_fields(def))
 }
 
-fn optional_field(
+fn prepend_option(
+  list: List(#(String, json.Json)),
   maybe: Option(a),
   name: String,
   to_json: fn(a) -> json.Json,
-) -> Result(#(String, json.Json), Nil) {
+) -> List(#(String, json.Json)) {
   case maybe {
     option.Some(value) -> {
-      Ok(#(name, to_json(value)))
+      list.prepend(list, #(name, to_json(value)))
     }
-    None -> Error(Nil)
+    None -> list
   }
 }
 
@@ -239,46 +239,48 @@ fn schema_definition_to_json_fields(
     Nullable(schema) -> schema_definition_to_json_fields(schema)
 
     Number(minimum, maximum, exclusive_minimum, exclusive_maximum, multiple_of) -> {
-      [
-        optional_field(minimum, "minimum", json.float),
-        optional_field(maximum, "maximum", json.float),
-        optional_field(exclusive_minimum, "exclusiveMinimum", json.float),
-        optional_field(exclusive_maximum, "exclusiveMaximum", json.float),
-        optional_field(multiple_of, "multipleOf", json.float),
-      ]
-      |> list.filter_map(fn(x) { x })
+      []
+      |> prepend_option(minimum, "minimum", json.float)
+      |> prepend_option(maximum, "maximum", json.float)
+      |> prepend_option(exclusive_minimum, "exclusiveMinimum", json.float)
+      |> prepend_option(exclusive_maximum, "exclusiveMaximum", json.float)
+      |> prepend_option(multiple_of, "multipleOf", json.float)
     }
 
     String(min_length, max_length, pattern, format) -> {
-      [
-        optional_field(min_length, "minLength", json.int),
-        optional_field(max_length, "maxLength", json.int),
-        optional_field(pattern, "pattern", json.string),
-        optional_field(format, "format", fn(f) {
-          json.string(string_format_to_string(f))
-        }),
-      ]
-      |> list.filter_map(fn(x) { x })
+      []
+      |> prepend_option(min_length, "minLength", json.int)
+      |> prepend_option(max_length, "maxLength", json.int)
+      |> prepend_option(pattern, "pattern", json.string)
+      |> prepend_option(format, "format", fn(f) {
+        json.string(string_format_to_string(f))
+      })
     }
 
     Array(items) -> {
-      optional_field(items, "items", fn(schema) {
+      prepend_option([], items, "items", fn(schema) {
         schema_definition_to_json(schema)
       })
-      |> result.map(fn(x) { [x] })
-      |> result.unwrap([])
     }
 
-    Object(properties) -> {
-      optional_field(properties, "properties", fn(props) {
-        json.object(
-          list.map(props, fn(prop) {
-            #(prop.0, schema_definition_to_json(prop.1))
-          }),
-        )
-      })
-      |> result.map(fn(x) { [x] })
-      |> result.unwrap([])
+    Object(properties, additional_properties, required) -> {
+      [
+        #("type", json.string("object")),
+        #(
+          "properties",
+          json.object(
+            list.map(properties, fn(prop) {
+              #(prop.0, schema_definition_to_json(prop.1))
+            }),
+          ),
+        ),
+      ]
+      |> prepend_option(
+        additional_properties,
+        "additionalProperties",
+        json.bool,
+      )
+      |> prepend_option(required, "required", json.array(_, json.string))
     }
 
     DetailedArray(
@@ -291,23 +293,21 @@ fn schema_definition_to_json_fields(
       min_contains,
       max_contains,
     ) -> {
-      [
-        optional_field(items, "items", fn(schema) {
-          schema_definition_to_json(schema)
-        }),
-        optional_field(prefix_items, "prefixItems", fn(schemas) {
-          json.array(schemas, schema_definition_to_json)
-        }),
-        optional_field(min_items, "minItems", json.int),
-        optional_field(max_items, "maxItems", json.int),
-        optional_field(unique_items, "uniqueItems", json.bool),
-        optional_field(contains, "contains", fn(schema) {
-          schema_definition_to_json(schema)
-        }),
-        optional_field(min_contains, "minContains", json.int),
-        optional_field(max_contains, "maxContains", json.int),
-      ]
-      |> list.filter_map(fn(x) { x })
+      []
+      |> prepend_option(items, "items", fn(schema) {
+        schema_definition_to_json(schema)
+      })
+      |> prepend_option(prefix_items, "prefixItems", fn(schemas) {
+        json.array(schemas, schema_definition_to_json)
+      })
+      |> prepend_option(min_items, "minItems", json.int)
+      |> prepend_option(max_items, "maxItems", json.int)
+      |> prepend_option(unique_items, "uniqueItems", json.bool)
+      |> prepend_option(contains, "contains", fn(schema) {
+        schema_definition_to_json(schema)
+      })
+      |> prepend_option(min_contains, "minContains", json.int)
+      |> prepend_option(max_contains, "maxContains", json.int)
     }
 
     DetailedObject(
@@ -319,36 +319,34 @@ fn schema_definition_to_json_fields(
       min_properties,
       max_properties,
     ) -> {
-      [
-        optional_field(properties, "properties", fn(props) {
-          json.object(
-            list.map(props, fn(prop) {
-              #(prop.0, schema_definition_to_json(prop.1))
-            }),
-          )
-        }),
-        optional_field(pattern_properties, "patternProperties", fn(patterns) {
-          json.object(
-            list.map(patterns, fn(pattern) {
-              #(pattern.0, schema_definition_to_json(pattern.1))
-            }),
-          )
-        }),
-        optional_field(
-          additional_properties,
-          "additionalProperties",
-          fn(schema) { schema_definition_to_json(schema) },
-        ),
-        optional_field(required, "required", fn(reqs) {
-          json.array(reqs, json.string)
-        }),
-        optional_field(property_names, "propertyNames", fn(schema) {
-          schema_definition_to_json(schema)
-        }),
-        optional_field(min_properties, "minProperties", json.int),
-        optional_field(max_properties, "maxProperties", json.int),
-      ]
-      |> list.filter_map(fn(x) { x })
+      []
+      |> prepend_option(properties, "properties", fn(props) {
+        json.object(
+          list.map(props, fn(prop) {
+            #(prop.0, schema_definition_to_json(prop.1))
+          }),
+        )
+      })
+      |> prepend_option(pattern_properties, "patternProperties", fn(patterns) {
+        json.object(
+          list.map(patterns, fn(pattern) {
+            #(pattern.0, schema_definition_to_json(pattern.1))
+          }),
+        )
+      })
+      |> prepend_option(
+        additional_properties,
+        "additionalProperties",
+        fn(schema) { schema_definition_to_json(schema) },
+      )
+      |> prepend_option(required, "required", fn(reqs) {
+        json.array(reqs, json.string)
+      })
+      |> prepend_option(property_names, "propertyNames", fn(schema) {
+        schema_definition_to_json(schema)
+      })
+      |> prepend_option(min_properties, "minProperties", json.int)
+      |> prepend_option(max_properties, "maxProperties", json.int)
     }
 
     AllOf(schemas) -> [

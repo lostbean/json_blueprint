@@ -1,6 +1,8 @@
 import gleam/dynamic
 import gleam/json
+import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import json_schema.{type SchemaDefinition, Type} as jsch
 
 pub type Decoder(t) =
@@ -64,6 +66,77 @@ pub fn optional_field(
 ) -> FieldDecoder(Option(t)) {
   let #(decoder, schema) = inner_type
   #(dynamic.optional_field(name, decoder), #(name, jsch.Nullable(schema)))
+}
+
+/// Function to defined a decoder for a union types.
+/// The function takes a list of decoders for each possible type of the union.
+///
+///> [!IMPORTANT]  
+///> Make sure to add tests for every possible type of the union because it is not possible to check for exhaustiveness in the case.
+///
+/// ## Example
+/// ```gleam
+/// type Shape {
+///   Circle(Float)
+///   Rectangle(Float, Float)
+/// }
+///
+/// let shape_decoder = union_type_decoder([
+///   #("circle", decode1(Circle, field("radius", float()))),
+///   #("rectangle", decode2(Rectangle, 
+///     field("width", float()),
+///     field("height", float())
+///   ))
+/// ])
+/// ```
+///
+pub fn union_type_decoder(
+  constructor_decoders decoders: List(#(String, Decoder(a))),
+) -> Decoder(a) {
+  let constructor = fn(type_str: String, data: dynamic.Dynamic) -> Result(
+    a,
+    List(dynamic.DecodeError),
+  ) {
+    decoders
+    |> list.find_map(fn(dec) {
+      case dec {
+        #(name, d) if type_str == name -> {
+          let #(dyn_decoder, _) = d
+          dyn_decoder(data)
+        }
+        _ -> Error([])
+      }
+    })
+    |> result.replace_error([
+      dynamic.DecodeError(
+        expected: "valid constructor type",
+        found: type_str,
+        path: [],
+      ),
+    ])
+  }
+
+  let enum_decoder = fn(data) {
+    dynamic.decode2(
+      constructor,
+      dynamic.field("type", dynamic.string),
+      dynamic.field("data", dynamic.dynamic),
+    )(data)
+    |> result.flatten
+  }
+
+  #(
+    enum_decoder,
+    list.map(decoders, fn(field_dec) {
+      let #(_name, dec) = field_dec
+      jsch.Object(
+        [#("type", jsch.Type(jsch.StringType)), #("data", dec.1)],
+        Some(False),
+        Some(["type", "data"]),
+      )
+    })
+      |> jsch.OneOf,
+  )
 }
 
 pub fn tuple2(
@@ -191,9 +264,26 @@ pub fn tuple6(
   )
 }
 
+fn create_object_schema(
+  fields: List(#(String, SchemaDefinition)),
+) -> SchemaDefinition {
+  jsch.Object(
+    fields,
+    Some(False),
+    Some(
+      list.filter_map(fields, fn(field_dec) {
+        case field_dec {
+          #(_, jsch.Nullable(_)) -> Error(Nil)
+          #(name, _) -> Ok(name)
+        }
+      }),
+    ),
+  )
+}
+
 pub fn decode1(constructor: fn(t1) -> t, t1: FieldDecoder(t1)) -> Decoder(t) {
   let #(decoder, schema) = t1
-  #(dynamic.decode1(constructor, decoder), jsch.Object(Some([schema])))
+  #(dynamic.decode1(constructor, decoder), create_object_schema([schema]))
 }
 
 pub fn decode2(
@@ -205,7 +295,7 @@ pub fn decode2(
   let #(decoder2, schema2) = t2
   #(
     dynamic.decode2(constructor, decoder1, decoder2),
-    jsch.Object(Some([schema1, schema2])),
+    create_object_schema([schema1, schema2]),
   )
 }
 
@@ -220,6 +310,6 @@ pub fn decode3(
   let #(decoder3, schema3) = t3
   #(
     dynamic.decode3(constructor, decoder1, decoder2, decoder3),
-    jsch.Object(Some([schema1, schema2, schema3])),
+    create_object_schema([schema1, schema2, schema3]),
   )
 }

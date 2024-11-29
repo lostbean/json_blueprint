@@ -1,4 +1,6 @@
 import blueprint
+import gleam/dynamic
+import gleam/io
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleeunit
@@ -10,7 +12,7 @@ pub fn main() {
 }
 
 fn get_schema_header() {
-  #("$schema", json.string("https://json-schema.org/draft/2020-12/schema"))
+  #("$schema", json.string(json_schema.json_schema_version))
 }
 
 // Test type for object decoding
@@ -135,9 +137,16 @@ pub fn person_decoder_test() {
 
   // Test schema generation
   blueprint.generate_json_schema(person_decoder)
+  |> json.to_string
   |> should.equal(
     json.object([
       get_schema_header(),
+      #(
+        "required",
+        json.preprocessed_array([json.string("name"), json.string("age")]),
+      ),
+      #("additionalProperties", json.bool(False)),
+      #("type", json.string("object")),
       #(
         "properties",
         json.object([
@@ -146,7 +155,8 @@ pub fn person_decoder_test() {
           #("email", json.object([#("type", json.string("string"))])),
         ]),
       ),
-    ]),
+    ])
+    |> json.to_string,
   )
 }
 
@@ -231,13 +241,15 @@ pub fn json_schema_string_format_test() {
   let json = json_schema.to_json(schema)
 
   json
+  |> json.to_string
   |> should.equal(
     json.object([
-      #("$schema", json.string("https://json-schema.org/draft/2020-12/schema")),
-      #("minLength", json.int(5)),
-      #("maxLength", json.int(100)),
+      #("$schema", json.string(json_schema.json_schema_version)),
       #("format", json.string("email")),
-    ]),
+      #("maxLength", json.int(100)),
+      #("minLength", json.int(5)),
+    ])
+    |> json.to_string,
   )
 }
 
@@ -255,12 +267,60 @@ pub fn json_schema_number_constraint_test() {
   let json = json_schema.to_json(schema)
 
   json
+  |> json.to_string
   |> should.equal(
     json.object([
-      #("$schema", json.string("https://json-schema.org/draft/2020-12/schema")),
-      #("minimum", json.float(0.0)),
-      #("maximum", json.float(100.0)),
+      #("$schema", json.string(json_schema.json_schema_version)),
       #("multipleOf", json.float(0.5)),
-    ]),
+      #("maximum", json.float(100.0)),
+      #("minimum", json.float(0.0)),
+    ])
+    |> json.to_string,
   )
+}
+
+type Shape {
+  Circle(Float)
+  Rectangle(Float, Float)
+}
+
+pub fn constructor_type_decoder_test() {
+  let shape_decoder =
+    blueprint.union_type_decoder([
+      #(
+        "circle",
+        blueprint.decode1(Circle, blueprint.field("radius", blueprint.float())),
+      ),
+      #(
+        "rectangle",
+        blueprint.decode2(
+          Rectangle,
+          blueprint.field("width", blueprint.float()),
+          blueprint.field("height", blueprint.float()),
+        ),
+      ),
+    ])
+
+  let circle_json = "{\"type\":\"circle\",\"data\":{\"radius\":5.0}}"
+  let rectangle_json =
+    "{\"type\":\"rectangle\",\"data\":{\"width\":10.0,\"height\":20.0}}"
+
+  blueprint.decode(using: shape_decoder, from: circle_json)
+  |> should.equal(Ok(Circle(5.0)))
+
+  blueprint.decode(using: shape_decoder, from: rectangle_json)
+  |> should.equal(Ok(Rectangle(10.0, 20.0)))
+
+  let schema = blueprint.generate_json_schema(shape_decoder)
+
+  let expected_schema_str =
+    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"oneOf\":[{\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\"},\"data\":{\"required\":[\"radius\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"radius\":{\"type\":\"number\"}}}}},{\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\"},\"data\":{\"required\":[\"width\",\"height\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"}}}}}]}"
+
+  schema
+  |> json.to_string
+  |> io.println
+
+  schema
+  |> json.to_string
+  |> should.equal(expected_schema_str)
 }
