@@ -23,9 +23,10 @@ import gleam/json
 import gleam/io
 import gleeunit/should
 
-pub type Shape {
+type Shape {
   Circle(Float)
   Rectangle(Float, Float)
+  Void
 }
 
 fn encode_shape(shape: Shape) -> json.Json {
@@ -42,6 +43,7 @@ fn encode_shape(shape: Shape) -> json.Json {
           #("height", json.float(height)),
         ]),
       )
+      Void -> #("void", json.object([]))
     }
   })
 }
@@ -60,6 +62,7 @@ fn shape_decoder() -> blueprint.Decoder(Shape) {
         blueprint.field("height", blueprint.float()),
       ),
     ),
+    #("void", blueprint.decode0(Void)),
   ])
 }
 
@@ -79,6 +82,12 @@ fn simple_test() {
   |> json.to_string
   |> blueprint.decode(using: decoder)
   |> should.equal(Ok(rectangle))
+
+  // Test encoding a Void
+  encode_shape(Void)
+  |> json.to_string
+  |> blueprint.decode(using: decoder)
+  |> should.equal(Ok(Void))
 
   // Print JSON schema
   decoder

@@ -1,8 +1,10 @@
+import gleam/dict
 import gleam/dynamic
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/string
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
 pub type Decoder(t) =
@@ -314,6 +316,28 @@ fn create_object_schema(
         }
       }),
     ),
+  )
+}
+
+pub fn decode0(constructor: t) -> Decoder(t) {
+  let check = dynamic.from(dict.from_list([]))
+  #(
+    fn(value) {
+      case value {
+        x if x == check -> {
+          Ok(constructor)
+        }
+        x ->
+          Error([
+            dynamic.DecodeError(
+              expected: "{}",
+              found: string.inspect(x),
+              path: [],
+            ),
+          ])
+      }
+    },
+    jsch.Object([], Some(False), None),
   )
 }
 
