@@ -11,7 +11,7 @@ gleam add json_blueprint
 
 ## Usage
 
-json_blueprint provides utilities for encoding and decoding JSON data, with special support for union types.
+json_blueprint provides utilities for encoding and decoding JSON data, with special support for union types. The generated JSON schemas can be used to validate incoming JSON data with the decoder. The JSON schema follows the [JSON Schema Draft 7](https://json-schema.org/) specification and can tested and validate on [JSON Schema Lint](https://jsonschemalint.com/#!/version/draft-07/markup/json).
 
 ### Encoding Union Types
 
