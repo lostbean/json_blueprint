@@ -324,3 +324,77 @@ pub fn constructor_type_decoder_test() {
   |> json.to_string
   |> should.equal(expected_schema_str)
 }
+
+pub fn union_type_encoder_test() {
+  // Test encoding a Circle
+  let circle = Circle(5.0)
+  // Test encoding a Rectangle
+  let rectangle = Rectangle(10.0, 20.0)
+
+  let json_encoder = fn(input) {
+    blueprint.union_type_encoder(input, fn(shape) {
+      case shape {
+        Circle(radius) -> #(
+          "circle",
+          json.object([#("radius", json.float(radius))]),
+        )
+        Rectangle(width, height) -> #(
+          "rectangle",
+          json.object([
+            #("width", json.float(width)),
+            #("height", json.float(height)),
+          ]),
+        )
+      }
+    })
+  }
+
+  json_encoder(circle)
+  |> should.equal(
+    json.object([
+      #("type", json.string("circle")),
+      #("data", json.object([#("radius", json.float(5.0))])),
+    ]),
+  )
+
+  json_encoder(rectangle)
+  |> should.equal(
+    json.object([
+      #("type", json.string("rectangle")),
+      #(
+        "data",
+        json.object([
+          #("width", json.float(10.0)),
+          #("height", json.float(20.0)),
+        ]),
+      ),
+    ]),
+  )
+
+  //test decoding
+  let shape_decoder =
+    blueprint.union_type_decoder([
+      #(
+        "circle",
+        blueprint.decode1(Circle, blueprint.field("radius", blueprint.float())),
+      ),
+      #(
+        "rectangle",
+        blueprint.decode2(
+          Rectangle,
+          blueprint.field("width", blueprint.float()),
+          blueprint.field("height", blueprint.float()),
+        ),
+      ),
+    ])
+
+  json_encoder(circle)
+  |> json.to_string
+  |> blueprint.decode(using: shape_decoder)
+  |> should.equal(Ok(circle))
+
+  json_encoder(rectangle)
+  |> json.to_string
+  |> blueprint.decode(using: shape_decoder)
+  |> should.equal(Ok(rectangle))
+}

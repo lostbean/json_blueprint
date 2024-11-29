@@ -68,6 +68,42 @@ pub fn optional_field(
   #(dynamic.optional_field(name, decoder), #(name, jsch.Nullable(schema)))
 }
 
+/// Function to encode a union type into a JSON object.
+/// The function takes a value and an encoder function that returns a tuple of the type name and the JSON value.
+///
+///> [!IMPORTANT]  
+///> Make sure to update the decoder function accordingly.
+///
+/// ## Example
+/// ```gleam
+/// type Shape {
+///   Circle(Float)
+///   Rectangle(Float, Float)
+/// }
+///
+/// let shape_encoder = union_type_encoder(fn(shape) {
+///   case shape {
+///     Circle(radius) -> #("circle", json.object([#("radius", json.float(radius))]))
+///     Rectangle(width, height) -> #(
+///       "rectangle",
+///       json.object([
+///         #("width", json.float(width)),
+///         #("height", json.float(height))
+///       ])
+///     )
+///   }
+/// })
+/// ```
+///
+///
+pub fn union_type_encoder(
+  value of: a,
+  encoder_fn encoder_fn: fn(a) -> #(String, json.Json),
+) -> json.Json {
+  let #(field_name, json_value) = encoder_fn(of)
+  json.object([#("type", json.string(field_name)), #("data", json_value)])
+}
+
 /// Function to defined a decoder for a union types.
 /// The function takes a list of decoders for each possible type of the union.
 ///
