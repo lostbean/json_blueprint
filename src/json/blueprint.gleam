@@ -137,10 +137,10 @@ pub fn union_type_decoder(
   ) {
     decoders
     |> list.find_map(fn(dec) {
-      case dec {
-        #(name, d) if type_str == name -> {
-          let #(dyn_decoder, _) = d
-          dyn_decoder(data)
+      case dec.0 == type_str {
+        True -> {
+          let #(dyn_decoder, _) = dec.1
+          Ok(dyn_decoder(data))
         }
         _ -> Error([])
       }
@@ -157,6 +157,7 @@ pub fn union_type_decoder(
         ),
       ]
     })
+    |> result.flatten
   }
 
   let enum_decoder = fn(data) {
