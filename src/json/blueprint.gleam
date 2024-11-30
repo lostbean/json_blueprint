@@ -1,4 +1,3 @@
-import gleam/dict
 import gleam/dynamic
 import gleam/json
 import gleam/list
@@ -331,22 +330,26 @@ fn create_object_schema(
 }
 
 pub fn decode0(constructor: t) -> Decoder(t) {
-  let check = dynamic.from(dict.from_list([]))
+  // TODO: Disabled for now. For so reason the when running in the JS target the check fails with the following error:
+  // > DecodeError(expected: "{}", found: "//js({})", ...)
+  //
+  // let check = dynamic.from(dict.from_list([]))
   #(
-    fn(value) {
-      case value {
-        x if x == check -> {
-          Ok(constructor)
-        }
-        x ->
-          Error([
-            dynamic.DecodeError(
-              expected: "{}",
-              found: string.inspect(x),
-              path: [],
-            ),
-          ])
-      }
+    fn(_value) {
+      Ok(constructor)
+      // case value {
+      //   x if x == check -> {
+      //     Ok(constructor)
+      //   }
+      //   x ->
+      //     Error([
+      //       dynamic.DecodeError(
+      //         expected: "{}",
+      //         found: string.inspect(x),
+      //         path: [],
+      //       ),
+      //     ])
+      // }
     },
     jsch.Object([], Some(False), None),
   )
