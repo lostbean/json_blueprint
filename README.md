@@ -143,6 +143,21 @@ fn simple_test() {
           }
         }
       }
+    },
+    {
+      "required": ["type", "data"],
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": ["void"]
+        },
+        "data": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {}
+        }
+      }
     }
   ]
 }
