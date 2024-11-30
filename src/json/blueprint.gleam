@@ -145,13 +145,18 @@ pub fn union_type_decoder(
         _ -> Error([])
       }
     })
-    |> result.replace_error([
-      dynamic.DecodeError(
-        expected: "valid constructor type",
-        found: type_str,
-        path: [],
-      ),
-    ])
+    |> result.map_error(fn(_) {
+      let valid_types =
+        decoders |> list.map(fn(dec) { dec.0 }) |> string.join(", ")
+
+      [
+        dynamic.DecodeError(
+          expected: "valid constructor type, one of: " <> valid_types,
+          found: type_str,
+          path: [],
+        ),
+      ]
+    })
   }
 
   let enum_decoder = fn(data) {
