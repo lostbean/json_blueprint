@@ -574,3 +574,89 @@ pub fn palette_test() {
     "{\"type\":\"palette\",\"data\":{\"primary\":{\"enum\":\"green\"},\"secondary\":null,\"pair\":null,\"rgb\":null}}",
   )
 }
+
+type Coordinate =
+  #(Float, Float)
+
+type Drawing {
+  Box(Float, Float, Coordinate, Option(Color))
+}
+
+fn encode_coordinate(coord: Coordinate) -> json.Json {
+  blueprint.encode_tuple2(coord, json.float, json.float)
+}
+
+fn coordinate_decoder() {
+  blueprint.tuple2(blueprint.float(), blueprint.float())
+}
+
+fn encode_drawing(drawing: Drawing) -> json.Json {
+  blueprint.union_type_encoder(drawing, fn(shape) {
+    case shape {
+      Box(width, height, position, color) -> #(
+        "box",
+        json.object([
+          #("width", json.float(width)),
+          #("height", json.float(height)),
+          #("position", encode_coordinate(position)),
+          #("color", json.nullable(color, color_encoder)),
+        ]),
+      )
+    }
+  })
+}
+
+fn drawing_decoder() -> blueprint.Decoder(Drawing) {
+  blueprint.union_type_decoder([
+    #(
+      "box",
+      blueprint.decode4(
+        Box,
+        blueprint.field("width", blueprint.float()),
+        blueprint.field("height", blueprint.float()),
+        blueprint.field("position", coordinate_decoder()),
+        blueprint.optional_field("color", color_decoder()),
+      ),
+    ),
+  ])
+}
+
+pub fn drawing_test() {
+  // Test cases
+  let box = Box(15.0, 25.0, #(30.0, 40.0), None)
+
+  // Test encoding
+  let encoded_box = encode_drawing(box)
+
+  // Test decoding
+  encoded_box
+  |> json.to_string
+  |> blueprint.decode(using: drawing_decoder())
+  |> should.equal(Ok(box))
+
+  // Test specific JSON structure
+  encoded_box
+  |> should.equal(
+    json.object([
+      #("type", json.string("box")),
+      #(
+        "data",
+        json.object([
+          #("width", json.float(15.0)),
+          #("height", json.float(25.0)),
+          #(
+            "position",
+            json.preprocessed_array([json.float(30.0), json.float(40.0)]),
+          ),
+          #("color", json.null()),
+        ]),
+      ),
+    ]),
+  )
+
+  // Test invalid data
+  // Test missing required fields
+  "{\"type\":\"box\",\"data\":{\"width\":15.0}}"
+  |> blueprint.decode(using: drawing_decoder())
+  |> should.be_error()
+}

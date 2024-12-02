@@ -165,6 +165,94 @@ fn simple_test() {
 
 This will encode your union types into a standardized JSON format with `type` and `data` fields, making it easy to decode on the receiving end.
 
+And here's an example of decoding JSON data:
+
+```gleam
+type Color {
+  Red
+  Green
+  Blue
+}
+
+type Coordinate =
+  #(Float, Float)
+
+type Drawing {
+  Box(Float, Float, Coordinate, Option(Color))
+}
+
+fn color_decoder() {
+  blueprint.enum_type_decoder([
+    #("red", Red),
+    #("green", Green),
+    #("blue", Blue),
+  ])
+}
+
+fn color_encoder(input) {
+  blueprint.enum_type_encoder(input, fn(color) {
+    case color {
+      Red -> "red"
+      Green -> "green"
+      Blue -> "blue"
+    }
+  })
+}
+
+fn encode_coordinate(coord: Coordinate) -> json.Json {
+  blueprint.encode_tuple2(coord, json.float, json.float)
+}
+
+fn coordinate_decoder() {
+  blueprint.tuple2(blueprint.float(), blueprint.float())
+}
+
+fn encode_drawing(drawing: Drawing) -> json.Json {
+  blueprint.union_type_encoder(drawing, fn(shape) {
+    case shape {
+      Box(width, height, position, color) -> #(
+        "box",
+        json.object([
+          #("width", json.float(width)),
+          #("height", json.float(height)),
+          #("position", encode_coordinate(position)),
+          #("color", json.nullable(color, color_encoder)),
+        ]),
+      )
+    }
+  })
+}
+
+fn drawing_decoder() -> blueprint.Decoder(Drawing) {
+  blueprint.union_type_decoder([
+    #(
+      "box",
+      blueprint.decode4(
+        Box,
+        blueprint.field("width", blueprint.float()),
+        blueprint.field("height", blueprint.float()),
+        blueprint.field("position", coordinate_decoder()),
+        blueprint.optional_field("color", color_decoder()),
+      ),
+    ),
+  ])
+}
+
+pub fn drawing_test() {
+  // Test cases
+  let box = Box(15.0, 25.0, #(30.0, 40.0), None)
+
+  // Test encoding
+  let encoded_box = encode_drawing(box)
+
+  // Test decoding
+  encoded_box
+  |> json.to_string
+  |> blueprint.decode(using: drawing_decoder())
+  |> should.equal(Ok(box))
+}
+```
+
 ## Features
 
 - 🎯 Type-safe JSON encoding and decoding
