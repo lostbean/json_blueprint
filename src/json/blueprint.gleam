@@ -699,3 +699,143 @@ pub fn decode9(
     ]),
   )
 }
+
+pub fn encode_tuple2(
+  tuple tuple: #(a, b),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+) -> json.Json {
+  let #(t1, t2) = tuple
+  json.preprocessed_array([encode1(t1), encode2(t2)])
+}
+
+pub fn encode_tuple3(
+  tuple tuple: #(a, b, c),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3) = tuple
+  json.preprocessed_array([encode1(t1), encode2(t2), encode3(t3)])
+}
+
+pub fn encode_tuple4(
+  tuple tuple: #(a, b, c, d),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+  fourth encode4: fn(d) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3, t4) = tuple
+  json.preprocessed_array([encode1(t1), encode2(t2), encode3(t3), encode4(t4)])
+}
+
+pub fn encode_tuple5(
+  tuple tuple: #(a, b, c, d, e),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+  fourth encode4: fn(d) -> json.Json,
+  fifth encode5: fn(e) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3, t4, t5) = tuple
+  json.preprocessed_array([
+    encode1(t1),
+    encode2(t2),
+    encode3(t3),
+    encode4(t4),
+    encode5(t5),
+  ])
+}
+
+pub fn encode_tuple6(
+  tuple tuple: #(a, b, c, d, e, f),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+  fourth encode4: fn(d) -> json.Json,
+  fifth encode5: fn(e) -> json.Json,
+  sixth encode6: fn(f) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3, t4, t5, t6) = tuple
+  json.preprocessed_array([
+    encode1(t1),
+    encode2(t2),
+    encode3(t3),
+    encode4(t4),
+    encode5(t5),
+    encode6(t6),
+  ])
+}
+
+pub fn encode_tuple7(
+  tuple tuple: #(a, b, c, d, e, f, g),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+  fourth encode4: fn(d) -> json.Json,
+  fifth encode5: fn(e) -> json.Json,
+  sixth encode6: fn(f) -> json.Json,
+  seventh encode7: fn(g) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3, t4, t5, t6, t7) = tuple
+  json.preprocessed_array([
+    encode1(t1),
+    encode2(t2),
+    encode3(t3),
+    encode4(t4),
+    encode5(t5),
+    encode6(t6),
+    encode7(t7),
+  ])
+}
+
+pub fn encode_tuple8(
+  tuple tuple: #(a, b, c, d, e, f, g, h),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+  fourth encode4: fn(d) -> json.Json,
+  fifth encode5: fn(e) -> json.Json,
+  sixth encode6: fn(f) -> json.Json,
+  seventh encode7: fn(g) -> json.Json,
+  eighth encode8: fn(h) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3, t4, t5, t6, t7, t8) = tuple
+  json.preprocessed_array([
+    encode1(t1),
+    encode2(t2),
+    encode3(t3),
+    encode4(t4),
+    encode5(t5),
+    encode6(t6),
+    encode7(t7),
+    encode8(t8),
+  ])
+}
+
+pub fn encode_tuple9(
+  tuple tuple: #(a, b, c, d, e, f, g, h, i),
+  first encode1: fn(a) -> json.Json,
+  second encode2: fn(b) -> json.Json,
+  third encode3: fn(c) -> json.Json,
+  fourth encode4: fn(d) -> json.Json,
+  fifth encode5: fn(e) -> json.Json,
+  sixth encode6: fn(f) -> json.Json,
+  seventh encode7: fn(g) -> json.Json,
+  eighth encode8: fn(h) -> json.Json,
+  ninth encode9: fn(i) -> json.Json,
+) -> json.Json {
+  let #(t1, t2, t3, t4, t5, t6, t7, t8, t9) = tuple
+  json.preprocessed_array([
+    encode1(t1),
+    encode2(t2),
+    encode3(t3),
+    encode4(t4),
+    encode5(t5),
+    encode6(t6),
+    encode7(t7),
+    encode8(t8),
+    encode9(t9),
+  ])
+}

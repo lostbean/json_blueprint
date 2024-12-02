@@ -489,22 +489,20 @@ fn encode_palette(input) {
           #("secondary", json.nullable(secondary, color_encoder)),
           #(
             "pair",
-            json.nullable(pair, fn(pair) {
-              json.preprocessed_array([
-                color_encoder(pair.0),
-                color_encoder(pair.1),
-              ])
-            }),
+            json.nullable(pair, blueprint.encode_tuple2(
+              _,
+              color_encoder,
+              color_encoder,
+            )),
           ),
           #(
             "rgb",
-            json.nullable(rgb, fn(rbg) {
-              json.preprocessed_array([
-                json.int(rbg.0),
-                json.int(rbg.1),
-                json.int(rbg.2),
-              ])
-            }),
+            json.nullable(rgb, blueprint.encode_tuple3(
+              _,
+              json.int,
+              json.int,
+              json.int,
+            )),
           ),
         ]
         #("palette", json.object(fields))
