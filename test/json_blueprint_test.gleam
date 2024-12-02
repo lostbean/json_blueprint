@@ -659,4 +659,11 @@ pub fn drawing_test() {
   "{\"type\":\"box\",\"data\":{\"width\":15.0}}"
   |> blueprint.decode(using: drawing_decoder())
   |> should.be_error()
+
+  drawing_decoder()
+  |> blueprint.generate_json_schema
+  |> json.to_string
+  |> should.equal(
+    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"box\"]},\"data\":{\"required\":[\"width\",\"height\",\"position\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"},\"position\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}]},\"color\":{\"required\":[\"enum\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"enum\":{\"enum\":[\"red\",\"green\",\"blue\"]}}}}}}}",
+  )
 }

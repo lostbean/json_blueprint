@@ -184,18 +184,29 @@ pub fn union_type_decoder(
     |> result.flatten
   }
 
-  #(
-    enum_decoder,
-    list.map(decoders, fn(field_dec) {
-      let #(name, dec) = field_dec
+  let schema = case decoders {
+    [] -> jsch.Object([], Some(False), None)
+
+    [#(name, dec)] ->
       jsch.Object(
         [#("type", jsch.Enum([json.string(name)])), #("data", dec.1)],
         Some(False),
         Some(["type", "data"]),
       )
-    })
-      |> jsch.OneOf,
-  )
+
+    xs ->
+      list.map(xs, fn(field_dec) {
+        let #(name, dec) = field_dec
+        jsch.Object(
+          [#("type", jsch.Enum([json.string(name)])), #("data", dec.1)],
+          Some(False),
+          Some(["type", "data"]),
+        )
+      })
+      |> jsch.OneOf
+  }
+
+  #(enum_decoder, schema)
 }
 
 /// Function to encode an enum type (unions where constructors have no arguments) into a JSON object.
