@@ -402,52 +402,63 @@ type Color {
   Blue
 }
 
-fn encode_color(color: Color) -> json.Json {
-  blueprint.union_type_encoder(color, fn(color_case) {
-    case color_case {
-      Red -> #("red", json.object([]))
-      Blue -> #("blue", json.object([]))
-      Green -> #("green", json.object([]))
-    }
-  })
-}
+pub fn enum_type_test() {
+  let decoder =
+    blueprint.enum_type_decoder([
+      #("red", Red),
+      #("green", Green),
+      #("blue", Blue),
+    ])
 
-fn color_decoder() -> blueprint.Decoder(Color) {
-  blueprint.union_type_decoder([
-    #("red", blueprint.decode0(Red)),
-    #("blue", blueprint.decode0(Blue)),
-    #("green", blueprint.decode0(Green)),
-  ])
-}
+  let encoder = fn(input) {
+    blueprint.enum_type_encoder(input, fn(color) {
+      case color {
+        Red -> "red"
+        Green -> "green"
+        Blue -> "blue"
+      }
+    })
+  }
 
-pub fn color_test() {
+  // Test encoding
+  encoder(Red)
+  |> json.to_string
+  |> should.equal("{\"enum\":\"red\"}")
+
+  encoder(Green)
+  |> json.to_string
+  |> should.equal("{\"enum\":\"green\"}")
+
+  encoder(Blue)
+  |> json.to_string
+  |> should.equal("{\"enum\":\"blue\"}")
+
+  // Test decoding
+  blueprint.decode(decoder, "{\"enum\":\"red\"}")
+  |> should.equal(Ok(Red))
+
+  blueprint.decode(decoder, "{\"enum\":\"green\"}")
+  |> should.equal(Ok(Green))
+
+  blueprint.decode(decoder, "{\"enum\":\"blue\"}")
+  |> should.equal(Ok(Blue))
+
+  // Test invalid enum value
+  blueprint.decode(decoder, "{\"enum\":\"yellow\"}")
+  |> should.be_error
+
   // Test encoding a Circle
   let red = Red
   // Test encoding a Rectangle
   let blue = Blue
-  let decoder = color_decoder()
-
-  encode_color(red)
-  |> json.to_string
-  |> should.equal(
-    json.object([#("type", json.string("red")), #("data", json.object([]))])
-    |> json.to_string,
-  )
-
-  encode_color(blue)
-  |> json.to_string
-  |> should.equal(
-    json.object([#("type", json.string("blue")), #("data", json.object([]))])
-    |> json.to_string,
-  )
 
   //test decoding
-  encode_color(red)
+  encoder(red)
   |> json.to_string
   |> blueprint.decode(using: decoder)
   |> should.equal(Ok(red))
 
-  encode_color(blue)
+  encoder(blue)
   |> json.to_string
   |> blueprint.decode(using: decoder)
   |> should.equal(Ok(blue))

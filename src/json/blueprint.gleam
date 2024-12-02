@@ -182,6 +182,98 @@ pub fn union_type_decoder(
   )
 }
 
+/// Function to encode an enum type (unions where constructors have no arguments) into a JSON object.
+/// The function takes a value and an encoder function that returns the string representation of the enum value.
+///
+///> [!IMPORTANT]  
+///> Make sure to update the decoder function accordingly.
+///
+/// ## Example
+/// ```gleam
+/// type Color {
+///   Red
+///   Green
+///   Blue
+/// }
+///
+/// let color_encoder = enum_type_encoder(fn(color) {
+///   case color {
+///     Red -> "red"
+///     Green -> "green"
+///     Blue -> "blue"
+///   }
+/// })
+/// ```
+///
+pub fn enum_type_encoder(
+  value of: a,
+  encoder_fn encoder_fn: fn(a) -> String,
+) -> json.Json {
+  let field_name = encoder_fn(of)
+  json.object([#("enum", json.string(field_name))])
+}
+
+/// Function to define a decoder for enum types (unions where constructors have no arguments).
+/// The function takes a list of tuples containing the string representation and the corresponding enum value.
+///
+///> [!IMPORTANT]  
+///> Make sure to add tests for every possible enum value because it is not possible to check for exhaustiveness.
+///
+/// ## Example
+/// ```gleam
+/// type Color {
+///   Red
+///   Green
+///   Blue
+/// }
+///
+/// let color_decoder = enum_type_decoder([
+///   #("red", Red),
+///   #("green", Green),
+///   #("blue", Blue),
+/// ])
+/// ```
+///
+pub fn enum_type_decoder(
+  constructor_decoders decoders: List(#(String, a)),
+) -> Decoder(a) {
+  let constructor = fn(type_str: String) -> Result(a, List(dynamic.DecodeError)) {
+    decoders
+    |> list.find_map(fn(dec) {
+      case dec.0 == type_str {
+        True -> {
+          Ok(dec.1)
+        }
+        _ -> Error([])
+      }
+    })
+    |> result.map_error(fn(_) {
+      let valid_types =
+        decoders |> list.map(fn(dec) { dec.0 }) |> string.join(", ")
+
+      [
+        dynamic.DecodeError(
+          expected: "valid constructor type, one of: " <> valid_types,
+          found: type_str,
+          path: [],
+        ),
+      ]
+    })
+  }
+
+  let enum_decoder = fn(data) {
+    dynamic.decode1(constructor, dynamic.field("enum", dynamic.string))(data)
+    |> result.flatten
+  }
+
+  #(
+    enum_decoder,
+    list.map(decoders, fn(field_dec) { json.string(field_dec.0) })
+      |> fn(enum_values) { [#("enum", jsch.Enum(enum_values))] }
+      |> jsch.Object(Some(False), Some(["enum"])),
+  )
+}
+
 pub fn map(decoder decoder: Decoder(a), over foo: fn(a) -> b) -> Decoder(b) {
   let #(dyn_dec, schema) = decoder
   #(fn(input) { result.map(dyn_dec(input), foo) }, schema)
