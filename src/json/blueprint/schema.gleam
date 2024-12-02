@@ -21,7 +21,7 @@ pub type Schema {
 pub type SchemaDefinition {
   // Type constraints
   Type(type_: SchemaType)
-  Enum(values: List(json.Json))
+  Enum(values: List(json.Json), type_: Option(SchemaType))
   Const(value: json.Json)
 
   // Not required
@@ -231,7 +231,9 @@ fn schema_definition_to_json_fields(
   case def {
     Type(type_) -> [#("type", schema_type_to_json(type_))]
 
-    Enum(values) -> [#("enum", json.preprocessed_array(values))]
+    Enum(values, schema) ->
+      [#("enum", json.preprocessed_array(values))]
+      |> prepend_option(schema, "type", schema_type_to_json)
 
     Const(value) -> [#("const", value)]
 

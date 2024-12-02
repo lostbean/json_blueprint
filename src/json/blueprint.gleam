@@ -189,7 +189,10 @@ pub fn union_type_decoder(
 
     [#(name, dec)] ->
       jsch.Object(
-        [#("type", jsch.Enum([json.string(name)])), #("data", dec.1)],
+        [
+          #("type", jsch.Enum([json.string(name)], Some(jsch.StringType))),
+          #("data", dec.1),
+        ],
         Some(False),
         Some(["type", "data"]),
       )
@@ -198,7 +201,10 @@ pub fn union_type_decoder(
       list.map(xs, fn(field_dec) {
         let #(name, dec) = field_dec
         jsch.Object(
-          [#("type", jsch.Enum([json.string(name)])), #("data", dec.1)],
+          [
+            #("type", jsch.Enum([json.string(name)], Some(jsch.StringType))),
+            #("data", dec.1),
+          ],
           Some(False),
           Some(["type", "data"]),
         )
@@ -296,7 +302,9 @@ pub fn enum_type_decoder(
   #(
     enum_decoder,
     list.map(decoders, fn(field_dec) { json.string(field_dec.0) })
-      |> fn(enum_values) { [#("enum", jsch.Enum(enum_values))] }
+      |> fn(enum_values) {
+        [#("enum", jsch.Enum(enum_values, Some(jsch.StringType)))]
+      }
       |> jsch.Object(Some(False), Some(["enum"])),
   )
 }
