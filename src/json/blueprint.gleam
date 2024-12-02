@@ -61,12 +61,28 @@ pub fn field(named name: String, of inner_type: Decoder(t)) -> FieldDecoder(t) {
   #(dynamic.field(name, decoder), #(name, schema))
 }
 
+@external(erlang, "json_blueprint_ffi", "null")
+@external(javascript, "../json_blueprint_ffi.mjs", "do_null")
+fn native_null() -> dynamic.Dynamic
+
+/// Decode a `Option` value where the underlaying JSON field can be missing or have `null` value 
 pub fn optional_field(
   named name: String,
   of inner_type: Decoder(t),
 ) -> FieldDecoder(Option(t)) {
   let #(decoder, schema) = inner_type
-  #(dynamic.optional_field(name, decoder), #(name, jsch.Nullable(schema)))
+  #(
+    fn(value) {
+      dynamic.optional_field(name, fn(dyn) {
+        case dyn == native_null() {
+          False -> result.map(decoder(dyn), Some)
+          True -> Ok(None)
+        }
+      })(value)
+      |> result.map(option.flatten)
+    },
+    #(name, jsch.Nullable(schema)),
+  )
 }
 
 /// Function to encode a union type into a JSON object.
