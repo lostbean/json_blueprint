@@ -259,14 +259,15 @@ fn schema_definition_to_json_fields(
     }
 
     Array(items) -> {
-      prepend_option([], items, "items", fn(schema) {
+      [#("type", schema_type_to_json(ArrayType))]
+      |> prepend_option(items, "items", fn(schema) {
         schema_definition_to_json(schema)
       })
     }
 
     Object(properties, additional_properties, required) -> {
       [
-        #("type", json.string("object")),
+        #("type", schema_type_to_json(ObjectType)),
         #(
           "properties",
           json.object(
@@ -294,7 +295,7 @@ fn schema_definition_to_json_fields(
       min_contains,
       max_contains,
     ) -> {
-      []
+      [#("type", schema_type_to_json(ArrayType))]
       |> prepend_option(items, "items", fn(schema) {
         schema_definition_to_json(schema)
       })
@@ -320,7 +321,7 @@ fn schema_definition_to_json_fields(
       min_properties,
       max_properties,
     ) -> {
-      []
+      [#("type", schema_type_to_json(ObjectType))]
       |> prepend_option(properties, "properties", fn(props) {
         json.object(
           list.map(props, fn(prop) {

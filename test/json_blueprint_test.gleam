@@ -98,6 +98,7 @@ pub fn list_decoder_test() {
     json.object([
       get_schema_header(),
       #("items", json.object([#("type", json.string("integer"))])),
+      #("type", json.string("array")),
     ]),
   )
 }
@@ -664,6 +665,6 @@ pub fn drawing_test() {
   |> blueprint.generate_json_schema
   |> json.to_string
   |> should.equal(
-    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"box\"]},\"data\":{\"required\":[\"width\",\"height\",\"position\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"},\"position\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}]},\"color\":{\"required\":[\"enum\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"enum\":{\"type\":\"string\",\"enum\":[\"red\",\"green\",\"blue\"]}}}}}}}",
+    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"box\"]},\"data\":{\"required\":[\"width\",\"height\",\"position\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"},\"position\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},\"color\":{\"required\":[\"enum\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"enum\":{\"type\":\"string\",\"enum\":[\"red\",\"green\",\"blue\"]}}}}}}}",
   )
 }
