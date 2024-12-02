@@ -402,49 +402,50 @@ type Color {
   Blue
 }
 
+fn color_decoder() {
+  blueprint.enum_type_decoder([
+    #("red", Red),
+    #("green", Green),
+    #("blue", Blue),
+  ])
+}
+
+fn color_encoder(input) {
+  blueprint.enum_type_encoder(input, fn(color) {
+    case color {
+      Red -> "red"
+      Green -> "green"
+      Blue -> "blue"
+    }
+  })
+}
+
 pub fn enum_type_test() {
-  let decoder =
-    blueprint.enum_type_decoder([
-      #("red", Red),
-      #("green", Green),
-      #("blue", Blue),
-    ])
-
-  let encoder = fn(input) {
-    blueprint.enum_type_encoder(input, fn(color) {
-      case color {
-        Red -> "red"
-        Green -> "green"
-        Blue -> "blue"
-      }
-    })
-  }
-
   // Test encoding
-  encoder(Red)
+  color_encoder(Red)
   |> json.to_string
   |> should.equal("{\"enum\":\"red\"}")
 
-  encoder(Green)
+  color_encoder(Green)
   |> json.to_string
   |> should.equal("{\"enum\":\"green\"}")
 
-  encoder(Blue)
+  color_encoder(Blue)
   |> json.to_string
   |> should.equal("{\"enum\":\"blue\"}")
 
   // Test decoding
-  blueprint.decode(decoder, "{\"enum\":\"red\"}")
+  blueprint.decode(color_decoder(), "{\"enum\":\"red\"}")
   |> should.equal(Ok(Red))
 
-  blueprint.decode(decoder, "{\"enum\":\"green\"}")
+  blueprint.decode(color_decoder(), "{\"enum\":\"green\"}")
   |> should.equal(Ok(Green))
 
-  blueprint.decode(decoder, "{\"enum\":\"blue\"}")
+  blueprint.decode(color_decoder(), "{\"enum\":\"blue\"}")
   |> should.equal(Ok(Blue))
 
   // Test invalid enum value
-  blueprint.decode(decoder, "{\"enum\":\"yellow\"}")
+  blueprint.decode(color_decoder(), "{\"enum\":\"yellow\"}")
   |> should.be_error
 
   // Test encoding a Circle
@@ -453,13 +454,125 @@ pub fn enum_type_test() {
   let blue = Blue
 
   //test decoding
-  encoder(red)
+  color_encoder(red)
   |> json.to_string
-  |> blueprint.decode(using: decoder)
+  |> blueprint.decode(using: color_decoder())
   |> should.equal(Ok(red))
 
-  encoder(blue)
+  color_encoder(blue)
   |> json.to_string
-  |> blueprint.decode(using: decoder)
+  |> blueprint.decode(using: color_decoder())
   |> should.equal(Ok(blue))
+}
+
+type ColorPair =
+  #(Color, Color)
+
+type RBG =
+  #(Int, Int, Int)
+
+type Palette {
+  Palette(
+    primary: Color,
+    secondary: Option(Color),
+    pair: Option(ColorPair),
+    rgb: Option(RBG),
+  )
+}
+
+fn encode_palette(input) {
+  blueprint.union_type_encoder(input, fn(palette) {
+    case palette {
+      Palette(primary, secondary, pair, rgb) -> {
+        let fields = [
+          #("primary", color_encoder(primary)),
+          #("secondary", json.nullable(secondary, color_encoder)),
+          #(
+            "pair",
+            json.nullable(pair, fn(pair) {
+              json.preprocessed_array([
+                color_encoder(pair.0),
+                color_encoder(pair.1),
+              ])
+            }),
+          ),
+          #(
+            "rgb",
+            json.nullable(rgb, fn(rbg) {
+              json.preprocessed_array([
+                json.int(rbg.0),
+                json.int(rbg.1),
+                json.int(rbg.2),
+              ])
+            }),
+          ),
+        ]
+        #("palette", json.object(fields))
+      }
+    }
+  })
+}
+
+fn palette_decoder() {
+  blueprint.union_type_decoder([
+    #(
+      "palette",
+      blueprint.decode4(
+        Palette,
+        blueprint.field("primary", color_decoder()),
+        blueprint.optional_field("secondary", color_decoder()),
+        blueprint.optional_field(
+          "pair",
+          blueprint.tuple2(color_decoder(), color_decoder()),
+        ),
+        blueprint.optional_field(
+          "rgb",
+          blueprint.tuple3(blueprint.int(), blueprint.int(), blueprint.int()),
+        ),
+      ),
+    ),
+  ])
+}
+
+pub fn palette_test() {
+  // Create decoder for Palette
+
+  // Test cases
+  let palette1 =
+    Palette(
+      primary: Red,
+      secondary: Some(Blue),
+      pair: Some(#(Green, Red)),
+      rgb: Some(#(255, 128, 0)),
+    )
+
+  let palette2 = Palette(primary: Green, secondary: None, pair: None, rgb: None)
+
+  // Test encoding
+  let encoded1 = encode_palette(palette1)
+  let encoded2 = encode_palette(palette2)
+
+  // Test decoding
+  encoded1
+  |> json.to_string
+  |> blueprint.decode(using: palette_decoder())
+  |> should.equal(Ok(palette1))
+
+  encoded2
+  |> json.to_string
+  |> blueprint.decode(using: palette_decoder())
+  |> should.equal(Ok(palette2))
+
+  // Test specific JSON structure
+  encoded1
+  |> json.to_string
+  |> should.equal(
+    "{\"type\":\"palette\",\"data\":{\"primary\":{\"enum\":\"red\"},\"secondary\":{\"enum\":\"blue\"},\"pair\":[{\"enum\":\"green\"},{\"enum\":\"red\"}],\"rgb\":[255,128,0]}}",
+  )
+
+  encoded2
+  |> json.to_string
+  |> should.equal(
+    "{\"type\":\"palette\",\"data\":{\"primary\":{\"enum\":\"green\"},\"secondary\":null,\"pair\":null,\"rgb\":null}}",
+  )
 }
