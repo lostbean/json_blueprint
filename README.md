@@ -13,6 +13,10 @@ gleam add json_blueprint
 
 json_blueprint provides utilities for encoding and decoding JSON data, with special support for union types. The generated JSON schemas can be used to validate incoming JSON data with the decoder. The JSON schema follows the [JSON Schema Draft 7](https://json-schema.org/) specification and can tested and validate on [JSON Schema Lint](https://jsonschemalint.com/#!/version/draft-07/markup/json).
 
+> ⚠️ _**DO NOT USE IT FOR RECURSIVE DATA TYPE**_
+>
+> If you need to encode/decode recursive data types, you should use only the `json` and `dynamic` libraries. This is because `json_blueprint` will generate an infinite JSON schema for recursive data types.
+
 ### Encoding Union Types
 
 Here's an example of encoding a union type to JSON:
@@ -165,7 +169,7 @@ fn simple_test() {
 
 This will encode your union types into a standardized JSON format with `type` and `data` fields, making it easy to decode on the receiving end.
 
-And here's an example of decoding JSON data:
+And here's an example using type aliases, optional fields, and single constructor types:
 
 ```gleam
 type Color {
