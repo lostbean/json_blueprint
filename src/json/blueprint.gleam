@@ -7,18 +7,72 @@ import gleam/string
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
 pub type Decoder(t) {
-  Decoder(dyn_decoder: dynamic.Decoder(t), schema: SchemaDefinition)
+  Decoder(
+    dyn_decoder: dynamic.Decoder(t),
+    schema: SchemaDefinition,
+    defs: List(#(String, SchemaDefinition)),
+  )
 }
 
 pub type FieldDecoder(t) {
   FieldDecoder(
     dyn_decoder: dynamic.Decoder(t),
     field_schema: #(String, SchemaDefinition),
+    defs: List(#(String, SchemaDefinition)),
   )
 }
 
 pub fn generate_json_schema(decoder: Decoder(t)) -> json.Json {
-  jsch.to_json(jsch.new_schema(decoder.schema))
+  let refs = case decoder.defs {
+    [] -> None
+    xs -> Some(xs)
+  }
+  jsch.to_json(jsch.new_schema(decoder.schema, refs))
+}
+
+/// Creates a reusable version of a decoder that can be used multiple times in a schema
+/// without duplicating the schema definition.
+///
+/// The function:
+/// 1. Creates a unique reference name based on the schema's hash
+/// 2. Moves the original schema into the `$defs` section
+/// 3. Returns a new decoder that references the schema via `$ref`
+///
+/// ## Example
+/// ```gleam
+/// type Person {
+///   Person(name: String, friends: List(Pet))
+/// }
+///
+/// type Pet {
+///   Pet(name: String)
+/// }
+///
+///
+/// let pet_decoder = reuse_decoder(
+///   decode2(
+///     Pet,
+///     field("name", string()),
+///   )
+/// )
+///
+/// let person_decoder = reuse_decoder(
+///   decode2(
+///     Person,
+///     field("name", string()),
+///     field("friends", list(pet_decoder))
+///   )
+/// )
+/// ```
+///
+pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
+  // can we do this in a collision free and deterministic way?
+  let ref_name = "ref_" <> jsch.hash_schema_definition(decoder.schema)
+  Decoder(
+    decoder.dyn_decoder,
+    jsch.Ref("#/$defs/" <> ref_name),
+    decoder.defs |> list.prepend(#(ref_name, decoder.schema)),
+  )
 }
 
 pub fn get_dynamic_decoder(decoder: Decoder(t)) -> dynamic.Decoder(t) {
@@ -33,37 +87,43 @@ pub fn decode(
 }
 
 pub fn string() -> Decoder(String) {
-  Decoder(dynamic.string, Type(jsch.StringType))
+  Decoder(dynamic.string, Type(jsch.StringType), [])
 }
 
 pub fn int() -> Decoder(Int) {
-  Decoder(dynamic.int, Type(jsch.IntegerType))
+  Decoder(dynamic.int, Type(jsch.IntegerType), [])
 }
 
 pub fn float() -> Decoder(Float) {
-  Decoder(dynamic.float, Type(jsch.NumberType))
+  Decoder(dynamic.float, Type(jsch.NumberType), [])
 }
 
 pub fn bool() -> Decoder(Bool) {
-  Decoder(dynamic.bool, Type(jsch.BooleanType))
+  Decoder(dynamic.bool, Type(jsch.BooleanType), [])
 }
 
 pub fn list(of decoder_type: Decoder(inner)) -> Decoder(List(inner)) {
   Decoder(
     dynamic.list(decoder_type.dyn_decoder),
     jsch.Array(Some(decoder_type.schema)),
+    decoder_type.defs,
   )
 }
 
 pub fn optional(of decode: Decoder(inner)) -> Decoder(Option(inner)) {
-  Decoder(dynamic.optional(decode.dyn_decoder), jsch.Nullable(decode.schema))
+  Decoder(
+    dynamic.optional(decode.dyn_decoder),
+    jsch.Nullable(decode.schema),
+    decode.defs,
+  )
 }
 
 pub fn field(named name: String, of inner_type: Decoder(t)) -> FieldDecoder(t) {
-  FieldDecoder(dynamic.field(name, inner_type.dyn_decoder), #(
-    name,
-    inner_type.schema,
-  ))
+  FieldDecoder(
+    dynamic.field(name, inner_type.dyn_decoder),
+    #(name, inner_type.schema),
+    inner_type.defs,
+  )
 }
 
 @external(erlang, "json_blueprint_ffi", "null")
@@ -86,6 +146,7 @@ pub fn optional_field(
       |> result.map(option.flatten)
     },
     #(name, jsch.Nullable(inner_type.schema)),
+    inner_type.defs,
   )
 }
 
@@ -215,7 +276,9 @@ pub fn union_type_decoder(
       |> jsch.OneOf
   }
 
-  Decoder(enum_decoder, schema)
+  let defs = list.flat_map(decoders, fn(dec) { { dec.1 }.defs })
+
+  Decoder(enum_decoder, schema, defs)
 }
 
 /// Function to encode an enum type (unions where constructors have no arguments) into a JSON object.
@@ -309,6 +372,7 @@ pub fn enum_type_decoder(
         [#("enum", jsch.Enum(enum_values, Some(jsch.StringType)))]
       }
       |> jsch.Object(Some(False), Some(["enum"])),
+    [],
   )
 }
 
@@ -316,6 +380,7 @@ pub fn map(decoder decoder: Decoder(a), over foo: fn(a) -> b) -> Decoder(b) {
   Decoder(
     fn(input) { result.map(decoder.dyn_decoder(input), foo) },
     decoder.schema,
+    decoder.defs,
   )
 }
 
@@ -335,6 +400,7 @@ pub fn tuple2(
       None,
       None,
     ),
+    list.append(decode1.defs, decode2.defs),
   )
 }
 
@@ -359,6 +425,7 @@ pub fn tuple3(
       None,
       None,
     ),
+    list.concat([decode1.defs, decode2.defs, decode3.defs]),
   )
 }
 
@@ -368,15 +435,16 @@ pub fn tuple4(
   third decode3: Decoder(c),
   fourth decode4: Decoder(d),
 ) -> Decoder(#(a, b, c, d)) {
-  let Decoder(decoder1, schema1) = decode1
-  let Decoder(decoder2, schema2) = decode2
-  let Decoder(decoder3, schema3) = decode3
-  let Decoder(decoder4, schema4) = decode4
   Decoder(
-    dynamic.tuple4(decoder1, decoder2, decoder3, decoder4),
+    dynamic.tuple4(
+      decode1.dyn_decoder,
+      decode2.dyn_decoder,
+      decode3.dyn_decoder,
+      decode4.dyn_decoder,
+    ),
     jsch.DetailedArray(
       None,
-      Some([schema1, schema2, schema3, schema4]),
+      Some([decode1.schema, decode2.schema, decode3.schema, decode4.schema]),
       Some(4),
       Some(4),
       None,
@@ -384,6 +452,7 @@ pub fn tuple4(
       None,
       None,
     ),
+    list.concat([decode1.defs, decode2.defs, decode3.defs, decode4.defs]),
   )
 }
 
@@ -394,16 +463,23 @@ pub fn tuple5(
   fourth decode4: Decoder(d),
   fifth decode5: Decoder(e),
 ) -> Decoder(#(a, b, c, d, e)) {
-  let Decoder(decoder1, schema1) = decode1
-  let Decoder(decoder2, schema2) = decode2
-  let Decoder(decoder3, schema3) = decode3
-  let Decoder(decoder4, schema4) = decode4
-  let Decoder(decoder5, schema5) = decode5
   Decoder(
-    dynamic.tuple5(decoder1, decoder2, decoder3, decoder4, decoder5),
+    dynamic.tuple5(
+      decode1.dyn_decoder,
+      decode2.dyn_decoder,
+      decode3.dyn_decoder,
+      decode4.dyn_decoder,
+      decode5.dyn_decoder,
+    ),
     jsch.DetailedArray(
       None,
-      Some([schema1, schema2, schema3, schema4, schema5]),
+      Some([
+        decode1.schema,
+        decode2.schema,
+        decode3.schema,
+        decode4.schema,
+        decode5.schema,
+      ]),
       Some(5),
       Some(5),
       None,
@@ -411,6 +487,13 @@ pub fn tuple5(
       None,
       None,
     ),
+    list.concat([
+      decode1.defs,
+      decode2.defs,
+      decode3.defs,
+      decode4.defs,
+      decode5.defs,
+    ]),
   )
 }
 
@@ -422,17 +505,25 @@ pub fn tuple6(
   fifth decode5: Decoder(e),
   sixth decode6: Decoder(f),
 ) -> Decoder(#(a, b, c, d, e, f)) {
-  let Decoder(decoder1, schema1) = decode1
-  let Decoder(decoder2, schema2) = decode2
-  let Decoder(decoder3, schema3) = decode3
-  let Decoder(decoder4, schema4) = decode4
-  let Decoder(decoder5, schema5) = decode5
-  let Decoder(decoder6, schema6) = decode6
   Decoder(
-    dynamic.tuple6(decoder1, decoder2, decoder3, decoder4, decoder5, decoder6),
+    dynamic.tuple6(
+      decode1.dyn_decoder,
+      decode2.dyn_decoder,
+      decode3.dyn_decoder,
+      decode4.dyn_decoder,
+      decode5.dyn_decoder,
+      decode6.dyn_decoder,
+    ),
     jsch.DetailedArray(
       None,
-      Some([schema1, schema2, schema3, schema4, schema5, schema6]),
+      Some([
+        decode1.schema,
+        decode2.schema,
+        decode3.schema,
+        decode4.schema,
+        decode5.schema,
+        decode6.schema,
+      ]),
       Some(6),
       Some(6),
       None,
@@ -440,6 +531,14 @@ pub fn tuple6(
       None,
       None,
     ),
+    list.concat([
+      decode1.defs,
+      decode2.defs,
+      decode3.defs,
+      decode4.defs,
+      decode5.defs,
+      decode6.defs,
+    ]),
   )
 }
 
@@ -483,6 +582,7 @@ pub fn decode0(constructor: t) -> Decoder(t) {
       // }
     },
     jsch.Object([], Some(False), None),
+    [],
   )
 }
 
@@ -490,6 +590,7 @@ pub fn decode1(constructor: fn(t1) -> t, t1: FieldDecoder(t1)) -> Decoder(t) {
   Decoder(
     dynamic.decode1(constructor, t1.dyn_decoder),
     create_object_schema([t1.field_schema]),
+    t1.defs,
   )
 }
 
@@ -501,6 +602,7 @@ pub fn decode2(
   Decoder(
     dynamic.decode2(constructor, t1.dyn_decoder, t2.dyn_decoder),
     create_object_schema([t1.field_schema, t2.field_schema]),
+    list.concat([t1.defs, t2.defs]),
   )
 }
 
@@ -513,6 +615,7 @@ pub fn decode3(
   Decoder(
     dynamic.decode3(constructor, t1.dyn_decoder, t2.dyn_decoder, t3.dyn_decoder),
     create_object_schema([t1.field_schema, t2.field_schema, t3.field_schema]),
+    list.concat([t1.defs, t2.defs, t3.defs]),
   )
 }
 
@@ -537,6 +640,7 @@ pub fn decode4(
       t3.field_schema,
       t4.field_schema,
     ]),
+    list.concat([t1.defs, t2.defs, t3.defs, t4.defs]),
   )
 }
 
@@ -564,6 +668,7 @@ pub fn decode5(
       t4.field_schema,
       t5.field_schema,
     ]),
+    list.concat([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs]),
   )
 }
 
@@ -594,6 +699,7 @@ pub fn decode6(
       t5.field_schema,
       t6.field_schema,
     ]),
+    list.concat([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs, t6.defs]),
   )
 }
 
@@ -627,6 +733,7 @@ pub fn decode7(
       t6.field_schema,
       t7.field_schema,
     ]),
+    list.concat([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs, t6.defs, t7.defs]),
   )
 }
 
@@ -662,6 +769,16 @@ pub fn decode8(
       t6.field_schema,
       t7.field_schema,
       t8.field_schema,
+    ]),
+    list.concat([
+      t1.defs,
+      t2.defs,
+      t3.defs,
+      t4.defs,
+      t5.defs,
+      t6.defs,
+      t7.defs,
+      t8.defs,
     ]),
   )
 }
@@ -701,6 +818,17 @@ pub fn decode9(
       t7.field_schema,
       t8.field_schema,
       t9.field_schema,
+    ]),
+    list.concat([
+      t1.defs,
+      t2.defs,
+      t3.defs,
+      t4.defs,
+      t5.defs,
+      t6.defs,
+      t7.defs,
+      t8.defs,
+      t9.defs,
     ]),
   )
 }

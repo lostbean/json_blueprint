@@ -236,7 +236,7 @@ pub fn json_schema_string_format_test() {
       format: Some(json_schema.Email),
     )
 
-  let schema = json_schema.new_schema(email_schema)
+  let schema = json_schema.new_schema(email_schema, None)
   let json = json_schema.to_json(schema)
 
   json
@@ -262,7 +262,7 @@ pub fn json_schema_number_constraint_test() {
       multiple_of: Some(0.5),
     )
 
-  let schema = json_schema.new_schema(number_schema)
+  let schema = json_schema.new_schema(number_schema, None)
   let json = json_schema.to_json(schema)
 
   json
@@ -666,5 +666,86 @@ pub fn drawing_test() {
   |> json.to_string
   |> should.equal(
     "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"box\"]},\"data\":{\"required\":[\"width\",\"height\",\"position\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"width\":{\"type\":\"number\"},\"height\":{\"type\":\"number\"},\"position\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},\"color\":{\"required\":[\"enum\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"enum\":{\"type\":\"string\",\"enum\":[\"red\",\"green\",\"blue\"]}}}}}}}",
+  )
+}
+
+// Helper function to create a Person decoder
+fn person_decoder() -> blueprint.Decoder(Person) {
+  blueprint.decode3(
+    Person,
+    blueprint.field("name", blueprint.string()),
+    blueprint.field("age", blueprint.int()),
+    blueprint.field("email", blueprint.optional(blueprint.string())),
+  )
+}
+
+// Helper function to create an Address decoder
+fn address_decoder() -> blueprint.Decoder(Address) {
+  blueprint.decode3(
+    Address,
+    blueprint.field("street", blueprint.string()),
+    blueprint.field("city", blueprint.string()),
+    blueprint.field("zip", blueprint.string()),
+  )
+}
+
+// Test reuse_decoder with nested structures
+pub fn reuse_decoder_test() {
+  // Create a person decoder and reuse it
+  let person_decoder = person_decoder()
+  let reused_person_decoder = blueprint.reuse_decoder(person_decoder)
+
+  // Create an address decoder
+  let address_decoder = address_decoder()
+
+  // Create a PersonWithAddress decoder using the reused person decoder
+  let person_with_address_decoder =
+    blueprint.decode2(
+      PersonWithAddress,
+      blueprint.field("person", reused_person_decoder),
+      blueprint.field("address", address_decoder),
+    )
+
+  // Test JSON data
+  let json_str =
+    "{
+    \"person\": {
+      \"name\": \"John Doe\",
+      \"age\": 30,
+      \"email\": \"john@example.com\"
+    },
+    \"address\": {
+      \"street\": \"123 Main St\",
+      \"city\": \"Springfield\",
+      \"zip\": \"12345\"
+    }
+  }"
+
+  // Decode the JSON
+  let result = blueprint.decode(person_with_address_decoder, json_str)
+
+  // Assert the result
+  result
+  |> should.be_ok
+  |> fn(person_with_address) {
+    person_with_address.person.name
+    |> should.equal("John Doe")
+    person_with_address.person.age
+    |> should.equal(30)
+    person_with_address.person.email
+    |> should.equal(Some("john@example.com"))
+    person_with_address.address.street
+    |> should.equal("123 Main St")
+    person_with_address.address.city
+    |> should.equal("Springfield")
+    person_with_address.address.zip
+    |> should.equal("12345")
+  }
+
+  // Test schema generation
+  blueprint.generate_json_schema(person_with_address_decoder)
+  |> json.to_string
+  |> should.equal(
+    "{\"$defs\":{\"ref_3B07ED20E59E713A14D2B0C98C72D9ECB75C0D9C\":{\"required\":[\"name\",\"age\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"},\"email\":{\"type\":\"string\"}}}},\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"person\",\"address\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"person\":{\"$ref\":\"#/$defs/ref_3B07ED20E59E713A14D2B0C98C72D9ECB75C0D9C\"},\"address\":{\"required\":[\"street\",\"city\",\"zip\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"street\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"}}}}}",
   )
 }

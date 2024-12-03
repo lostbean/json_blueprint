@@ -1,3 +1,5 @@
+import gleam/bit_array
+import gleam/crypto
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -128,13 +130,16 @@ pub type StringFormat {
 }
 
 /// Helper function to create a new schema with default values
-pub fn new_schema(definition: SchemaDefinition) -> Schema {
+pub fn new_schema(
+  definition: SchemaDefinition,
+  references: Option(List(#(String, SchemaDefinition))),
+) -> Schema {
   Schema(
     schema: definition,
     vocabulary: None,
     id: None,
     comment: None,
-    defs: None,
+    defs: references,
   )
 }
 
@@ -203,6 +208,15 @@ pub fn to_json(schema: Schema) -> json.Json {
   let fields = list.append(fields, schema_fields)
 
   json.object(fields)
+}
+
+pub fn hash_schema_definition(def: SchemaDefinition) -> String {
+  def
+  |> schema_definition_to_json
+  |> json.to_string
+  |> bit_array.from_string
+  |> crypto.hash(crypto.Sha1, _)
+  |> bit_array.base16_encode
 }
 
 /// Convert a SchemaDefinition to JSON value
