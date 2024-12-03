@@ -13,9 +13,13 @@ gleam add json_blueprint
 
 json_blueprint provides utilities for encoding and decoding JSON data, with special support for union types. The generated JSON schemas can be used to validate incoming JSON data with the decoder. The JSON schema follows the [JSON Schema Draft 7](https://json-schema.org/) specification and can tested and validate on [JSON Schema Lint](https://jsonschemalint.com/#!/version/draft-07/markup/json).
 
-> ⚠️ _**DO NOT USE IT FOR RECURSIVE DATA TYPE**_
+> ❗️ _**IMPORTANT: Recursive data types**_
 >
-> If you need to encode/decode recursive data types, you should use only the `json` and `dynamic` libraries. This is because `json_blueprint` will generate an infinite JSON schema for recursive data types.
+> Make to use the `self_decoder` when defining the decoder for recursive data types.
+
+> ⚠️ _**WARNING: Do NOT use on cyclical data type definitions**_
+>
+> While the library supports recursive data types (types with self reference), it does not support cyclical data types (cyclical dependency between multiple data types). Cyclical data types will result in infinite loop during decoding or schema generation.
 
 ### Encoding Union Types
 

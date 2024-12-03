@@ -22,6 +22,9 @@ pub type FieldDecoder(t) {
   )
 }
 
+pub type LazyDecoder(t) =
+  fn() -> Decoder(t)
+
 pub fn generate_json_schema(decoder: Decoder(t)) -> json.Json {
   let refs = case decoder.defs {
     [] -> None
@@ -73,6 +76,41 @@ pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
     jsch.Ref("#/$defs/" <> ref_name),
     decoder.defs |> list.prepend(#(ref_name, decoder.schema)),
   )
+}
+
+/// Creates a decoder for recursive data types by allowing self-referential definitions.
+/// This is useful when you have types that contain themselves, like trees or linked lists.
+///
+/// The function takes a lazy decoder (a function that returns a decoder) to break the
+/// recursive dependency cycle. The returned decoder uses a JSON Schema reference "#"
+/// to point to the root schema definition.
+///
+/// ## Example
+/// ```gleam
+/// // A binary tree type that can contain itself
+/// pub type Tree {
+///   Node(value: Int, left: Option(Tree), right: Option(Tree))
+///   Leaf(value: Int)
+/// }
+///
+/// // Create a recursive decoder for the Tree type
+/// pub fn tree_decoder() -> Decoder(Tree) {
+///   // Use union_type_decoder for handling different variants
+///   union_type_decoder([
+///     #("leaf", decode1(Leaf, field("value", int()))),
+///     #("node", decode3(
+///       Node,
+///       field("value", int()),
+///       // Use self_decoder to handle recursive fields
+///       field("left", optional(self_decoder(tree_decoder))),
+///       field("right", optional(self_decoder(tree_decoder))),
+///     )),
+///   ])
+/// }
+/// ```
+///
+pub fn self_decoder(lazy: LazyDecoder(t)) -> Decoder(t) {
+  Decoder(fn(input) { lazy().dyn_decoder(input) }, jsch.Ref("#"), [])
 }
 
 pub fn get_dynamic_decoder(decoder: Decoder(t)) -> dynamic.Decoder(t) {

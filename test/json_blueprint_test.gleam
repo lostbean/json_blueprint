@@ -669,6 +669,84 @@ pub fn drawing_test() {
   )
 }
 
+type Tree {
+  Node(value: Int, left: Option(Tree), right: Option(Tree))
+}
+
+fn encode_tree(tree: Tree) -> json.Json {
+  blueprint.union_type_encoder(tree, fn(node) {
+    case node {
+      Node(value, left, right) -> #(
+        "node",
+        json.object([
+          #("value", json.int(value)),
+          #("left", json.nullable(left, encode_tree)),
+          #("right", json.nullable(right, encode_tree)),
+        ]),
+      )
+    }
+  })
+}
+
+// Without reuse_decoder, recursive types would cause infinite schema expansion
+fn tree_decoder() {
+  blueprint.union_type_decoder([
+    #(
+      "node",
+      blueprint.decode3(
+        Node,
+        blueprint.field("value", blueprint.int()),
+        blueprint.field(
+          "left",
+          blueprint.optional(blueprint.self_decoder(tree_decoder)),
+        ),
+        blueprint.field(
+          "right",
+          blueprint.optional(blueprint.self_decoder(tree_decoder)),
+        ),
+      ),
+    ),
+  ])
+}
+
+pub fn tree_decoder_test() {
+  // Create a sample tree structure:
+  //       5
+  //      / \
+  //     3   7
+  //    /     \
+  //   1       9
+  let tree =
+    Node(
+      value: 5,
+      left: Some(Node(value: 3, left: Some(Node(1, None, None)), right: None)),
+      right: Some(Node(value: 7, left: None, right: Some(Node(9, None, None)))),
+    )
+
+  // Test encoding
+  let json_str = tree |> encode_tree |> json.to_string()
+
+  // Test decoding
+  let decoded = blueprint.decode(using: tree_decoder(), from: json_str)
+  decoded
+  |> should.equal(Ok(tree))
+
+  // Test specific JSON structure
+  json_str
+  |> should.equal(
+    "{\"type\":\"node\",\"data\":{\"value\":5,\"left\":{\"type\":\"node\",\"data\":{\"value\":3,\"left\":{\"type\":\"node\",\"data\":{\"value\":1,\"left\":null,\"right\":null}},\"right\":null}},\"right\":{\"type\":\"node\",\"data\":{\"value\":7,\"left\":null,\"right\":{\"type\":\"node\",\"data\":{\"value\":9,\"left\":null,\"right\":null}}}}}}",
+  )
+
+  // Test schema generation
+  let schema = blueprint.generate_json_schema(tree_decoder())
+
+  schema
+  |> json.to_string
+  |> should.equal(
+    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"node\"]},\"data\":{\"required\":[\"value\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\"},\"left\":{\"$ref\":\"#\"},\"right\":{\"$ref\":\"#\"}}}}}",
+  )
+}
+
 // Helper function to create a Person decoder
 fn person_decoder() -> blueprint.Decoder(Person) {
   blueprint.decode3(
