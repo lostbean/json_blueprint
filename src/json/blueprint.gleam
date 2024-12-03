@@ -6,59 +6,64 @@ import gleam/result
 import gleam/string
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
-pub type Decoder(t) =
-  #(dynamic.Decoder(t), SchemaDefinition)
+pub type Decoder(t) {
+  Decoder(dyn_decoder: dynamic.Decoder(t), schema: SchemaDefinition)
+}
 
-pub type FieldDecoder(t) =
-  #(dynamic.Decoder(t), #(String, SchemaDefinition))
+pub type FieldDecoder(t) {
+  FieldDecoder(
+    dyn_decoder: dynamic.Decoder(t),
+    field_schema: #(String, SchemaDefinition),
+  )
+}
 
 pub fn generate_json_schema(decoder: Decoder(t)) -> json.Json {
-  let #(_, schema) = decoder
-  jsch.to_json(jsch.new_schema(schema))
+  jsch.to_json(jsch.new_schema(decoder.schema))
 }
 
 pub fn get_dynamic_decoder(decoder: Decoder(t)) -> dynamic.Decoder(t) {
-  let #(dyn_decoder, _) = decoder
-  dyn_decoder
+  decoder.dyn_decoder
 }
 
 pub fn decode(
   using decoder: Decoder(t),
   from json_string: String,
 ) -> Result(t, json.DecodeError) {
-  let #(dyn_decoder, _) = decoder
-  json.decode(from: json_string, using: dyn_decoder)
+  json.decode(from: json_string, using: decoder.dyn_decoder)
 }
 
 pub fn string() -> Decoder(String) {
-  #(dynamic.string, Type(jsch.StringType))
+  Decoder(dynamic.string, Type(jsch.StringType))
 }
 
 pub fn int() -> Decoder(Int) {
-  #(dynamic.int, Type(jsch.IntegerType))
+  Decoder(dynamic.int, Type(jsch.IntegerType))
 }
 
 pub fn float() -> Decoder(Float) {
-  #(dynamic.float, Type(jsch.NumberType))
+  Decoder(dynamic.float, Type(jsch.NumberType))
 }
 
 pub fn bool() -> Decoder(Bool) {
-  #(dynamic.bool, Type(jsch.BooleanType))
+  Decoder(dynamic.bool, Type(jsch.BooleanType))
 }
 
 pub fn list(of decoder_type: Decoder(inner)) -> Decoder(List(inner)) {
-  let #(decoder, schema) = decoder_type
-  #(dynamic.list(decoder), jsch.Array(Some(schema)))
+  Decoder(
+    dynamic.list(decoder_type.dyn_decoder),
+    jsch.Array(Some(decoder_type.schema)),
+  )
 }
 
 pub fn optional(of decode: Decoder(inner)) -> Decoder(Option(inner)) {
-  let #(decoder, schema) = decode
-  #(dynamic.optional(decoder), jsch.Nullable(schema))
+  Decoder(dynamic.optional(decode.dyn_decoder), jsch.Nullable(decode.schema))
 }
 
 pub fn field(named name: String, of inner_type: Decoder(t)) -> FieldDecoder(t) {
-  let #(decoder, schema) = inner_type
-  #(dynamic.field(name, decoder), #(name, schema))
+  FieldDecoder(dynamic.field(name, inner_type.dyn_decoder), #(
+    name,
+    inner_type.schema,
+  ))
 }
 
 @external(erlang, "json_blueprint_ffi", "null")
@@ -70,18 +75,17 @@ pub fn optional_field(
   named name: String,
   of inner_type: Decoder(t),
 ) -> FieldDecoder(Option(t)) {
-  let #(decoder, schema) = inner_type
-  #(
+  FieldDecoder(
     fn(value) {
       dynamic.optional_field(name, fn(dyn) {
         case dyn == native_null() {
-          False -> result.map(decoder(dyn), Some)
+          False -> result.map(inner_type.dyn_decoder(dyn), Some)
           True -> Ok(None)
         }
       })(value)
       |> result.map(option.flatten)
     },
-    #(name, jsch.Nullable(schema)),
+    #(name, jsch.Nullable(inner_type.schema)),
   )
 }
 
@@ -154,8 +158,7 @@ pub fn union_type_decoder(
     |> list.find_map(fn(dec) {
       case dec.0 == type_str {
         True -> {
-          let #(dyn_decoder, _) = dec.1
-          Ok(dyn_decoder(data))
+          Ok({ dec.1 }.dyn_decoder(data))
         }
         _ -> Error([])
       }
@@ -191,7 +194,7 @@ pub fn union_type_decoder(
       jsch.Object(
         [
           #("type", jsch.Enum([json.string(name)], Some(jsch.StringType))),
-          #("data", dec.1),
+          #("data", dec.schema),
         ],
         Some(False),
         Some(["type", "data"]),
@@ -203,7 +206,7 @@ pub fn union_type_decoder(
         jsch.Object(
           [
             #("type", jsch.Enum([json.string(name)], Some(jsch.StringType))),
-            #("data", dec.1),
+            #("data", dec.schema),
           ],
           Some(False),
           Some(["type", "data"]),
@@ -212,7 +215,7 @@ pub fn union_type_decoder(
       |> jsch.OneOf
   }
 
-  #(enum_decoder, schema)
+  Decoder(enum_decoder, schema)
 }
 
 /// Function to encode an enum type (unions where constructors have no arguments) into a JSON object.
@@ -299,7 +302,7 @@ pub fn enum_type_decoder(
     |> result.flatten
   }
 
-  #(
+  Decoder(
     enum_decoder,
     list.map(decoders, fn(field_dec) { json.string(field_dec.0) })
       |> fn(enum_values) {
@@ -310,21 +313,21 @@ pub fn enum_type_decoder(
 }
 
 pub fn map(decoder decoder: Decoder(a), over foo: fn(a) -> b) -> Decoder(b) {
-  let #(dyn_dec, schema) = decoder
-  #(fn(input) { result.map(dyn_dec(input), foo) }, schema)
+  Decoder(
+    fn(input) { result.map(decoder.dyn_decoder(input), foo) },
+    decoder.schema,
+  )
 }
 
 pub fn tuple2(
   first decode1: Decoder(a),
   second decode2: Decoder(b),
 ) -> Decoder(#(a, b)) {
-  let #(decoder1, schema1) = decode1
-  let #(decoder2, schema2) = decode2
-  #(
-    dynamic.tuple2(decoder1, decoder2),
+  Decoder(
+    dynamic.tuple2(decode1.dyn_decoder, decode2.dyn_decoder),
     jsch.DetailedArray(
       None,
-      Some([schema1, schema2]),
+      Some([decode1.schema, decode2.schema]),
       Some(2),
       Some(2),
       None,
@@ -340,14 +343,15 @@ pub fn tuple3(
   second decode2: Decoder(b),
   third decode3: Decoder(c),
 ) -> Decoder(#(a, b, c)) {
-  let #(decoder1, schema1) = decode1
-  let #(decoder2, schema2) = decode2
-  let #(decoder3, schema3) = decode3
-  #(
-    dynamic.tuple3(decoder1, decoder2, decoder3),
+  Decoder(
+    dynamic.tuple3(
+      decode1.dyn_decoder,
+      decode2.dyn_decoder,
+      decode3.dyn_decoder,
+    ),
     jsch.DetailedArray(
       None,
-      Some([schema1, schema2, schema3]),
+      Some([decode1.schema, decode2.schema, decode3.schema]),
       Some(3),
       Some(3),
       None,
@@ -364,11 +368,11 @@ pub fn tuple4(
   third decode3: Decoder(c),
   fourth decode4: Decoder(d),
 ) -> Decoder(#(a, b, c, d)) {
-  let #(decoder1, schema1) = decode1
-  let #(decoder2, schema2) = decode2
-  let #(decoder3, schema3) = decode3
-  let #(decoder4, schema4) = decode4
-  #(
+  let Decoder(decoder1, schema1) = decode1
+  let Decoder(decoder2, schema2) = decode2
+  let Decoder(decoder3, schema3) = decode3
+  let Decoder(decoder4, schema4) = decode4
+  Decoder(
     dynamic.tuple4(decoder1, decoder2, decoder3, decoder4),
     jsch.DetailedArray(
       None,
@@ -390,12 +394,12 @@ pub fn tuple5(
   fourth decode4: Decoder(d),
   fifth decode5: Decoder(e),
 ) -> Decoder(#(a, b, c, d, e)) {
-  let #(decoder1, schema1) = decode1
-  let #(decoder2, schema2) = decode2
-  let #(decoder3, schema3) = decode3
-  let #(decoder4, schema4) = decode4
-  let #(decoder5, schema5) = decode5
-  #(
+  let Decoder(decoder1, schema1) = decode1
+  let Decoder(decoder2, schema2) = decode2
+  let Decoder(decoder3, schema3) = decode3
+  let Decoder(decoder4, schema4) = decode4
+  let Decoder(decoder5, schema5) = decode5
+  Decoder(
     dynamic.tuple5(decoder1, decoder2, decoder3, decoder4, decoder5),
     jsch.DetailedArray(
       None,
@@ -418,13 +422,13 @@ pub fn tuple6(
   fifth decode5: Decoder(e),
   sixth decode6: Decoder(f),
 ) -> Decoder(#(a, b, c, d, e, f)) {
-  let #(decoder1, schema1) = decode1
-  let #(decoder2, schema2) = decode2
-  let #(decoder3, schema3) = decode3
-  let #(decoder4, schema4) = decode4
-  let #(decoder5, schema5) = decode5
-  let #(decoder6, schema6) = decode6
-  #(
+  let Decoder(decoder1, schema1) = decode1
+  let Decoder(decoder2, schema2) = decode2
+  let Decoder(decoder3, schema3) = decode3
+  let Decoder(decoder4, schema4) = decode4
+  let Decoder(decoder5, schema5) = decode5
+  let Decoder(decoder6, schema6) = decode6
+  Decoder(
     dynamic.tuple6(decoder1, decoder2, decoder3, decoder4, decoder5, decoder6),
     jsch.DetailedArray(
       None,
@@ -461,7 +465,7 @@ pub fn decode0(constructor: t) -> Decoder(t) {
   // > DecodeError(expected: "{}", found: "//js({})", ...)
   //
   // let check = dynamic.from(dict.from_list([]))
-  #(
+  Decoder(
     fn(_value) {
       Ok(constructor)
       // case value {
@@ -483,8 +487,10 @@ pub fn decode0(constructor: t) -> Decoder(t) {
 }
 
 pub fn decode1(constructor: fn(t1) -> t, t1: FieldDecoder(t1)) -> Decoder(t) {
-  let #(decoder, schema) = t1
-  #(dynamic.decode1(constructor, decoder), create_object_schema([schema]))
+  Decoder(
+    dynamic.decode1(constructor, t1.dyn_decoder),
+    create_object_schema([t1.field_schema]),
+  )
 }
 
 pub fn decode2(
@@ -492,11 +498,9 @@ pub fn decode2(
   t1: FieldDecoder(t1),
   t2: FieldDecoder(t2),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  #(
-    dynamic.decode2(constructor, decoder1, decoder2),
-    create_object_schema([schema1, schema2]),
+  Decoder(
+    dynamic.decode2(constructor, t1.dyn_decoder, t2.dyn_decoder),
+    create_object_schema([t1.field_schema, t2.field_schema]),
   )
 }
 
@@ -506,12 +510,9 @@ pub fn decode3(
   t2: FieldDecoder(t2),
   t3: FieldDecoder(t3),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  #(
-    dynamic.decode3(constructor, decoder1, decoder2, decoder3),
-    create_object_schema([schema1, schema2, schema3]),
+  Decoder(
+    dynamic.decode3(constructor, t1.dyn_decoder, t2.dyn_decoder, t3.dyn_decoder),
+    create_object_schema([t1.field_schema, t2.field_schema, t3.field_schema]),
   )
 }
 
@@ -522,13 +523,20 @@ pub fn decode4(
   t3: FieldDecoder(t3),
   t4: FieldDecoder(t4),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  let #(decoder4, schema4) = t4
-  #(
-    dynamic.decode4(constructor, decoder1, decoder2, decoder3, decoder4),
-    create_object_schema([schema1, schema2, schema3, schema4]),
+  Decoder(
+    dynamic.decode4(
+      constructor,
+      t1.dyn_decoder,
+      t2.dyn_decoder,
+      t3.dyn_decoder,
+      t4.dyn_decoder,
+    ),
+    create_object_schema([
+      t1.field_schema,
+      t2.field_schema,
+      t3.field_schema,
+      t4.field_schema,
+    ]),
   )
 }
 
@@ -540,21 +548,22 @@ pub fn decode5(
   t4: FieldDecoder(t4),
   t5: FieldDecoder(t5),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  let #(decoder4, schema4) = t4
-  let #(decoder5, schema5) = t5
-  #(
+  Decoder(
     dynamic.decode5(
       constructor,
-      decoder1,
-      decoder2,
-      decoder3,
-      decoder4,
-      decoder5,
+      t1.dyn_decoder,
+      t2.dyn_decoder,
+      t3.dyn_decoder,
+      t4.dyn_decoder,
+      t5.dyn_decoder,
     ),
-    create_object_schema([schema1, schema2, schema3, schema4, schema5]),
+    create_object_schema([
+      t1.field_schema,
+      t2.field_schema,
+      t3.field_schema,
+      t4.field_schema,
+      t5.field_schema,
+    ]),
   )
 }
 
@@ -567,23 +576,24 @@ pub fn decode6(
   t5: FieldDecoder(t5),
   t6: FieldDecoder(t6),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  let #(decoder4, schema4) = t4
-  let #(decoder5, schema5) = t5
-  let #(decoder6, schema6) = t6
-  #(
+  Decoder(
     dynamic.decode6(
       constructor,
-      decoder1,
-      decoder2,
-      decoder3,
-      decoder4,
-      decoder5,
-      decoder6,
+      t1.dyn_decoder,
+      t2.dyn_decoder,
+      t3.dyn_decoder,
+      t4.dyn_decoder,
+      t5.dyn_decoder,
+      t6.dyn_decoder,
     ),
-    create_object_schema([schema1, schema2, schema3, schema4, schema5, schema6]),
+    create_object_schema([
+      t1.field_schema,
+      t2.field_schema,
+      t3.field_schema,
+      t4.field_schema,
+      t5.field_schema,
+      t6.field_schema,
+    ]),
   )
 }
 
@@ -597,32 +607,25 @@ pub fn decode7(
   t6: FieldDecoder(t6),
   t7: FieldDecoder(t7),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  let #(decoder4, schema4) = t4
-  let #(decoder5, schema5) = t5
-  let #(decoder6, schema6) = t6
-  let #(decoder7, schema7) = t7
-  #(
+  Decoder(
     dynamic.decode7(
       constructor,
-      decoder1,
-      decoder2,
-      decoder3,
-      decoder4,
-      decoder5,
-      decoder6,
-      decoder7,
+      t1.dyn_decoder,
+      t2.dyn_decoder,
+      t3.dyn_decoder,
+      t4.dyn_decoder,
+      t5.dyn_decoder,
+      t6.dyn_decoder,
+      t7.dyn_decoder,
     ),
     create_object_schema([
-      schema1,
-      schema2,
-      schema3,
-      schema4,
-      schema5,
-      schema6,
-      schema7,
+      t1.field_schema,
+      t2.field_schema,
+      t3.field_schema,
+      t4.field_schema,
+      t5.field_schema,
+      t6.field_schema,
+      t7.field_schema,
     ]),
   )
 }
@@ -638,35 +641,27 @@ pub fn decode8(
   t7: FieldDecoder(t7),
   t8: FieldDecoder(t8),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  let #(decoder4, schema4) = t4
-  let #(decoder5, schema5) = t5
-  let #(decoder6, schema6) = t6
-  let #(decoder7, schema7) = t7
-  let #(decoder8, schema8) = t8
-  #(
+  Decoder(
     dynamic.decode8(
       constructor,
-      decoder1,
-      decoder2,
-      decoder3,
-      decoder4,
-      decoder5,
-      decoder6,
-      decoder7,
-      decoder8,
+      t1.dyn_decoder,
+      t2.dyn_decoder,
+      t3.dyn_decoder,
+      t4.dyn_decoder,
+      t5.dyn_decoder,
+      t6.dyn_decoder,
+      t7.dyn_decoder,
+      t8.dyn_decoder,
     ),
     create_object_schema([
-      schema1,
-      schema2,
-      schema3,
-      schema4,
-      schema5,
-      schema6,
-      schema7,
-      schema8,
+      t1.field_schema,
+      t2.field_schema,
+      t3.field_schema,
+      t4.field_schema,
+      t5.field_schema,
+      t6.field_schema,
+      t7.field_schema,
+      t8.field_schema,
     ]),
   )
 }
@@ -683,38 +678,29 @@ pub fn decode9(
   t8: FieldDecoder(t8),
   t9: FieldDecoder(t9),
 ) -> Decoder(t) {
-  let #(decoder1, schema1) = t1
-  let #(decoder2, schema2) = t2
-  let #(decoder3, schema3) = t3
-  let #(decoder4, schema4) = t4
-  let #(decoder5, schema5) = t5
-  let #(decoder6, schema6) = t6
-  let #(decoder7, schema7) = t7
-  let #(decoder8, schema8) = t8
-  let #(decoder9, schema9) = t9
-  #(
+  Decoder(
     dynamic.decode9(
       constructor,
-      decoder1,
-      decoder2,
-      decoder3,
-      decoder4,
-      decoder5,
-      decoder6,
-      decoder7,
-      decoder8,
-      decoder9,
+      t1.dyn_decoder,
+      t2.dyn_decoder,
+      t3.dyn_decoder,
+      t4.dyn_decoder,
+      t5.dyn_decoder,
+      t6.dyn_decoder,
+      t7.dyn_decoder,
+      t8.dyn_decoder,
+      t9.dyn_decoder,
     ),
     create_object_schema([
-      schema1,
-      schema2,
-      schema3,
-      schema4,
-      schema5,
-      schema6,
-      schema7,
-      schema8,
-      schema9,
+      t1.field_schema,
+      t2.field_schema,
+      t3.field_schema,
+      t4.field_schema,
+      t5.field_schema,
+      t6.field_schema,
+      t7.field_schema,
+      t8.field_schema,
+      t9.field_schema,
     ]),
   )
 }
