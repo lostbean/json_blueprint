@@ -21,15 +21,23 @@ json_blueprint provides utilities for encoding and decoding JSON data, with spec
 >
 > While the library supports recursive data types (types with self reference), it does not support cyclical data types (cyclical dependency between multiple data types). Cyclical data types will result in infinite loop during decoding or schema generation.
 
-### Encoding Union Types
+## Examples
 
+<details>
+  <summary>Encoding Union Types</summary>
+  
 Here's an example of encoding a union type to JSON:
 
 ```gleam
-import json/blueprint
-import gleam/json
 import gleam/io
+import gleam/json
+import gleeunit
 import gleeunit/should
+import json/blueprint
+
+pub fn main() {
+  gleeunit.main()
+}
 
 type Shape {
   Circle(Float)
@@ -74,47 +82,47 @@ fn shape_decoder() -> blueprint.Decoder(Shape) {
   ])
 }
 
-fn simple_test() {
+pub fn union_type_test() {
+  let circle = Circle(5.0)
+  let rectangle = Rectangle(10.0, 20.0)
+
   let decoder = shape_decoder()
 
-  // Test encoding a Circle
-  let circle = Circle(5.0)
+  //test decoding
   encode_shape(circle)
   |> json.to_string
   |> blueprint.decode(using: decoder)
   |> should.equal(Ok(circle))
 
-  // Test encoding a Rectangle
-  let rectangle = Rectangle(10.0, 20.0)
   encode_shape(rectangle)
   |> json.to_string
   |> blueprint.decode(using: decoder)
   |> should.equal(Ok(rectangle))
 
-  // Test encoding a Void
   encode_shape(Void)
   |> json.to_string
   |> blueprint.decode(using: decoder)
   |> should.equal(Ok(Void))
 
-  // Print JSON schema
-  decoder
-  |> blueprint.generate_json_schema()
+  blueprint.generate_json_schema(shape_decoder())
   |> json.to_string
   |> io.println
 }
 ```
 
+#### Generated JSON Schema
+
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "oneOf": [
+  "anyOf": [
     {
       "required": ["type", "data"],
       "additionalProperties": false,
       "type": "object",
       "properties": {
         "type": {
+          "type": "string",
           "enum": ["circle"]
         },
         "data": {
@@ -135,6 +143,7 @@ fn simple_test() {
       "type": "object",
       "properties": {
         "type": {
+          "type": "string",
           "enum": ["rectangle"]
         },
         "data": {
@@ -158,6 +167,7 @@ fn simple_test() {
       "type": "object",
       "properties": {
         "type": {
+          "type": "string",
           "enum": ["void"]
         },
         "data": {
@@ -173,9 +183,25 @@ fn simple_test() {
 
 This will encode your union types into a standardized JSON format with `type` and `data` fields, making it easy to decode on the receiving end.
 
+</details>
+
+<details>
+  <summary>Type aliases and optional fields</summary>
+  
 And here's an example using type aliases, optional fields, and single constructor types:
 
 ```gleam
+import gleam/io
+import gleam/json
+import gleam/option.{type Option, None, Some}
+import gleeunit
+import gleeunit/should
+import json/blueprint
+
+pub fn main() {
+  gleeunit.main()
+}
+
 type Color {
   Red
   Green
@@ -186,7 +212,7 @@ type Coordinate =
   #(Float, Float)
 
 type Drawing {
-  Box(Float, Float, Option(Coordinate), Option(Color))
+  Box(Float, Float, Coordinate, Option(Color))
 }
 
 fn color_decoder() {
@@ -239,9 +265,7 @@ fn drawing_decoder() -> blueprint.Decoder(Drawing) {
         Box,
         blueprint.field("width", blueprint.float()),
         blueprint.field("height", blueprint.float()),
-        // Make this field required by with a possible null value
-        blueprint.field("position", optional(coordinate_decoder())),
-        // Make this field optional
+        blueprint.field("position", coordinate_decoder()),
         blueprint.optional_field("color", color_decoder()),
       ),
     ),
@@ -250,7 +274,7 @@ fn drawing_decoder() -> blueprint.Decoder(Drawing) {
 
 pub fn drawing_test() {
   // Test cases
-  let box = Box(15.0, 25.0, Some(#(30.0, 40.0)), None)
+  let box = Box(15.0, 25.0, #(30.0, 40.0), None)
 
   // Test encoding
   let encoded_box = encode_drawing(box)
@@ -260,8 +284,303 @@ pub fn drawing_test() {
   |> json.to_string
   |> blueprint.decode(using: drawing_decoder())
   |> should.equal(Ok(box))
+
+  blueprint.generate_json_schema(drawing_decoder())
+  |> json.to_string
+  |> io.println
+}
+
+```
+
+#### Generated JSON Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "required": ["type", "data"],
+  "additionalProperties": false,
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["box"]
+    },
+    "data": {
+      "required": ["width", "height", "position"],
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "position": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        },
+        "color": {
+          "required": ["enum"],
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "enum": {
+              "type": "string",
+              "enum": ["red", "green", "blue"]
+            }
+          }
+        }
+      }
+    }
+  }
 }
 ```
+
+</details>
+
+<details>
+  <summary>Recursive data types</summary>
+  
+And here's an example using type aliases, optional fields, and single constructor types:
+
+```gleam
+import gleam/io
+import gleam/json
+import gleam/option.{type Option, None, Some}
+import gleeunit
+import gleeunit/should
+import json/blueprint
+
+pub fn main() {
+  gleeunit.main()
+}
+
+type Tree {
+  Node(value: Int, left: Option(Tree), right: Option(Tree))
+}
+
+type ListOfTrees(t) {
+  ListOfTrees(head: t, tail: ListOfTrees(t))
+  NoTrees
+}
+
+fn encode_tree(tree: Tree) -> json.Json {
+  blueprint.union_type_encoder(tree, fn(node) {
+    case node {
+      Node(value, left, right) -> #(
+        "node",
+        [
+          #("value", json.int(value)),
+          #("right", json.nullable(right, encode_tree)),
+        ]
+          |> blueprint.encode_optional_field("left", left, encode_tree)
+          |> json.object(),
+      )
+    }
+  })
+}
+
+fn encode_list_of_trees(tree: ListOfTrees(Tree)) -> json.Json {
+  blueprint.union_type_encoder(tree, fn(list) {
+    case list {
+      ListOfTrees(head, tail) -> #(
+        "list",
+        json.object([
+          #("head", encode_tree(head)),
+          #("tail", encode_list_of_trees(tail)),
+        ]),
+      )
+      NoTrees -> #("no_trees", json.object([]))
+    }
+  })
+}
+
+// Without reuse_decoder, recursive types would cause infinite schema expansion
+fn tree_decoder() {
+  blueprint.union_type_decoder([
+    #(
+      "node",
+      blueprint.decode3(
+        Node,
+        blueprint.field("value", blueprint.int()),
+        // testing both an optional field a field with a possible null
+        blueprint.optional_field("left", blueprint.self_decoder(tree_decoder)),
+        blueprint.field(
+          "right",
+          blueprint.optional(blueprint.self_decoder(tree_decoder)),
+        ),
+      ),
+    ),
+  ])
+  // !!!IMPORTANT!!! Add the reuse_decoder when there are nested recursive types so
+  // the schema references (`#`) get rewritten correctly and self-references from the
+  // different types don't get mixed up. As a recommendation, always add it when
+  // decoding recursive types.
+  |> blueprint.reuse_decoder
+}
+
+fn decode_list_of_trees() {
+  blueprint.union_type_decoder([
+    #(
+      "list",
+      blueprint.decode2(
+        ListOfTrees,
+        blueprint.field("head", tree_decoder()),
+        blueprint.field("tail", blueprint.self_decoder(decode_list_of_trees)),
+      ),
+    ),
+    #("no_trees", blueprint.decode0(NoTrees)),
+  ])
+}
+
+pub fn tree_decoder_test() {
+  // Create a sample tree structure:
+  //       5
+  //      / \
+  //     3   7
+  //    /     \
+  //   1       9
+  let tree =
+    Node(
+      value: 5,
+      left: Some(Node(value: 3, left: Some(Node(1, None, None)), right: None)),
+      right: Some(Node(value: 7, left: None, right: Some(Node(9, None, None)))),
+    )
+
+  // Create a list of trees
+  let tree_list =
+    ListOfTrees(
+      Node(value: 1, left: None, right: None),
+      ListOfTrees(
+        Node(
+          value: 10,
+          left: Some(Node(value: 1, left: None, right: None)),
+          right: None,
+        ),
+        NoTrees,
+      ),
+    )
+
+  // Test encoding
+  let json_str = tree |> encode_tree |> json.to_string()
+  let list_json_str = tree_list |> encode_list_of_trees |> json.to_string()
+
+  // Test decoding
+  let decoded = blueprint.decode(using: tree_decoder(), from: json_str)
+
+  decoded
+  |> should.equal(Ok(tree))
+
+  let decoded_list =
+    blueprint.decode(using: decode_list_of_trees(), from: list_json_str)
+
+  decoded_list
+  |> should.equal(Ok(tree_list))
+
+  // Test schema generation
+  blueprint.generate_json_schema(decode_list_of_trees())
+  |> json.to_string
+  |> io.println
+}
+```
+
+#### Generated JSON Schema
+
+```json
+{
+  "$defs": {
+    "ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2": {
+      "required": ["type", "data"],
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["node"]
+        },
+        "data": {
+          "required": ["value", "right"],
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "integer"
+            },
+            "left": {
+              "$ref": "#/$defs/ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2"
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "anyOf": [
+    {
+      "required": ["type", "data"],
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["list"]
+        },
+        "data": {
+          "required": ["head", "tail"],
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "head": {
+              "$ref": "#/$defs/ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2"
+            },
+            "tail": {
+              "$ref": "#"
+            }
+          }
+        }
+      }
+    },
+    {
+      "required": ["type", "data"],
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["no_trees"]
+        },
+        "data": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
+  ]
+}
+```
+
+</details>
 
 ## Features
 

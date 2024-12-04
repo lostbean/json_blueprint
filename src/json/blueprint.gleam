@@ -94,6 +94,12 @@ pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
 /// recursive dependency cycle. The returned decoder uses a JSON Schema reference "#"
 /// to point to the root schema definition.
 ///
+/// > ❗ _**IMPORTANT**_ 
+/// > Add the reuse_decoder when there are nested recursive types so
+/// > the schema references (`#`) get rewritten correctly and self-references from the
+/// > different types don't get mixed up. As a recommendation, always add it when
+/// > decoding recursive types.
+///
 /// ## Example
 /// ```gleam
 /// // A binary tree type that can contain itself
@@ -115,6 +121,7 @@ pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
 ///       field("right", optional(self_decoder(tree_decoder))),
 ///     )),
 ///   ])
+///   |> reuse_decoder
 /// }
 /// ```
 ///
