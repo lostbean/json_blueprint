@@ -70,11 +70,20 @@ pub fn generate_json_schema(decoder: Decoder(t)) -> json.Json {
 ///
 pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
   // can we do this in a collision free and deterministic way?
-  let ref_name = "ref_" <> jsch.hash_schema_definition(decoder.schema)
+  let def_name = "ref_" <> jsch.hash_schema_definition(decoder.schema)
+  let ref_name = "#/$defs/" <> def_name
+
+  let schema_with_rebased_self_refs =
+    jsch.map_ref(decoder.schema, fn(original_ref_name) {
+      case original_ref_name {
+        "#" -> ref_name
+        x -> x
+      }
+    })
   Decoder(
     decoder.dyn_decoder,
-    jsch.Ref("#/$defs/" <> ref_name),
-    decoder.defs |> list.prepend(#(ref_name, decoder.schema)),
+    jsch.Ref(ref_name),
+    decoder.defs |> list.prepend(#(def_name, schema_with_rebased_self_refs)),
   )
 }
 

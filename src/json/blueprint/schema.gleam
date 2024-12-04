@@ -222,6 +222,73 @@ pub fn hash_schema_definition(def: SchemaDefinition) -> String {
   |> bit_array.base16_encode
 }
 
+pub fn map_ref(
+  def: SchemaDefinition,
+  f: fn(String) -> String,
+) -> SchemaDefinition {
+  case def {
+    Ref(ref) -> Ref(f(ref))
+    Array(items) -> Array(option.map(items, fn(i) { map_ref(i, f) }))
+    DetailedArray(
+      items,
+      prefix_items,
+      min_items,
+      max_items,
+      unique_items,
+      contains,
+      min_contains,
+      max_contains,
+    ) ->
+      DetailedArray(
+        option.map(items, fn(i) { map_ref(i, f) }),
+        option.map(prefix_items, fn(items) {
+          list.map(items, fn(i) { map_ref(i, f) })
+        }),
+        min_items,
+        max_items,
+        unique_items,
+        option.map(contains, fn(c) { map_ref(c, f) }),
+        min_contains,
+        max_contains,
+      )
+    Object(properties, additional_properties, required) ->
+      Object(
+        list.map(properties, fn(prop) { #(prop.0, map_ref(prop.1, f)) }),
+        additional_properties,
+        required,
+      )
+    DetailedObject(
+      properties,
+      pattern_properties,
+      additional_properties,
+      required,
+      property_names,
+      min_properties,
+      max_properties,
+    ) ->
+      DetailedObject(
+        option.map(properties, fn(props) {
+          list.map(props, fn(prop) { #(prop.0, map_ref(prop.1, f)) })
+        }),
+        option.map(pattern_properties, fn(patterns) {
+          list.map(patterns, fn(pattern) { #(pattern.0, map_ref(pattern.1, f)) })
+        }),
+        option.map(additional_properties, fn(props) { map_ref(props, f) }),
+        required,
+        option.map(property_names, fn(names) { map_ref(names, f) }),
+        min_properties,
+        max_properties,
+      )
+    AllOf(schemas) -> AllOf(list.map(schemas, fn(s) { map_ref(s, f) }))
+    AnyOf(schemas) -> AnyOf(list.map(schemas, fn(s) { map_ref(s, f) }))
+    OneOf(schemas) -> OneOf(list.map(schemas, fn(s) { map_ref(s, f) }))
+    Not(schema) -> Not(map_ref(schema, f))
+    Nullable(schema) -> Nullable(map_ref(schema, f))
+    Optional(schema) -> Optional(map_ref(schema, f))
+    _ -> def
+  }
+}
+
 /// Convert a SchemaDefinition to JSON value
 fn schema_definition_to_json(def: SchemaDefinition) -> json.Json {
   json.object(schema_definition_to_json_fields(def, False))
