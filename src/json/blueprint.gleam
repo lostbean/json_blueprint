@@ -420,7 +420,7 @@ pub fn union_type_decoder(
           Some(["type", "data"]),
         )
       })
-      |> jsch.OneOf
+      |> jsch.AnyOf
   }
 
   let defs = list.flat_map(decoders, fn(dec) { { dec.1 }.defs })
