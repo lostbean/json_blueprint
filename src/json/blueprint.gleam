@@ -242,6 +242,61 @@ pub fn optional_field(
   )
 }
 
+/// Adds an optional field to a list of key-value pairs that will be used to create a JSON object.
+/// This is particularly useful when defining JSON encoder to pair up to the `optional_field` decoder.
+///
+/// ## Example
+/// ```gleam
+/// fn tree_decoder() {
+///   blueprint.union_type_decoder([
+///     #(
+///       "node",
+///       blueprint.decode3(
+///         Node,
+///         blueprint.field("value", blueprint.int()),
+///         // This is an optional field for an optional value
+///         blueprint.optional_field("left", blueprint.self_decoder(tree_decoder)),
+///         // And this is a required field with an optional value
+///         blueprint.field(
+///           "right",
+///           blueprint.optional(blueprint.self_decoder(tree_decoder)),
+///         ),
+///       ),
+///     ),
+///   ])
+///   |> blueprint.reuse_decoder
+/// }
+///
+/// fn encode_tree(tree: Tree) -> json.Json {
+///   blueprint.union_type_encoder(tree, fn(node) {
+///     case node {
+///       Node(value, left, right) -> #(
+///         "node",
+///         [
+///           #("value", json.int(value)),
+///           // This is a required field with an optional value
+///           #("right", json.nullable(right, encode_tree)),
+///         ]
+///           // And this is an optional field for an optional value
+///           |> blueprint.encode_optional_field("left", left, encode_tree)
+///           |> json.object(),
+///       )
+///     }
+///   })
+/// }
+/// ```
+pub fn encode_optional_field(
+  fields fields: List(#(String, json.Json)),
+  name name: String,
+  maybe value: Option(t),
+  encoder encode_fn: fn(t) -> json.Json,
+) -> List(#(String, json.Json)) {
+  case value {
+    Some(left) -> list.prepend(fields, #(name, encode_fn(left)))
+    None -> fields
+  }
+}
+
 /// Function to encode a union type into a JSON object.
 /// The function takes a value and an encoder function that returns a tuple of the type name and the JSON value.
 ///

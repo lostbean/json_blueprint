@@ -1,6 +1,5 @@
 import gleam/io
 import gleam/json
-import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleeunit
 import gleeunit/should
@@ -691,12 +690,7 @@ fn encode_tree(tree: Tree) -> json.Json {
           #("value", json.int(value)),
           #("right", json.nullable(right, encode_tree)),
         ]
-          |> fn(fields) {
-            case left {
-              Some(left) -> list.prepend(fields, #("left", encode_tree(left)))
-              None -> fields
-            }
-          }
+          |> blueprint.encode_optional_field("left", left, encode_tree)
           |> json.object(),
       )
     }
