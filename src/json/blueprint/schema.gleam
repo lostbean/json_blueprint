@@ -29,6 +29,9 @@ pub type SchemaDefinition {
   // Not required
   Nullable(schema: SchemaDefinition)
 
+  // Not required
+  Optional(schema: SchemaDefinition)
+
   // Numeric constraints
   Number(
     minimum: Option(Float),
@@ -204,7 +207,7 @@ pub fn to_json(schema: Schema) -> json.Json {
     })
 
   // Add the main schema definition
-  let schema_fields = schema_definition_to_json_fields(schema.schema)
+  let schema_fields = schema_definition_to_json_fields(schema.schema, False)
   let fields = list.append(fields, schema_fields)
 
   json.object(fields)
@@ -221,7 +224,7 @@ pub fn hash_schema_definition(def: SchemaDefinition) -> String {
 
 /// Convert a SchemaDefinition to JSON value
 fn schema_definition_to_json(def: SchemaDefinition) -> json.Json {
-  json.object(schema_definition_to_json_fields(def))
+  json.object(schema_definition_to_json_fields(def, False))
 }
 
 fn prepend_option(
@@ -241,20 +244,31 @@ fn prepend_option(
 /// Convert a SchemaDefinition to a list of JSON fields
 fn schema_definition_to_json_fields(
   def: SchemaDefinition,
+  make_type_nullable: Bool,
 ) -> List(#(String, json.Json)) {
+  let with_nullable_type = fn(type_) {
+    case make_type_nullable {
+      False -> schema_type_to_json(type_)
+      True -> schema_type_to_json(Multiple([type_, Null]))
+    }
+  }
+
   case def {
-    Type(type_) -> [#("type", schema_type_to_json(type_))]
+    Type(type_) -> [#("type", with_nullable_type(type_))]
 
     Enum(values, schema) ->
       [#("enum", json.preprocessed_array(values))]
-      |> prepend_option(schema, "type", schema_type_to_json)
+      |> prepend_option(schema, "type", with_nullable_type)
 
     Const(value) -> [#("const", value)]
 
-    Nullable(schema) -> schema_definition_to_json_fields(schema)
+    Nullable(schema) -> schema_definition_to_json_fields(schema, True)
+
+    Optional(schema) ->
+      schema_definition_to_json_fields(schema, make_type_nullable)
 
     Number(minimum, maximum, exclusive_minimum, exclusive_maximum, multiple_of) -> {
-      []
+      [#("type", with_nullable_type(NumberType))]
       |> prepend_option(minimum, "minimum", json.float)
       |> prepend_option(maximum, "maximum", json.float)
       |> prepend_option(exclusive_minimum, "exclusiveMinimum", json.float)
@@ -263,7 +277,7 @@ fn schema_definition_to_json_fields(
     }
 
     String(min_length, max_length, pattern, format) -> {
-      []
+      [#("type", with_nullable_type(StringType))]
       |> prepend_option(min_length, "minLength", json.int)
       |> prepend_option(max_length, "maxLength", json.int)
       |> prepend_option(pattern, "pattern", json.string)
@@ -273,7 +287,7 @@ fn schema_definition_to_json_fields(
     }
 
     Array(items) -> {
-      [#("type", schema_type_to_json(ArrayType))]
+      [#("type", with_nullable_type(ArrayType))]
       |> prepend_option(items, "items", fn(schema) {
         schema_definition_to_json(schema)
       })
@@ -281,7 +295,7 @@ fn schema_definition_to_json_fields(
 
     Object(properties, additional_properties, required) -> {
       [
-        #("type", schema_type_to_json(ObjectType)),
+        #("type", with_nullable_type(ObjectType)),
         #(
           "properties",
           json.object(
@@ -309,7 +323,7 @@ fn schema_definition_to_json_fields(
       min_contains,
       max_contains,
     ) -> {
-      [#("type", schema_type_to_json(ArrayType))]
+      [#("type", with_nullable_type(ArrayType))]
       |> prepend_option(items, "items", fn(schema) {
         schema_definition_to_json(schema)
       })
@@ -335,7 +349,7 @@ fn schema_definition_to_json_fields(
       min_properties,
       max_properties,
     ) -> {
-      [#("type", schema_type_to_json(ObjectType))]
+      [#("type", with_nullable_type(ObjectType))]
       |> prepend_option(properties, "properties", fn(props) {
         json.object(
           list.map(props, fn(prop) {
@@ -376,7 +390,12 @@ fn schema_definition_to_json_fields(
     ]
     Not(schema) -> [#("not", schema_definition_to_json(schema))]
 
-    Ref(ref) -> [#("$ref", json.string(ref))]
+    Ref(ref) ->
+      case make_type_nullable {
+        False -> [#("$ref", json.string(ref))]
+        True ->
+          schema_definition_to_json_fields(AnyOf([Ref(ref), Type(Null)]), False)
+      }
 
     TrueValue -> [#("type", json.bool(True))]
     FalseValue -> [#("type", json.bool(False))]

@@ -148,14 +148,6 @@ pub fn list(of decoder_type: Decoder(inner)) -> Decoder(List(inner)) {
   )
 }
 
-pub fn optional(of decode: Decoder(inner)) -> Decoder(Option(inner)) {
-  Decoder(
-    dynamic.optional(decode.dyn_decoder),
-    jsch.Nullable(decode.schema),
-    decode.defs,
-  )
-}
-
 pub fn field(named name: String, of inner_type: Decoder(t)) -> FieldDecoder(t) {
   FieldDecoder(
     dynamic.field(name, inner_type.dyn_decoder),
@@ -164,11 +156,64 @@ pub fn field(named name: String, of inner_type: Decoder(t)) -> FieldDecoder(t) {
   )
 }
 
+/// Creates a decoder that can handle `null` values by wrapping the result in an `Option` type.
+/// When the value is `null`, it returns `None`. Otherwise, it uses the provided decoder
+/// to decode the value and wraps the result in `Some`. If you need the decoder to handle a possible missing field
+/// (i.e., the field is absent from the JSON), use the `optional_field` function instead.
+///
+/// ## Example
+/// ```gleam
+/// type User {
+///   User(name: String, age: Option(Int))
+/// }
+///
+/// let decoder = decode2(
+///   User,
+///   field("name", string()),
+///   field("age", optional(int()))  // Will handle "age": null
+/// )
+///
+/// // These JSON strings will decode successfully:
+/// // {"name": "Alice", "age": 25}  -> User("Alice", Some(25))
+/// // {"name": "Bob", "age": null}  -> User("Bob", None)
+/// ```
+///
+pub fn optional(of decode: Decoder(inner)) -> Decoder(Option(inner)) {
+  Decoder(
+    dynamic.optional(decode.dyn_decoder),
+    jsch.Nullable(decode.schema),
+    decode.defs,
+  )
+}
+
 @external(erlang, "json_blueprint_ffi", "null")
 @external(javascript, "../json_blueprint_ffi.mjs", "do_null")
 fn native_null() -> dynamic.Dynamic
 
-/// Decode a `Option` value where the underlaying JSON field can be missing or have `null` value 
+/// Decode a field that can be missing or have a `null` value into an `Option` type.
+/// This function is useful when you want to handle both cases where a field is absent from the JSON
+/// or when it's explicitly set to `null`.
+///
+/// If you only need to handle fields that are present but might be `null`, use the `optional` function instead.
+///
+/// ## Example
+/// ```gleam
+/// type User {
+///   User(name: String, age: Option(Int))
+/// }
+///
+/// let decoder = decode2(
+///   User,
+///   field("name", string()),
+///   optional_field("age", int())  // Will handle both missing "age" field and "age": null
+/// )
+///
+/// // All these JSON strings will decode successfully:
+/// // {"name": "Alice", "age": 25}     -> User("Alice", Some(25))
+/// // {"name": "Bob", "age": null}     -> User("Bob", None)
+/// // {"name": "Charlie"}              -> User("Charlie", None)
+/// ```
+///
 pub fn optional_field(
   named name: String,
   of inner_type: Decoder(t),
@@ -183,7 +228,7 @@ pub fn optional_field(
       })(value)
       |> result.map(option.flatten)
     },
-    #(name, jsch.Nullable(inner_type.schema)),
+    #(name, jsch.Optional(inner_type.schema)),
     inner_type.defs,
   )
 }
@@ -589,7 +634,7 @@ fn create_object_schema(
     Some(
       list.filter_map(fields, fn(field_dec) {
         case field_dec {
-          #(_, jsch.Nullable(_)) -> Error(Nil)
+          #(_, jsch.Optional(_)) -> Error(Nil)
           #(name, _) -> Ok(name)
         }
       }),

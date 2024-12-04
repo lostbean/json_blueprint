@@ -247,6 +247,7 @@ pub fn json_schema_string_format_test() {
       #("format", json.string("email")),
       #("maxLength", json.int(100)),
       #("minLength", json.int(5)),
+      #("type", json.string("string")),
     ])
     |> json.to_string,
   )
@@ -273,6 +274,7 @@ pub fn json_schema_number_constraint_test() {
       #("multipleOf", json.float(0.5)),
       #("maximum", json.float(100.0)),
       #("minimum", json.float(0.0)),
+      #("type", json.string("number")),
     ])
     |> json.to_string,
   )
@@ -696,10 +698,8 @@ fn tree_decoder() {
       blueprint.decode3(
         Node,
         blueprint.field("value", blueprint.int()),
-        blueprint.field(
-          "left",
-          blueprint.optional(blueprint.self_decoder(tree_decoder)),
-        ),
+        // testing both an optional field a field with a possible null
+        blueprint.optional_field("left", blueprint.self_decoder(tree_decoder)),
         blueprint.field(
           "right",
           blueprint.optional(blueprint.self_decoder(tree_decoder)),
@@ -743,7 +743,7 @@ pub fn tree_decoder_test() {
   schema
   |> json.to_string
   |> should.equal(
-    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"node\"]},\"data\":{\"required\":[\"value\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\"},\"left\":{\"$ref\":\"#\"},\"right\":{\"$ref\":\"#\"}}}}}",
+    "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"type\",\"data\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"node\"]},\"data\":{\"required\":[\"value\",\"right\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\"},\"left\":{\"$ref\":\"#\"},\"right\":{\"anyOf\":[{\"$ref\":\"#\"},{\"type\":\"null\"}]}}}}}",
   )
 }
 
@@ -824,6 +824,6 @@ pub fn reuse_decoder_test() {
   blueprint.generate_json_schema(person_with_address_decoder)
   |> json.to_string
   |> should.equal(
-    "{\"$defs\":{\"ref_3B07ED20E59E713A14D2B0C98C72D9ECB75C0D9C\":{\"required\":[\"name\",\"age\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"},\"email\":{\"type\":\"string\"}}}},\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"person\",\"address\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"person\":{\"$ref\":\"#/$defs/ref_3B07ED20E59E713A14D2B0C98C72D9ECB75C0D9C\"},\"address\":{\"required\":[\"street\",\"city\",\"zip\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"street\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"}}}}}",
+    "{\"$defs\":{\"ref_707AD0AE2AF80DF30FAB6C677D270B616C19AF94\":{\"required\":[\"name\",\"age\",\"email\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"},\"email\":{\"type\":[\"string\",\"null\"]}}}},\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"person\",\"address\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"person\":{\"$ref\":\"#/$defs/ref_707AD0AE2AF80DF30FAB6C677D270B616C19AF94\"},\"address\":{\"required\":[\"street\",\"city\",\"zip\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"street\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"}}}}}",
   )
 }

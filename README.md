@@ -186,7 +186,7 @@ type Coordinate =
   #(Float, Float)
 
 type Drawing {
-  Box(Float, Float, Coordinate, Option(Color))
+  Box(Float, Float, Option(Coordinate), Option(Color))
 }
 
 fn color_decoder() {
@@ -239,7 +239,9 @@ fn drawing_decoder() -> blueprint.Decoder(Drawing) {
         Box,
         blueprint.field("width", blueprint.float()),
         blueprint.field("height", blueprint.float()),
-        blueprint.field("position", coordinate_decoder()),
+        // Make this field required by with a possible null value
+        blueprint.field("position", optional(coordinate_decoder())),
+        // Make this field optional
         blueprint.optional_field("color", color_decoder()),
       ),
     ),
@@ -248,7 +250,7 @@ fn drawing_decoder() -> blueprint.Decoder(Drawing) {
 
 pub fn drawing_test() {
   // Test cases
-  let box = Box(15.0, 25.0, #(30.0, 40.0), None)
+  let box = Box(15.0, 25.0, Some(#(30.0, 40.0)), None)
 
   // Test encoding
   let encoded_box = encode_drawing(box)
