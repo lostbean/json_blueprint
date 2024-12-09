@@ -579,7 +579,7 @@ pub fn tuple3(
       None,
       None,
     ),
-    list.concat([decode1.defs, decode2.defs, decode3.defs]),
+    list.flatten([decode1.defs, decode2.defs, decode3.defs]),
   )
 }
 
@@ -606,7 +606,7 @@ pub fn tuple4(
       None,
       None,
     ),
-    list.concat([decode1.defs, decode2.defs, decode3.defs, decode4.defs]),
+    list.flatten([decode1.defs, decode2.defs, decode3.defs, decode4.defs]),
   )
 }
 
@@ -641,7 +641,7 @@ pub fn tuple5(
       None,
       None,
     ),
-    list.concat([
+    list.flatten([
       decode1.defs,
       decode2.defs,
       decode3.defs,
@@ -685,7 +685,7 @@ pub fn tuple6(
       None,
       None,
     ),
-    list.concat([
+    list.flatten([
       decode1.defs,
       decode2.defs,
       decode3.defs,
@@ -756,7 +756,7 @@ pub fn decode2(
   Decoder(
     dynamic.decode2(constructor, t1.dyn_decoder, t2.dyn_decoder),
     create_object_schema([t1.field_schema, t2.field_schema]),
-    list.concat([t1.defs, t2.defs]),
+    list.flatten([t1.defs, t2.defs]),
   )
 }
 
@@ -769,7 +769,7 @@ pub fn decode3(
   Decoder(
     dynamic.decode3(constructor, t1.dyn_decoder, t2.dyn_decoder, t3.dyn_decoder),
     create_object_schema([t1.field_schema, t2.field_schema, t3.field_schema]),
-    list.concat([t1.defs, t2.defs, t3.defs]),
+    list.flatten([t1.defs, t2.defs, t3.defs]),
   )
 }
 
@@ -794,7 +794,7 @@ pub fn decode4(
       t3.field_schema,
       t4.field_schema,
     ]),
-    list.concat([t1.defs, t2.defs, t3.defs, t4.defs]),
+    list.flatten([t1.defs, t2.defs, t3.defs, t4.defs]),
   )
 }
 
@@ -822,7 +822,7 @@ pub fn decode5(
       t4.field_schema,
       t5.field_schema,
     ]),
-    list.concat([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs]),
+    list.flatten([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs]),
   )
 }
 
@@ -853,7 +853,7 @@ pub fn decode6(
       t5.field_schema,
       t6.field_schema,
     ]),
-    list.concat([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs, t6.defs]),
+    list.flatten([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs, t6.defs]),
   )
 }
 
@@ -887,7 +887,7 @@ pub fn decode7(
       t6.field_schema,
       t7.field_schema,
     ]),
-    list.concat([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs, t6.defs, t7.defs]),
+    list.flatten([t1.defs, t2.defs, t3.defs, t4.defs, t5.defs, t6.defs, t7.defs]),
   )
 }
 
@@ -924,7 +924,7 @@ pub fn decode8(
       t7.field_schema,
       t8.field_schema,
     ]),
-    list.concat([
+    list.flatten([
       t1.defs,
       t2.defs,
       t3.defs,
@@ -973,7 +973,7 @@ pub fn decode9(
       t8.field_schema,
       t9.field_schema,
     ]),
-    list.concat([
+    list.flatten([
       t1.defs,
       t2.defs,
       t3.defs,
