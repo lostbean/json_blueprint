@@ -22,6 +22,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gleam
+            rebar3
             erlang_27
             nodejs
           ];
