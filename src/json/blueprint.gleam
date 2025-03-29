@@ -1,14 +1,18 @@
-import gleam/dynamic
+import gleam/dynamic as gleam_dynamic
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import json/blueprint/dynamic
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
+
+type DynamicDecoder(t) =
+  fn(gleam_dynamic.Dynamic) -> Result(t, List(gleam_dynamic.DecodeError))
 
 pub type Decoder(t) {
   Decoder(
-    dyn_decoder: dynamic.Decoder(t),
+    dyn_decoder: DynamicDecoder(t),
     schema: SchemaDefinition,
     defs: List(#(String, SchemaDefinition)),
   )
@@ -16,7 +20,7 @@ pub type Decoder(t) {
 
 pub type FieldDecoder(t) {
   FieldDecoder(
-    dyn_decoder: dynamic.Decoder(t),
+    dyn_decoder: DynamicDecoder(t),
     field_schema: #(String, SchemaDefinition),
     defs: List(#(String, SchemaDefinition)),
   )
@@ -94,7 +98,7 @@ pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
 /// recursive dependency cycle. The returned decoder uses a JSON Schema reference "#"
 /// to point to the root schema definition.
 ///
-/// > ❗ _**IMPORTANT**_ 
+/// > ❗ _**IMPORTANT**_
 /// > Add the reuse_decoder when there are nested recursive types so
 /// > the schema references (`#`) get rewritten correctly and self-references from the
 /// > different types don't get mixed up. As a recommendation, always add it when
@@ -129,7 +133,7 @@ pub fn self_decoder(lazy: LazyDecoder(t)) -> Decoder(t) {
   Decoder(fn(input) { lazy().dyn_decoder(input) }, jsch.Ref("#"), [])
 }
 
-pub fn get_dynamic_decoder(decoder: Decoder(t)) -> dynamic.Decoder(t) {
+pub fn get_dynamic_decoder(decoder: Decoder(t)) -> DynamicDecoder(t) {
   decoder.dyn_decoder
 }
 
@@ -204,7 +208,7 @@ pub fn optional(of decode: Decoder(inner)) -> Decoder(Option(inner)) {
 
 @external(erlang, "json_blueprint_ffi", "null")
 @external(javascript, "../json_blueprint_ffi.mjs", "do_null")
-fn native_null() -> dynamic.Dynamic
+fn native_null() -> gleam_dynamic.Dynamic
 
 /// Decode a field that can be missing or have a `null` value into an `Option` type.
 /// This function is useful when you want to handle both cases where a field is absent from the JSON
@@ -307,7 +311,7 @@ pub fn encode_optional_field(
 /// Function to encode a union type into a JSON object.
 /// The function takes a value and an encoder function that returns a tuple of the type name and the JSON value.
 ///
-///> [!IMPORTANT]  
+///> [!IMPORTANT]
 ///> Make sure to update the decoder function accordingly.
 ///
 /// ## Example
@@ -343,7 +347,7 @@ pub fn union_type_encoder(
 /// Function to defined a decoder for a union types.
 /// The function takes a list of decoders for each possible type of the union.
 ///
-///> [!IMPORTANT]  
+///> [!IMPORTANT]
 ///> Make sure to add tests for every possible type of the union because it is not possible to check for exhaustiveness in the case.
 ///
 /// ## Example
@@ -355,7 +359,7 @@ pub fn union_type_encoder(
 ///
 /// let shape_decoder = union_type_decoder([
 ///   #("circle", decode1(Circle, field("radius", float()))),
-///   #("rectangle", decode2(Rectangle, 
+///   #("rectangle", decode2(Rectangle,
 ///     field("width", float()),
 ///     field("height", float())
 ///   ))
@@ -365,9 +369,9 @@ pub fn union_type_encoder(
 pub fn union_type_decoder(
   constructor_decoders decoders: List(#(String, Decoder(a))),
 ) -> Decoder(a) {
-  let constructor = fn(type_str: String, data: dynamic.Dynamic) -> Result(
+  let constructor = fn(type_str: String, data: gleam_dynamic.Dynamic) -> Result(
     a,
-    List(dynamic.DecodeError),
+    List(gleam_dynamic.DecodeError),
   ) {
     decoders
     |> list.find_map(fn(dec) {
@@ -383,7 +387,7 @@ pub fn union_type_decoder(
         decoders |> list.map(fn(dec) { dec.0 }) |> string.join(", ")
 
       [
-        dynamic.DecodeError(
+        gleam_dynamic.DecodeError(
           expected: "valid constructor type, one of: " <> valid_types,
           found: type_str,
           path: [],
@@ -438,7 +442,7 @@ pub fn union_type_decoder(
 /// Function to encode an enum type (unions where constructors have no arguments) into a JSON object.
 /// The function takes a value and an encoder function that returns the string representation of the enum value.
 ///
-///> [!IMPORTANT]  
+///> [!IMPORTANT]
 ///> Make sure to update the decoder function accordingly.
 ///
 /// ## Example
@@ -469,7 +473,7 @@ pub fn enum_type_encoder(
 /// Function to define a decoder for enum types (unions where constructors have no arguments).
 /// The function takes a list of tuples containing the string representation and the corresponding enum value.
 ///
-///> [!IMPORTANT]  
+///> [!IMPORTANT]
 ///> Make sure to add tests for every possible enum value because it is not possible to check for exhaustiveness.
 ///
 /// ## Example
@@ -490,7 +494,10 @@ pub fn enum_type_encoder(
 pub fn enum_type_decoder(
   constructor_decoders decoders: List(#(String, a)),
 ) -> Decoder(a) {
-  let constructor = fn(type_str: String) -> Result(a, List(dynamic.DecodeError)) {
+  let constructor = fn(type_str: String) -> Result(
+    a,
+    List(gleam_dynamic.DecodeError),
+  ) {
     decoders
     |> list.find_map(fn(dec) {
       case dec.0 == type_str {
@@ -505,7 +512,7 @@ pub fn enum_type_decoder(
         decoders |> list.map(fn(dec) { dec.0 }) |> string.join(", ")
 
       [
-        dynamic.DecodeError(
+        gleam_dynamic.DecodeError(
           expected: "valid constructor type, one of: " <> valid_types,
           found: type_str,
           path: [],
