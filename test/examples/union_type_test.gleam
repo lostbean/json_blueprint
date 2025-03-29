@@ -1,4 +1,3 @@
-import gleam/io
 import gleam/json
 import gleeunit
 import gleeunit/should
@@ -75,7 +74,6 @@ pub fn union_type_test() {
 
   blueprint.generate_json_schema(shape_decoder())
   |> json.to_string
-  |> io.println
 }
 
 pub fn constructor_type_decoder_test() {

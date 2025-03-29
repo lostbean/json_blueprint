@@ -1,4 +1,3 @@
-import gleam/io
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleeunit
@@ -134,7 +133,6 @@ pub fn tree_decoder_test() {
   // Test schema generation
   blueprint.generate_json_schema(decode_list_of_trees())
   |> json.to_string
-  |> io.println
 }
 
 pub fn tree_decoder_match_str_test() {

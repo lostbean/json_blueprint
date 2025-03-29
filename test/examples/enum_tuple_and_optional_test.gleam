@@ -1,4 +1,3 @@
-import gleam/io
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleeunit
@@ -94,7 +93,6 @@ pub fn drawing_test() {
 
   blueprint.generate_json_schema(drawing_decoder())
   |> json.to_string
-  |> io.println
 }
 
 pub fn drawing_match_str_test() {
