@@ -1,5 +1,5 @@
 name = "json_blueprint"
-version = "1.5.2"
+version = "1.6.0"
 
 description = "Simplify JSON encoding/decoding while automatically generating JSON schemas for your data types."
 licences = ["MIT"]
