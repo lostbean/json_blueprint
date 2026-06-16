@@ -116,7 +116,9 @@ pub fn bool(from data: Dynamic) -> Result(Bool, DecodeErrors) {
 @external(javascript, "../../gleam_dynamic.mjs", "decode_bool")
 fn decode_bool(a: Dynamic) -> Result(Bool, DecodeErrors)
 
-pub fn shallow_list(from value: Dynamic) -> Result(List(Dynamic), DecodeErrors) {
+pub fn shallow_list(
+  from value: Dynamic,
+) -> Result(List(Dynamic), DecodeErrors) {
   decode_list(value)
 }
 
