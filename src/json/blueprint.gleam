@@ -1,4 +1,5 @@
 import gleam/dynamic as gleam_dynamic
+import gleam/dynamic/decode
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -8,7 +9,7 @@ import json/blueprint/dynamic
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
 type DynamicDecoder(t) =
-  fn(gleam_dynamic.Dynamic) -> Result(t, List(gleam_dynamic.DecodeError))
+  fn(gleam_dynamic.Dynamic) -> Result(t, List(dynamic.DecodeError))
 
 pub type Decoder(t) {
   Decoder(
@@ -141,7 +142,23 @@ pub fn decode(
   using decoder: Decoder(t),
   from json_string: String,
 ) -> Result(t, json.DecodeError) {
-  json.decode(from: json_string, using: decoder.dyn_decoder)
+  // `gleam_json` 3.0 removed `json.decode` (which accepted an old-style
+  // `fn(Dynamic) -> Result(t, _)` decoder) in favour of `json.parse`, which
+  // takes a `gleam/dynamic/decode.Decoder`. We parse to a raw `Dynamic` using
+  // the identity decoder and then run this library's vendored decoder on it.
+  use dyn <- result.try(json.parse(from: json_string, using: decode.dynamic))
+  decoder.dyn_decoder(dyn)
+  |> result.map_error(fn(errors) {
+    json.UnableToDecode(
+      list.map(errors, fn(error) {
+        decode.DecodeError(
+          expected: error.expected,
+          found: error.found,
+          path: error.path,
+        )
+      }),
+    )
+  })
 }
 
 pub fn string() -> Decoder(String) {
@@ -371,7 +388,7 @@ pub fn union_type_decoder(
 ) -> Decoder(a) {
   let constructor = fn(type_str: String, data: gleam_dynamic.Dynamic) -> Result(
     a,
-    List(gleam_dynamic.DecodeError),
+    List(dynamic.DecodeError),
   ) {
     decoders
     |> list.find_map(fn(dec) {
@@ -387,7 +404,7 @@ pub fn union_type_decoder(
         decoders |> list.map(fn(dec) { dec.0 }) |> string.join(", ")
 
       [
-        gleam_dynamic.DecodeError(
+        dynamic.DecodeError(
           expected: "valid constructor type, one of: " <> valid_types,
           found: type_str,
           path: [],
@@ -494,10 +511,7 @@ pub fn enum_type_encoder(
 pub fn enum_type_decoder(
   constructor_decoders decoders: List(#(String, a)),
 ) -> Decoder(a) {
-  let constructor = fn(type_str: String) -> Result(
-    a,
-    List(gleam_dynamic.DecodeError),
-  ) {
+  let constructor = fn(type_str: String) -> Result(a, List(dynamic.DecodeError)) {
     decoders
     |> list.find_map(fn(dec) {
       case dec.0 == type_str {
@@ -512,7 +526,7 @@ pub fn enum_type_decoder(
         decoders |> list.map(fn(dec) { dec.0 }) |> string.join(", ")
 
       [
-        gleam_dynamic.DecodeError(
+        dynamic.DecodeError(
           expected: "valid constructor type, one of: " <> valid_types,
           found: type_str,
           path: [],

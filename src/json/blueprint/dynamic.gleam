@@ -4,12 +4,29 @@
 
 import gleam/bit_array as bit_array_mod
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type DecodeError, type Decoder, type Dynamic, DecodeError}
+import gleam/dynamic.{type Dynamic}
 import gleam/int as int_mod
 import gleam/list as list_mod
 import gleam/option.{type Option, Some}
 import gleam/result as result_mod
 import gleam/string_tree
+
+/// Error returned when decoding fails.
+///
+/// This was previously provided by `gleam/dynamic` but was removed there when
+/// the old decoder API was deleted in `gleam_stdlib` 0.60.0, so it is defined
+/// locally here to keep this vendored decoder self-contained.
+pub type DecodeError {
+  DecodeError(expected: String, found: String, path: List(String))
+}
+
+/// A decoder is a function that turns dynamically typed `Dynamic` data into
+/// typed data, returning the decoded value or a list of `DecodeError`s.
+///
+/// This was previously provided by `gleam/dynamic` but was removed there when
+/// the old decoder API was deleted in `gleam_stdlib` 0.60.0.
+pub type Decoder(t) =
+  fn(Dynamic) -> Result(t, List(DecodeError))
 
 pub type DecodeErrors =
   List(DecodeError)
@@ -99,7 +116,9 @@ pub fn bool(from data: Dynamic) -> Result(Bool, DecodeErrors) {
 @external(javascript, "../../gleam_dynamic.mjs", "decode_bool")
 fn decode_bool(a: Dynamic) -> Result(Bool, DecodeErrors)
 
-pub fn shallow_list(from value: Dynamic) -> Result(List(Dynamic), DecodeErrors) {
+pub fn shallow_list(
+  from value: Dynamic,
+) -> Result(List(Dynamic), DecodeErrors) {
   decode_list(value)
 }
 
