@@ -2,7 +2,7 @@ import gleam/bit_array
 import gleam/crypto
 import gleam/json
 import gleam/list
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option, None}
 
 pub const json_schema_version = "http://json-schema.org/draft-07/schema#"
 

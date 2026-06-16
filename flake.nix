@@ -23,7 +23,7 @@
           buildInputs = with pkgs; [
             gleam
             rebar3
-            erlang_27
+            erlang_28
             nodejs
           ];
 
