@@ -9,17 +9,146 @@ json_blueprint is a Gleam library that simplifies JSON encoding and decoding whi
 gleam add json_blueprint
 ```
 
-## Usage
+## Schema-Aware Core (Release-Ready Initial Facade)
 
-json_blueprint provides utilities for encoding and decoding JSON data, with special support for union types. The generated JSON schemas can be used to validate incoming JSON data with the decoder. The JSON schema follows the [JSON Schema Draft 7](https://json-schema.org/) specification and can tested and validate on [JSON Schema Lint](https://jsonschemalint.com/#!/version/draft-07/markup/json).
+`json_blueprint` provides a production-grade, schema-aware JSON core for Gleam applications:
+- **`Value`**: Explicit, JSON-exact value model (`Null`, `Bool`, `String`, `Number`, `Array`, `Object`) with duplicate key preservation until rejection.
+- **Exact `Number`**: Canonical arbitrary-precision decimal representation representing all numeric values. Native `Int` and `Float` are checked projections.
+- **`Codec(a)`**: Bidirectional typed combinator deriving encoder, decoder, and Draft 2020-12 schema from a single definition.
+- **`RuntimeContract`**: Validated schema contract for runtime schema matching and value validation.
+- **`Document`**: Finite Draft 2020-12 schema document loader from parsed values or raw bytes.
+- **`Parser`**: Bounded whole-document byte admission parser enforcing byte size, depth, number token, significand, and exponent limits, with duplicate key rejection and structured location errors.
+- **`Migration`**: Explicit adapter bridging legacy 1.7.1 decoders into modern `Codec(a)` contracts while preserving wire envelopes and reporting unavailable schema.
 
-> ❗️ _**IMPORTANT: Recursive data types**_
->
-> Make to use the `self_decoder` when defining the decoder for recursive data types.
+### Target Support Matrix
 
-> ⚠️ _**WARNING: Do NOT use on cyclical data type definitions**_
->
-> While the library supports recursive data types (types with self reference), it does not support cyclical data types (cyclical dependency between multiple data types). Cyclical data types will result in infinite loop during decoding or schema generation.
+| Target | Status | Exact Number Model | Native Integer Bounds | Binary64 Float Projections | Exercised Environment |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **BEAM / Erlang** | Full Support | Arbitrary-precision decimal | Unlimited (bignum) | Exact binary64 conversions | OTP 28 (all 95 tests pass) |
+| **JavaScript (Node.js)** | Full Support | Arbitrary-precision decimal | `[-9007199254740991, 9007199254740991]` (typed `UnsafeNativeInteger` construction refusal / `UnsupportedNativeInteger` projection refusal) | Exact binary64 conversions via BigInt | Node.js v24.15 (all 95 tests pass) |
+| **JavaScript (Browser)** | Unverified | Target-neutral ESM (`TextEncoder`, `DataView`, `BigInt`), but unverified in test suite | Same as Node.js | Same as Node.js | Untested in CI |
+
+### Supported Finite Draft 2020-12 Profile
+
+- **Closed Objects**: `ObjectSchema(properties)` with explicit required and optional fields.
+- **Exact Pairs**: `PairSchema(left, right)` representing fixed 2-element tuples.
+- **Collections**: `ListSchema(element)` representing homogenous arrays.
+- **Nullable Values**: `NullableSchema(inner)` representing optional/nullable values.
+- **Bounded Integers**: `IntegerRangeSchema(min, max)` enforcing integer bounds.
+- **String Enums**: `StringEnumSchema(labels)` representing finite string variants.
+- **Tagged Alternatives**: `TaggedSchema(tag1, s1, tag2, s2)` representing discriminated unions.
+
+### Documented Design-Deferred Families (Retained Future Scope)
+
+These capabilities are explicitly outside the initial release facade (per `PUBLIC-API.md`) rather than hidden behind incomplete todos:
+- **Source Code Generation**: Experimental dev-time code generator paused for application naming research.
+- **Recursive References (`$ref`, `$defs`)**: Deferred pending resource and cycle policies.
+- **Arbitrary Unions**: Untagged unions (`anyOf`, general `oneOf`) deferred pending subtyping policy.
+- **Pattern / Regex**: String format regex validation deferred.
+
+### Schema-Aware Core Quickstart
+
+A complete end-to-end example defining a bounded schema-aware codec, validating input bytes against Draft 2020-12 runtime contracts, and decoding into a typed domain record (tested verbatim in `test/readme_example_test.gleam`):
+
+```gleam
+pub type Task {
+  Task(id: Int, title: String)
+}
+
+pub fn run_task_pipeline() -> Result(Task, String) {
+  // 1. Build bidirectional codec with bounded integer range
+  use id_codec <- result.try(
+    codec.integer_between(1, 100_000)
+    |> result.map_error(fn(_) { "Invalid id range" }),
+  )
+  use task_props <- result.try(
+    codec.combine(
+      codec.required("id", id_codec),
+      codec.required("title", codec.string()),
+    )
+    |> result.map_error(fn(_) { "Invalid properties combination" }),
+  )
+  let task_codec =
+    codec.imap(
+      codec.object(task_props),
+      fn(pair: #(Int, String)) { Task(pair.0, pair.1) },
+      fn(task: Task) { #(task.id, task.title) },
+    )
+
+  // 2. Parse untrusted JSON bytes with bounded parser limits
+  let limits = parser.default_limits()
+  let input_bytes =
+    bit_array.from_string("{\"id\": 42, \"title\": \"Verify Blueprint\"}")
+
+  use parsed_val <- result.try(
+    parser.parse_value(limits, input_bytes)
+    |> result.map_error(fn(_) { "JSON parse error" }),
+  )
+
+  // 3. Derive Draft 2020-12 runtime contract and validate
+  use schema <- result.try(
+    codec.schema(task_codec)
+    |> result.map_error(fn(_) { "Unknown schema" }),
+  )
+  use contract <- result.try(
+    runtime.from_schema(schema)
+    |> result.map_error(fn(_) { "Invalid schema contract" }),
+  )
+  use _validated <- result.try(
+    runtime.validate(contract, parsed_val)
+    |> result.map_error(fn(_) { "Schema validation failure" }),
+  )
+
+  // 4. Decode into typed domain record
+  codec.decode(task_codec, parsed_val)
+  |> result.map_error(fn(_) { "Decoding failure" })
+}
+```
+
+### Legacy 1.7.1 Migration Contract
+
+Existing 1.7.1 decoders (`json/blueprint.Decoder(a)`) can be adapted to modern `Codec(a)` using `json/blueprint/migration.adapt`. All errors (including safe native integer bounds) are handled honestly:
+
+```gleam
+pub type MyRecord {
+  MyRecord(name: String, count: Int)
+}
+
+pub fn example() {
+  let legacy_decoder =
+    legacy.decode2(
+      MyRecord,
+      legacy.field("name", legacy.string()),
+      legacy.field("count", legacy.int()),
+    )
+
+  let my_encoder = fn(record: MyRecord) {
+    case number.from_int(record.count) {
+      Error(_) ->
+        Error(
+          codec.CannotEncode(codec.CustomEncodeReason("Safe integer overflow")),
+        )
+      Ok(count_num) ->
+        Ok(
+          value.Object([
+            #("name", value.String(record.name)),
+            #("count", value.Number(count_num)),
+          ]),
+        )
+    }
+  }
+
+  // Adapts legacy decoder with explicit encoder; reports codec.UnknownSchema
+  let modern_codec = migration.adapt(legacy_decoder, my_encoder)
+  modern_codec
+}
+```
+
+---
+
+## Legacy 1.7.1 Usage (Preserved for Compatibility)
+
+json_blueprint preserves legacy utilities for encoding and decoding JSON data with union types under Draft 7:
 
 ## Examples
 

@@ -1,11 +1,7 @@
-@target(erlang)
 import gleeunit/should
-@target(erlang)
 import json/blueprint/number
-@target(erlang)
 import json/blueprint/value
 
-@target(erlang)
 pub fn value_constructors_test() {
   value.null()
   |> should.equal(value.Null)
@@ -19,7 +15,7 @@ pub fn value_constructors_test() {
   value.string("test-string")
   |> should.equal(value.String("test-string"))
 
-  let num = number.from_int(42)
+  let assert Ok(num) = number.from_int(42)
   value.number(num)
   |> should.equal(value.Number(num))
 
@@ -27,7 +23,6 @@ pub fn value_constructors_test() {
   |> should.equal(value.Array([value.String("item"), value.Null]))
 }
 
-@target(erlang)
 pub fn value_object_key_policy_test() {
   value.object([], value.RejectDuplicates)
   |> should.equal(Ok(value.Object([])))

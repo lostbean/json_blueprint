@@ -1,0 +1,1465 @@
+{
+  "finite-priority/valid-low": {
+    "family": "finite-priority",
+    "accepted": true,
+    "instance": "low",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/valid-normal": {
+    "family": "finite-priority",
+    "accepted": true,
+    "instance": "normal",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/valid-urgent": {
+    "family": "finite-priority",
+    "accepted": true,
+    "instance": "urgent",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/rejected-uppercase": {
+    "family": "finite-priority",
+    "accepted": false,
+    "instance": "LOW",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/rejected-unknown-enum": {
+    "family": "finite-priority",
+    "accepted": false,
+    "instance": "critical",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/rejected-empty-string": {
+    "family": "finite-priority",
+    "accepted": false,
+    "instance": "",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/rejected-type-integer": {
+    "family": "finite-priority",
+    "accepted": false,
+    "instance": 1,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-priority/rejected-type-null": {
+    "family": "finite-priority",
+    "accepted": false,
+    "instance": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "urgent"
+      ]
+    }
+  },
+  "finite-unusual-labels/valid-empty-label": {
+    "family": "finite-unusual-labels",
+    "accepted": true,
+    "instance": "",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "",
+        "quoted \"\u96ea\u732b"
+      ]
+    }
+  },
+  "finite-unusual-labels/valid-quoted-unicode": {
+    "family": "finite-unusual-labels",
+    "accepted": true,
+    "instance": "quoted \"\u96ea\u732b",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "",
+        "quoted \"\u96ea\u732b"
+      ]
+    }
+  },
+  "finite-unusual-labels/rejected-missing-prefix": {
+    "family": "finite-unusual-labels",
+    "accepted": false,
+    "instance": "\u96ea\u732b",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "",
+        "quoted \"\u96ea\u732b"
+      ]
+    }
+  },
+  "finite-unusual-labels/rejected-type-bool": {
+    "family": "finite-unusual-labels",
+    "accepted": false,
+    "instance": true,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "",
+        "quoted \"\u96ea\u732b"
+      ]
+    }
+  },
+  "finite-object/valid-required-only": {
+    "family": "finite-object",
+    "accepted": true,
+    "instance": {
+      "priority": "urgent"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-object/valid-with-null-note": {
+    "family": "finite-object",
+    "accepted": true,
+    "instance": {
+      "priority": "normal",
+      "note": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-object/valid-with-string-note": {
+    "family": "finite-object",
+    "accepted": true,
+    "instance": {
+      "priority": "low",
+      "note": "hello"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-object/rejected-invalid-enum-field": {
+    "family": "finite-object",
+    "accepted": false,
+    "instance": {
+      "priority": "critical"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-object/rejected-null-required-field": {
+    "family": "finite-object",
+    "accepted": false,
+    "instance": {
+      "priority": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-object/rejected-extra-property": {
+    "family": "finite-object",
+    "accepted": false,
+    "instance": {
+      "priority": "low",
+      "extra": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-object/rejected-missing-required-field": {
+    "family": "finite-object",
+    "accepted": false,
+    "instance": {},
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "urgent"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "finite-list-nullable/valid-empty-list": {
+    "family": "finite-list-nullable",
+    "accepted": true,
+    "instance": [],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "urgent"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "finite-list-nullable/valid-mixed-elements": {
+    "family": "finite-list-nullable",
+    "accepted": true,
+    "instance": [
+      "low",
+      null,
+      "urgent"
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "urgent"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "finite-list-nullable/rejected-invalid-element": {
+    "family": "finite-list-nullable",
+    "accepted": false,
+    "instance": [
+      "normal",
+      "critical"
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "urgent"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "finite-list-nullable/rejected-type-null": {
+    "family": "finite-list-nullable",
+    "accepted": false,
+    "instance": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "urgent"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "text/valid-string": {
+    "family": "text",
+    "accepted": true,
+    "instance": "hello",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string"
+    }
+  },
+  "text/rejected-type-number": {
+    "family": "text",
+    "accepted": false,
+    "instance": 1,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string"
+    }
+  },
+  "text/rejected-type-null": {
+    "family": "text",
+    "accepted": false,
+    "instance": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string"
+    }
+  },
+  "integer/valid-zero": {
+    "family": "integer",
+    "accepted": true,
+    "instance": 0,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer"
+    }
+  },
+  "integer/rejected-type-string": {
+    "family": "integer",
+    "accepted": false,
+    "instance": "1",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer"
+    }
+  },
+  "integer/rejected-type-bool": {
+    "family": "integer",
+    "accepted": false,
+    "instance": true,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer"
+    }
+  },
+  "boolean/valid-false": {
+    "family": "boolean",
+    "accepted": true,
+    "instance": false,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "boolean"
+    }
+  },
+  "boolean/rejected-type-number": {
+    "family": "boolean",
+    "accepted": false,
+    "instance": 0,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "boolean"
+    }
+  },
+  "pair/valid-string-int-pair": {
+    "family": "pair",
+    "accepted": true,
+    "instance": [
+      "a",
+      1
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "pair/rejected-empty-array": {
+    "family": "pair",
+    "accepted": false,
+    "instance": [],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "pair/rejected-single-element": {
+    "family": "pair",
+    "accepted": false,
+    "instance": [
+      "a"
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "pair/rejected-three-elements": {
+    "family": "pair",
+    "accepted": false,
+    "instance": [
+      "a",
+      1,
+      2
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "pair/rejected-reversed-element-types": {
+    "family": "pair",
+    "accepted": false,
+    "instance": [
+      1,
+      "a"
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "list-nullable/valid-empty-list": {
+    "family": "list-nullable",
+    "accepted": true,
+    "instance": [],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  },
+  "list-nullable/valid-null-and-int": {
+    "family": "list-nullable",
+    "accepted": true,
+    "instance": [
+      null,
+      2
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  },
+  "list-nullable/rejected-string-element": {
+    "family": "list-nullable",
+    "accepted": false,
+    "instance": [
+      "bad"
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  },
+  "list-nullable/rejected-type-null": {
+    "family": "list-nullable",
+    "accepted": false,
+    "instance": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  },
+  "empty-object/valid-empty-object": {
+    "family": "empty-object",
+    "accepted": true,
+    "instance": {},
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "empty-object/rejected-with-property": {
+    "family": "empty-object",
+    "accepted": false,
+    "instance": {
+      "x": 1
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "empty-object/rejected-type-null": {
+    "family": "empty-object",
+    "accepted": false,
+    "instance": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "optional-nullable-record/valid-required-only": {
+    "family": "optional-nullable-record",
+    "accepted": true,
+    "instance": {
+      "name": "Ada"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "optional-nullable-record/valid-null-optional": {
+    "family": "optional-nullable-record",
+    "accepted": true,
+    "instance": {
+      "name": "Ada",
+      "note": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "optional-nullable-record/valid-present-optional": {
+    "family": "optional-nullable-record",
+    "accepted": true,
+    "instance": {
+      "name": "Ada",
+      "note": "hello"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "optional-nullable-record/rejected-wrong-type-optional": {
+    "family": "optional-nullable-record",
+    "accepted": false,
+    "instance": {
+      "name": "Ada",
+      "note": 1
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "optional-nullable-record/rejected-unknown-property": {
+    "family": "optional-nullable-record",
+    "accepted": false,
+    "instance": {
+      "name": "Ada",
+      "unknown": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "optional-nullable-record/rejected-missing-required-field": {
+    "family": "optional-nullable-record",
+    "accepted": false,
+    "instance": {},
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "inclusive-bounds/rejected-below-minimum": {
+    "family": "inclusive-bounds",
+    "accepted": false,
+    "instance": -3,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    }
+  },
+  "inclusive-bounds/valid-minimum-boundary": {
+    "family": "inclusive-bounds",
+    "accepted": true,
+    "instance": -2,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    }
+  },
+  "inclusive-bounds/valid-middle-value": {
+    "family": "inclusive-bounds",
+    "accepted": true,
+    "instance": 0,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    }
+  },
+  "inclusive-bounds/valid-maximum-boundary": {
+    "family": "inclusive-bounds",
+    "accepted": true,
+    "instance": 2,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    }
+  },
+  "inclusive-bounds/rejected-above-maximum": {
+    "family": "inclusive-bounds",
+    "accepted": false,
+    "instance": 3,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    }
+  },
+  "inclusive-bounds/rejected-type-string": {
+    "family": "inclusive-bounds",
+    "accepted": false,
+    "instance": "2",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": -2,
+      "maximum": 2
+    }
+  },
+  "tagged-decision/valid-approve-branch": {
+    "family": "tagged-decision",
+    "accepted": true,
+    "instance": {
+      "tag": "approve",
+      "value": {
+        "quantity": 1
+      }
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "approve"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100.0
+                }
+              },
+              "required": [
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "decline"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "tagged-decision/rejected-approve-out-of-range": {
+    "family": "tagged-decision",
+    "accepted": false,
+    "instance": {
+      "tag": "approve",
+      "value": {
+        "quantity": 0
+      }
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "approve"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100.0
+                }
+              },
+              "required": [
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "decline"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "tagged-decision/valid-decline-branch": {
+    "family": "tagged-decision",
+    "accepted": true,
+    "instance": {
+      "tag": "decline",
+      "value": {
+        "reason": "stock"
+      }
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "approve"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100.0
+                }
+              },
+              "required": [
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "decline"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "tagged-decision/rejected-unknown-tag": {
+    "family": "tagged-decision",
+    "accepted": false,
+    "instance": {
+      "tag": "unknown",
+      "value": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "approve"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100.0
+                }
+              },
+              "required": [
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "decline"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "tagged-decision/rejected-missing-value-field": {
+    "family": "tagged-decision",
+    "accepted": false,
+    "instance": {
+      "tag": "approve"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "approve"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100.0
+                }
+              },
+              "required": [
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "decline"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "tagged-decision/rejected-extra-property-in-branch": {
+    "family": "tagged-decision",
+    "accepted": false,
+    "instance": {
+      "tag": "decline",
+      "value": {
+        "reason": "stock",
+        "extra": true
+      }
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "approve"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100.0
+                }
+              },
+              "required": [
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "decline"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

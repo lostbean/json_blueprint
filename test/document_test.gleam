@@ -1,20 +1,17 @@
-@target(erlang)
 import gleeunit/should
-@target(erlang)
 import json/blueprint/codec
-@target(erlang)
 import json/blueprint/document
-@target(erlang)
 import json/blueprint/number
-@target(erlang)
 import json/blueprint/runtime
-@target(erlang)
 import json/blueprint/value
 
-@target(erlang)
 const draft_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
-@target(erlang)
+fn int_num(n: Int) -> number.Number {
+  let assert Ok(num) = number.from_int(n)
+  num
+}
+
 pub fn document_dialect_validation_test() {
   // Missing $schema
   document.load(value.Object([#("type", value.String("string"))]))
@@ -28,7 +25,7 @@ pub fn document_dialect_validation_test() {
   // Non-string $schema
   document.load(
     value.Object([
-      #("$schema", value.Number(number.from_int(2020))),
+      #("$schema", value.Number(int_num(2020))),
       #("type", value.String("string")),
     ]),
   )
@@ -60,7 +57,6 @@ pub fn document_dialect_validation_test() {
   )
 }
 
-@target(erlang)
 pub fn document_unsupported_keywords_test() {
   // Unknown keyword at root
   document.load(
@@ -95,15 +91,14 @@ pub fn document_unsupported_keywords_test() {
   )
 }
 
-@target(erlang)
 pub fn document_schema_invariants_test() {
   // Reversed integer range in document
   document.load(
     value.Object([
       #("$schema", value.String(draft_2020_12)),
       #("type", value.String("integer")),
-      #("minimum", value.Number(number.from_int(10))),
-      #("maximum", value.Number(number.from_int(5))),
+      #("minimum", value.Number(int_num(10))),
+      #("maximum", value.Number(int_num(5))),
     ]),
   )
   |> should.equal(
@@ -114,7 +109,6 @@ pub fn document_schema_invariants_test() {
   )
 }
 
-@target(erlang)
 pub fn document_load_roundtrips_test() {
   // String
   let str_doc = codec.schema_document(codec.StringSchema)

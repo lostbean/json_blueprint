@@ -1,36 +1,24 @@
-@target(erlang)
 import gleam/json
-@target(erlang)
 import gleam/list
-@target(erlang)
 import gleam/string
-@target(erlang)
 import gleeunit/should
-@target(erlang)
 import json/blueprint/codec
-@target(erlang)
 import json/blueprint/document
-@target(erlang)
 import json/blueprint/number
-@target(erlang)
 import json/blueprint/runtime
-@target(erlang)
 import json/blueprint/value
 
-@target(erlang)
 pub type Priority {
   Low
   Normal
   Urgent
 }
 
-@target(erlang)
 pub type DecorativeLabel {
   EmptyLabel
   QuotedUnicodeLabel
 }
 
-@target(erlang)
 pub type PriorityRequest {
   PriorityRequest(
     priority: Priority,
@@ -38,18 +26,20 @@ pub type PriorityRequest {
   )
 }
 
-@target(erlang)
 pub type UpdateRecord {
   UpdateRecord(name: String, note: codec.Optional(codec.Nullable(String)))
 }
 
-@target(erlang)
 pub type Decision {
   Approve(quantity: Int)
   Decline(reason: String)
 }
 
-@target(erlang)
+fn int_num(n: Int) -> number.Number {
+  let assert Ok(num) = number.from_int(n)
+  num
+}
+
 fn run_corpus_case(
   codec: codec.Codec(a),
   instances: List(#(value.Value, Bool)),
@@ -75,7 +65,6 @@ fn run_corpus_case(
   })
 }
 
-@target(erlang)
 pub fn corpus_finite_priority_test() {
   let assert Ok(priority) =
     codec.string_enum([
@@ -91,12 +80,11 @@ pub fn corpus_finite_priority_test() {
     #(value.String("LOW"), False),
     #(value.String("critical"), False),
     #(value.String(""), False),
-    #(value.Number(number.from_int(1)), False),
+    #(value.Number(int_num(1)), False),
     #(value.Null, False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_finite_unusual_labels_test() {
   let assert Ok(decorative) =
     codec.string_enum([
@@ -112,7 +100,6 @@ pub fn corpus_finite_unusual_labels_test() {
   ])
 }
 
-@target(erlang)
 pub fn corpus_finite_object_test() {
   let assert Ok(priority) =
     codec.string_enum([
@@ -159,7 +146,6 @@ pub fn corpus_finite_object_test() {
   ])
 }
 
-@target(erlang)
 pub fn corpus_finite_list_nullable_test() {
   let assert Ok(priority) =
     codec.string_enum([
@@ -181,76 +167,69 @@ pub fn corpus_finite_list_nullable_test() {
   ])
 }
 
-@target(erlang)
 pub fn corpus_text_test() {
   run_corpus_case(codec.string(), [
     #(value.String("hello"), True),
-    #(value.Number(number.from_int(1)), False),
+    #(value.Number(int_num(1)), False),
     #(value.Null, False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_integer_test() {
   run_corpus_case(codec.int(), [
-    #(value.Number(number.from_int(0)), True),
+    #(value.Number(int_num(0)), True),
     #(value.String("1"), False),
     #(value.Bool(True), False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_boolean_test() {
   run_corpus_case(codec.bool(), [
     #(value.Bool(False), True),
-    #(value.Number(number.from_int(0)), False),
+    #(value.Number(int_num(0)), False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_pair_test() {
   let c = codec.pair(codec.string(), codec.int())
 
   run_corpus_case(c, [
-    #(value.Array([value.String("a"), value.Number(number.from_int(1))]), True),
+    #(value.Array([value.String("a"), value.Number(int_num(1))]), True),
     #(value.Array([]), False),
     #(value.Array([value.String("a")]), False),
     #(
       value.Array([
         value.String("a"),
-        value.Number(number.from_int(1)),
-        value.Number(number.from_int(2)),
+        value.Number(int_num(1)),
+        value.Number(int_num(2)),
       ]),
       False,
     ),
-    #(value.Array([value.Number(number.from_int(1)), value.String("a")]), False),
+    #(value.Array([value.Number(int_num(1)), value.String("a")]), False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_list_nullable_test() {
   let c = codec.list(codec.nullable(codec.int()))
 
   run_corpus_case(c, [
     #(value.Array([]), True),
-    #(value.Array([value.Null, value.Number(number.from_int(2))]), True),
+    #(value.Array([value.Null, value.Number(int_num(2))]), True),
     #(value.Array([value.String("bad")]), False),
     #(value.Null, False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_empty_object_test() {
   let c = codec.object(codec.empty())
 
   run_corpus_case(c, [
     #(value.Object([]), True),
-    #(value.Object([#("x", value.Number(number.from_int(1)))]), False),
+    #(value.Object([#("x", value.Number(int_num(1)))]), False),
     #(value.Null, False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_optional_nullable_record_test() {
   let assert Ok(update_props) =
     codec.combine(
@@ -280,7 +259,7 @@ pub fn corpus_optional_nullable_record_test() {
     #(
       value.Object([
         #("name", value.String("Ada")),
-        #("note", value.Number(number.from_int(1))),
+        #("note", value.Number(int_num(1))),
       ]),
       False,
     ),
@@ -292,21 +271,19 @@ pub fn corpus_optional_nullable_record_test() {
   ])
 }
 
-@target(erlang)
 pub fn corpus_inclusive_bounds_test() {
   let assert Ok(range) = codec.integer_between(-2, 2)
 
   run_corpus_case(range, [
-    #(value.Number(number.from_int(-3)), False),
-    #(value.Number(number.from_int(-2)), True),
-    #(value.Number(number.from_int(0)), True),
-    #(value.Number(number.from_int(2)), True),
-    #(value.Number(number.from_int(3)), False),
+    #(value.Number(int_num(-3)), False),
+    #(value.Number(int_num(-2)), True),
+    #(value.Number(int_num(0)), True),
+    #(value.Number(int_num(2)), True),
+    #(value.Number(int_num(3)), False),
     #(value.String("2"), False),
   ])
 }
 
-@target(erlang)
 pub fn corpus_tagged_decision_test() {
   let assert Ok(quantity) = codec.integer_between(1, 100)
   let assert Ok(decision_tagged) =
@@ -337,20 +314,14 @@ pub fn corpus_tagged_decision_test() {
     #(
       value.Object([
         #("tag", value.String("approve")),
-        #(
-          "value",
-          value.Object([#("quantity", value.Number(number.from_int(1)))]),
-        ),
+        #("value", value.Object([#("quantity", value.Number(int_num(1)))])),
       ]),
       True,
     ),
     #(
       value.Object([
         #("tag", value.String("approve")),
-        #(
-          "value",
-          value.Object([#("quantity", value.Number(number.from_int(0)))]),
-        ),
+        #("value", value.Object([#("quantity", value.Number(int_num(0)))])),
       ]),
       False,
     ),
@@ -382,7 +353,6 @@ pub fn corpus_tagged_decision_test() {
   ])
 }
 
-@target(erlang)
 pub fn value_to_json_string(val: value.Value) -> String {
   case val {
     value.Null -> "null"

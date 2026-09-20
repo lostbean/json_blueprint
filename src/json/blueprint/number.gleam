@@ -34,6 +34,7 @@ pub type IntegerProjectionLimitError {
 pub type IntegerProjectionError {
   FractionalInteger
   IntegerDigitLimitExceeded
+  UnsupportedNativeInteger
 }
 
 pub type FloatProjectionError {
@@ -41,6 +42,12 @@ pub type FloatProjectionError {
   FloatUnderflow
   FloatInexact
   InvalidFloatCandidate
+}
+
+pub type IntegerConstructionError {
+  NonFiniteInteger
+  NonIntegerValue
+  UnsafeNativeInteger
 }
 
 pub type FloatConstructionError {
@@ -76,120 +83,84 @@ pub fn integer_projection_limit(
   }
 }
 
-// ---------------------------------------------------------------------------
-// JavaScript target definitions (honest named todos, no throwing FFI)
-// ---------------------------------------------------------------------------
-
-@target(javascript)
-pub fn parse_number(
-  _limits: NumberLimits,
-  _token: String,
-) -> Result(Number, NumberError) {
-  todo as "JavaScript exact number parser not implemented"
-}
-
-@target(javascript)
-pub fn number_text(_number: Number) -> String {
-  todo as "JavaScript canonical number text not implemented"
-}
-
-@target(javascript)
-pub fn compare(_left: Number, _right: Number) -> NumberOrder {
-  todo as "JavaScript number comparison not implemented"
-}
-
-@target(javascript)
-pub fn to_int_exact(
-  _number: Number,
-  _limit: IntegerProjectionLimit,
-) -> Result(Int, IntegerProjectionError) {
-  todo as "JavaScript exact integer projection not implemented"
-}
-
-@target(javascript)
-pub fn from_int(_value: Int) -> Number {
-  todo as "JavaScript exact number from_int not implemented"
-}
-
-@target(javascript)
-pub fn is_integer(_number: Number) -> Bool {
-  todo as "JavaScript exact number is_integer not implemented"
-}
-
-@target(javascript)
-pub fn from_float_exact(
-  _value: Float,
-) -> Result(Number, FloatConstructionError) {
-  todo as "JavaScript exact number from_float_exact not implemented"
-}
-
-@target(javascript)
-pub fn to_float_exact(_number: Number) -> Result(Float, FloatProjectionError) {
-  todo as "JavaScript exact number to_float_exact not implemented"
-}
-
-// ---------------------------------------------------------------------------
-// Erlang target implementation (complete exact-number kernel)
-// ---------------------------------------------------------------------------
-
-@target(erlang)
-type FloatParts {
-  FiniteParts(negative: Bool, significand: Int, exponent2: Int)
-  NonFiniteParts
-}
-
-@target(erlang)
-type FloatCandidate {
+pub type FloatCandidate {
   CandidateValue(Float)
   CandidateOverflow
   CandidateInvalid
 }
 
-@target(erlang)
 @external(erlang, "json_number_ffi", "byte_length")
+@external(javascript, "../../json_number_ffi.mjs", "byte_length")
 fn native_byte_length(value: String) -> Int
 
-@target(erlang)
 @external(erlang, "json_number_ffi", "byte_codes")
+@external(javascript, "../../json_number_ffi.mjs", "byte_codes")
 fn native_byte_codes(value: String) -> List(Int)
 
-@target(erlang)
 @external(erlang, "json_number_ffi", "ascii_string")
+@external(javascript, "../../json_number_ffi.mjs", "ascii_string")
 fn native_ascii_string(bytes: List(Int)) -> String
 
-@target(erlang)
 @external(erlang, "json_number_ffi", "integer_to_string")
+@external(javascript, "../../json_number_ffi.mjs", "integer_to_string")
 fn native_integer_to_string(value: Int) -> String
 
-@target(erlang)
-@external(erlang, "json_number_ffi", "integer_divide")
-fn native_integer_divide(dividend: Int, divisor: Int) -> Int
+@external(erlang, "json_number_ffi", "validate_native_int")
+@external(javascript, "../../json_number_ffi.mjs", "validate_native_int")
+fn native_validate_native_int(
+  value: Int,
+  on_non_finite: IntegerConstructionError,
+  on_fractional: IntegerConstructionError,
+  on_unsupported: IntegerConstructionError,
+) -> Result(String, IntegerConstructionError)
 
-@target(erlang)
-@external(erlang, "json_number_ffi", "integer_remainder")
-fn native_integer_remainder(dividend: Int, divisor: Int) -> Int
-
-@target(erlang)
 @external(erlang, "json_number_ffi", "float_parts")
-fn native_float_parts(value: Float) -> FloatParts
+@external(javascript, "../../json_number_ffi.mjs", "float_parts")
+fn native_float_parts(value: Float) -> Result(#(Bool, Int, Int), Nil)
 
-@target(erlang)
 @external(erlang, "json_number_ffi", "parse_float_candidate")
-fn native_parse_float_candidate(value: String) -> FloatCandidate
+@external(javascript, "../../json_number_ffi.mjs", "parse_float_candidate")
+fn native_parse_float_candidate(
+  value: String,
+  on_value: fn(Float) -> FloatCandidate,
+  on_overflow: FloatCandidate,
+  on_invalid: FloatCandidate,
+) -> FloatCandidate
 
-@target(erlang)
+@external(erlang, "json_number_ffi", "float_to_decimal")
+@external(javascript, "../../json_number_ffi.mjs", "float_to_decimal")
+fn native_float_to_decimal(
+  significand: Int,
+  exponent2: Int,
+) -> #(List(Int), Int)
+
+@external(erlang, "json_number_ffi", "decimal_equals_binary")
+@external(javascript, "../../json_number_ffi.mjs", "decimal_equals_binary")
+fn native_decimal_equals_binary(
+  decimal_digits: List(Int),
+  decimal_exponent: Int,
+  binary_significand: Int,
+  binary_exponent: Int,
+) -> Bool
+
+@external(erlang, "json_number_ffi", "project_native_int")
+@external(javascript, "../../json_number_ffi.mjs", "project_native_int")
+fn native_project_native_int(
+  negative: Bool,
+  digits: List(Int),
+  exponent10: Int,
+) -> Result(Int, Nil)
+
 type ExponentPart {
   NoExponent
   HasExponent(List(Int))
 }
 
-@target(erlang)
 type DecimalPart {
   IntegerPart(List(Int))
   FractionalPart(List(Int), List(Int))
 }
 
-@target(erlang)
 pub fn parse_number(
   limits: NumberLimits,
   token: String,
@@ -203,7 +174,6 @@ pub fn parse_number(
   }
 }
 
-@target(erlang)
 fn parse_within_token_limit(
   max_significand_digits: Int,
   max_abs_exponent: Int,
@@ -244,7 +214,6 @@ fn parse_within_token_limit(
   }
 }
 
-@target(erlang)
 fn normalize_parsed_number(
   token_length: Int,
   max_abs_exponent: Int,
@@ -278,7 +247,6 @@ fn normalize_parsed_number(
   }
 }
 
-@target(erlang)
 pub fn number_text(number: Number) -> String {
   let Number(negative, coefficient, exponent10) = number
   case coefficient {
@@ -298,7 +266,6 @@ pub fn number_text(number: Number) -> String {
   }
 }
 
-@target(erlang)
 fn match_coefficient_digits(digits: List(Int)) -> String {
   case digits {
     [] -> ""
@@ -308,7 +275,6 @@ fn match_coefficient_digits(digits: List(Int)) -> String {
   }
 }
 
-@target(erlang)
 pub fn compare(left: Number, right: Number) -> NumberOrder {
   let Number(left_negative, left_digits, left_exponent) = left
   let Number(right_negative, right_digits, right_exponent) = right
@@ -346,7 +312,6 @@ pub fn compare(left: Number, right: Number) -> NumberOrder {
   }
 }
 
-@target(erlang)
 fn compare_magnitudes(
   left_digits: List(Int),
   left_exponent: Int,
@@ -361,7 +326,6 @@ fn compare_magnitudes(
   }
 }
 
-@target(erlang)
 fn compare_padded_digits(left: List(Int), right: List(Int)) -> NumberOrder {
   case left, right {
     [], [] -> EqualTo
@@ -383,7 +347,6 @@ fn compare_padded_digits(left: List(Int), right: List(Int)) -> NumberOrder {
   }
 }
 
-@target(erlang)
 fn compare_ints(left: Int, right: Int) -> NumberOrder {
   case left {
     _ if left < right -> LessThan
@@ -392,7 +355,6 @@ fn compare_ints(left: Int, right: Int) -> NumberOrder {
   }
 }
 
-@target(erlang)
 fn reverse_order(order: NumberOrder) -> NumberOrder {
   case order {
     LessThan -> GreaterThan
@@ -401,7 +363,6 @@ fn reverse_order(order: NumberOrder) -> NumberOrder {
   }
 }
 
-@target(erlang)
 pub fn to_int_exact(
   number: Number,
   limit: IntegerProjectionLimit,
@@ -417,84 +378,91 @@ pub fn to_int_exact(
           let output_digits = list_length(coefficient) + exponent10
           case output_digits > max_digits {
             True -> Error(IntegerDigitLimitExceeded)
-            False -> {
-              let integer_coefficient = decimal_digits_to_int(coefficient)
-              let integer_value = integer_coefficient * power(10, exponent10)
-              case negative {
-                True -> Ok(-integer_value)
-                False -> Ok(integer_value)
+            False ->
+              case
+                native_project_native_int(negative, coefficient, exponent10)
+              {
+                Ok(value) -> Ok(value)
+                Error(Nil) -> Error(UnsupportedNativeInteger)
               }
-            }
           }
         }
       }
   }
 }
 
-@target(erlang)
 pub fn is_integer(number: Number) -> Bool {
   let Number(_, coefficient, exponent10) = number
   coefficient == [48] || exponent10 >= 0
 }
 
-@target(erlang)
-pub fn from_int(value: Int) -> Number {
-  let text = native_integer_to_string(value)
-  let chars = native_byte_codes(text)
-  let #(negative, digits) = strip_negative_sign(chars)
-  let normalized_digits = drop_leading_zeroes(digits)
-  case normalized_digits {
-    [] -> Number(False, [48], 0)
-    _ -> {
-      let #(coefficient, exponent10) =
-        trim_trailing_zeroes(normalized_digits, 0)
-      Number(negative, coefficient, exponent10)
+pub fn from_int(value: Int) -> Result(Number, IntegerConstructionError) {
+  case
+    native_validate_native_int(
+      value,
+      NonFiniteInteger,
+      NonIntegerValue,
+      UnsafeNativeInteger,
+    )
+  {
+    Error(err) -> Error(err)
+    Ok(text) -> {
+      let chars = native_byte_codes(text)
+      let #(negative, digits) = strip_negative_sign(chars)
+      let normalized_digits = drop_leading_zeroes(digits)
+      case normalized_digits {
+        [] -> Ok(Number(False, [48], 0))
+        _ -> {
+          let #(coefficient, exponent10) =
+            trim_trailing_zeroes(normalized_digits, 0)
+          Ok(Number(negative, coefficient, exponent10))
+        }
+      }
     }
   }
 }
 
-@target(erlang)
 pub fn from_float_exact(
   value: Float,
 ) -> Result(Number, FloatConstructionError) {
   case native_float_parts(value) {
-    NonFiniteParts -> Error(NonFiniteFloat)
-    FiniteParts(_, 0, _) -> Ok(Number(False, [48], 0))
-    FiniteParts(negative, significand, exponent2) -> {
-      let #(coefficient, exponent10) = case exponent2 {
-        exponent2 if exponent2 >= 0 -> #(significand * power(2, exponent2), 0)
-        exponent2 -> #(significand * power(5, -exponent2), exponent2)
-      }
-      let #(normalized_digits, normalized_exponent) =
-        trim_trailing_zeroes(
-          native_byte_codes(native_integer_to_string(coefficient)),
-          exponent10,
-        )
-      Ok(Number(negative, normalized_digits, normalized_exponent))
+    Error(Nil) -> Error(NonFiniteFloat)
+    Ok(#(_, 0, _)) -> Ok(Number(False, [48], 0))
+    Ok(#(negative, significand, exponent2)) -> {
+      let #(digits, exponent10) =
+        native_float_to_decimal(significand, exponent2)
+      let #(coefficient, normalized_exponent) =
+        trim_trailing_zeroes(digits, exponent10)
+      Ok(Number(negative, coefficient, normalized_exponent))
     }
   }
 }
 
-@target(erlang)
 pub fn to_float_exact(number: Number) -> Result(Float, FloatProjectionError) {
   let Number(negative, coefficient, exponent10) = number
   case coefficient == [48] {
     True -> Ok(0.0)
     False ->
-      case native_parse_float_candidate(number_text(number)) {
+      case
+        native_parse_float_candidate(
+          number_text(number),
+          CandidateValue,
+          CandidateOverflow,
+          CandidateInvalid,
+        )
+      {
         CandidateOverflow -> Error(FloatOverflow)
         CandidateInvalid -> Error(InvalidFloatCandidate)
         CandidateValue(candidate) ->
           case native_float_parts(candidate) {
-            NonFiniteParts -> Error(FloatOverflow)
-            FiniteParts(_, 0, _) -> Error(FloatUnderflow)
-            FiniteParts(candidate_negative, significand, exponent2) ->
+            Error(Nil) -> Error(FloatOverflow)
+            Ok(#(_, 0, _)) -> Error(FloatUnderflow)
+            Ok(#(candidate_negative, significand, exponent2)) ->
               case
-                decimal_equals_binary_float(
-                  negative,
+                candidate_negative == negative
+                && native_decimal_equals_binary(
                   coefficient,
                   exponent10,
-                  candidate_negative,
                   significand,
                   exponent2,
                 )
@@ -507,61 +475,10 @@ pub fn to_float_exact(number: Number) -> Result(Float, FloatProjectionError) {
   }
 }
 
-@target(erlang)
-fn decimal_equals_binary_float(
-  decimal_negative: Bool,
-  decimal_digits: List(Int),
-  decimal_exponent: Int,
-  binary_negative: Bool,
-  binary_significand: Int,
-  binary_exponent: Int,
-) -> Bool {
-  case decimal_negative == binary_negative {
-    False -> False
-    True -> {
-      let #(normalized_significand, normalized_binary_exponent) =
-        remove_binary_trailing_zeroes(binary_significand, binary_exponent)
-      let decimal_significand = decimal_digits_to_int(decimal_digits)
-      case decimal_exponent >= 0, normalized_binary_exponent >= 0 {
-        True, True ->
-          decimal_significand * power(10, decimal_exponent)
-          == normalized_significand * power(2, normalized_binary_exponent)
-        True, False -> False
-        False, True -> False
-        False, False -> {
-          let decimal_denominator_exponent = -decimal_exponent
-          let binary_denominator_exponent = -normalized_binary_exponent
-          decimal_significand * power(2, binary_denominator_exponent)
-          == normalized_significand
-          * power(2, decimal_denominator_exponent)
-          * power(5, decimal_denominator_exponent)
-        }
-      }
-    }
-  }
-}
-
-@target(erlang)
-fn remove_binary_trailing_zeroes(
-  significand: Int,
-  exponent2: Int,
-) -> #(Int, Int) {
-  case native_integer_remainder(significand, 2) {
-    0 ->
-      remove_binary_trailing_zeroes(
-        native_integer_divide(significand, 2),
-        exponent2 + 1,
-      )
-    _ -> #(significand, exponent2)
-  }
-}
-
-@target(erlang)
 fn trim_trailing_zeroes(digits: List(Int), exponent: Int) -> #(List(Int), Int) {
   remove_trailing_zeroes_reversed(reverse_list(digits), exponent)
 }
 
-@target(erlang)
 fn remove_trailing_zeroes_reversed(
   reversed_digits: List(Int),
   exponent: Int,
@@ -572,21 +489,6 @@ fn remove_trailing_zeroes_reversed(
   }
 }
 
-@target(erlang)
-fn decimal_digits_to_int(digits: List(Int)) -> Int {
-  decimal_digits_to_int_acc(digits, 0)
-}
-
-@target(erlang)
-fn decimal_digits_to_int_acc(digits: List(Int), current: Int) -> Int {
-  case digits {
-    [] -> current
-    [digit, ..rest] ->
-      decimal_digits_to_int_acc(rest, current * 10 + digit_value(digit))
-  }
-}
-
-@target(erlang)
 fn digit_value(digit: Int) -> Int {
   case digit {
     48 -> 0
@@ -603,22 +505,6 @@ fn digit_value(digit: Int) -> Int {
   }
 }
 
-@target(erlang)
-fn power(base: Int, exponent: Int) -> Int {
-  case exponent <= 0 {
-    True -> 1
-    False ->
-      case native_integer_remainder(exponent, 2) {
-        0 -> {
-          let half = power(base, native_integer_divide(exponent, 2))
-          half * half
-        }
-        _ -> base * power(base, exponent - 1)
-      }
-  }
-}
-
-@target(erlang)
 fn strip_negative_sign(chars: List(Int)) -> #(Bool, List(Int)) {
   case chars {
     [45, ..rest] -> #(True, rest)
@@ -626,7 +512,6 @@ fn strip_negative_sign(chars: List(Int)) -> #(Bool, List(Int)) {
   }
 }
 
-@target(erlang)
 fn split_exponent(
   chars: List(Int),
   before_reversed: List(Int),
@@ -642,7 +527,6 @@ fn split_exponent(
   }
 }
 
-@target(erlang)
 fn contains_exponent_marker(chars: List(Int)) -> Bool {
   case chars {
     [] -> False
@@ -651,7 +535,6 @@ fn contains_exponent_marker(chars: List(Int)) -> Bool {
   }
 }
 
-@target(erlang)
 fn split_decimal(
   chars: List(Int),
   before_reversed: List(Int),
@@ -667,7 +550,6 @@ fn split_decimal(
   }
 }
 
-@target(erlang)
 fn contains_decimal_point(chars: List(Int)) -> Bool {
   case chars {
     [] -> False
@@ -676,7 +558,6 @@ fn contains_decimal_point(chars: List(Int)) -> Bool {
   }
 }
 
-@target(erlang)
 fn validated_significand(
   decimal_part: DecimalPart,
 ) -> Result(#(List(Int), List(Int)), Nil) {
@@ -697,7 +578,6 @@ fn validated_significand(
   }
 }
 
-@target(erlang)
 fn valid_integer_digits(chars: List(Int)) -> Bool {
   case chars {
     [48] -> True
@@ -706,7 +586,6 @@ fn valid_integer_digits(chars: List(Int)) -> Bool {
   }
 }
 
-@target(erlang)
 fn nonzero_digit(digit: Int) -> Bool {
   case digit {
     49 -> True
@@ -722,7 +601,6 @@ fn nonzero_digit(digit: Int) -> Bool {
   }
 }
 
-@target(erlang)
 fn all_digits(chars: List(Int)) -> Bool {
   case chars {
     [] -> True
@@ -730,12 +608,10 @@ fn all_digits(chars: List(Int)) -> Bool {
   }
 }
 
-@target(erlang)
 fn is_digit(digit: Int) -> Bool {
   nonzero_digit(digit) || digit == 48
 }
 
-@target(erlang)
 fn parse_written_exponent(
   exponent_part: ExponentPart,
   max_raw_magnitude: Int,
@@ -764,7 +640,6 @@ fn parse_written_exponent(
   }
 }
 
-@target(erlang)
 fn valid_exponent_shape(exponent_part: ExponentPart) -> Bool {
   case exponent_part {
     NoExponent -> True
@@ -775,7 +650,6 @@ fn valid_exponent_shape(exponent_part: ExponentPart) -> Bool {
   }
 }
 
-@target(erlang)
 fn strip_exponent_sign(chars: List(Int)) -> #(Bool, List(Int)) {
   case chars {
     [45, ..rest] -> #(True, rest)
@@ -784,7 +658,6 @@ fn strip_exponent_sign(chars: List(Int)) -> #(Bool, List(Int)) {
   }
 }
 
-@target(erlang)
 fn parse_bounded_digits(
   digits: List(Int),
   max_value: Int,
@@ -802,7 +675,6 @@ fn parse_bounded_digits(
   }
 }
 
-@target(erlang)
 fn drop_leading_zeroes(chars: List(Int)) -> List(Int) {
   case chars {
     [48, ..rest] -> drop_leading_zeroes(rest)
@@ -810,12 +682,10 @@ fn drop_leading_zeroes(chars: List(Int)) -> List(Int) {
   }
 }
 
-@target(erlang)
 fn reverse_list(items: List(a)) -> List(a) {
   reverse_acc(items, [])
 }
 
-@target(erlang)
 fn reverse_acc(items: List(a), reversed: List(a)) -> List(a) {
   case items {
     [] -> reversed
@@ -823,12 +693,10 @@ fn reverse_acc(items: List(a), reversed: List(a)) -> List(a) {
   }
 }
 
-@target(erlang)
 fn list_length(items: List(a)) -> Int {
   list_length_acc(items, 0)
 }
 
-@target(erlang)
 fn list_length_acc(items: List(a), length: Int) -> Int {
   case items {
     [] -> length
@@ -836,7 +704,6 @@ fn list_length_acc(items: List(a), length: Int) -> Int {
   }
 }
 
-@target(erlang)
 fn append(left: List(a), right: List(a)) -> List(a) {
   case left {
     [] -> right

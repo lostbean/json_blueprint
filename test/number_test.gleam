@@ -1,31 +1,68 @@
-@target(erlang)
 import gleam/string
-@target(erlang)
 import gleeunit/should
-@target(erlang)
 import json/blueprint/number
 
-@target(erlang)
-@external(erlang, "number_test_ffi", "float_from_bits")
-fn float_from_bits(bits: Int) -> Float
+@external(erlang, "number_test_ffi", "float_from_hex")
+@external(javascript, "./number_test_ffi.mjs", "float_from_hex")
+fn float_from_hex(hex: String) -> Float
 
-@target(erlang)
 @external(erlang, "number_test_ffi", "float_to_bits_hex")
+@external(javascript, "./number_test_ffi.mjs", "float_to_bits_hex")
 fn float_to_bits_hex(value: Float) -> String
 
-@target(erlang)
+@external(erlang, "number_test_ffi", "call_from_int_raw")
+@external(javascript, "./number_test_ffi.mjs", "call_from_int_raw")
+fn call_from_int_raw(
+  from_int_fn: fn(Int) -> Result(number.Number, number.IntegerConstructionError),
+  kind: String,
+) -> Result(number.Number, number.IntegerConstructionError)
+
 fn default_limits() -> number.NumberLimits {
   let assert Ok(limits) = number.number_limits(64, 32, 1200)
   limits
 }
 
-@target(erlang)
 fn default_projection_limit() -> number.IntegerProjectionLimit {
   let assert Ok(limit) = number.integer_projection_limit(24)
   limit
 }
 
 @target(erlang)
+fn assert_pow2_53_int_projection(
+  num: number.Number,
+  limit: number.IntegerProjectionLimit,
+) {
+  number.to_int_exact(num, limit)
+  |> should.equal(Ok(9_007_199_254_740_992))
+}
+
+@target(javascript)
+fn assert_pow2_53_int_projection(
+  num: number.Number,
+  limit: number.IntegerProjectionLimit,
+) {
+  number.to_int_exact(num, limit)
+  |> should.equal(Error(number.UnsupportedNativeInteger))
+}
+
+@target(erlang)
+fn assert_pow2_53_p1_int_projection(
+  num: number.Number,
+  limit: number.IntegerProjectionLimit,
+) {
+  number.to_int_exact(num, limit)
+  |> should.equal(Ok(9_007_199_254_740_993))
+}
+
+@target(javascript)
+fn assert_pow2_53_p1_int_projection(
+  num: number.Number,
+  limit: number.IntegerProjectionLimit,
+) {
+  number.to_int_exact(num, limit)
+  |> should.equal(Error(number.UnsupportedNativeInteger))
+}
+
 pub fn exact_number_kernel_test() {
   let assert Ok(limits) = number.number_limits(1024, 100, 1000)
   let assert Ok(int_limit) = number.integer_projection_limit(50)
@@ -42,7 +79,6 @@ pub fn exact_number_kernel_test() {
   |> should.equal(Ok(123))
 }
 
-@target(erlang)
 pub fn number_resource_limits_test() {
   let assert Ok(short_token_limits) = number.number_limits(5, 100, 1000)
   number.parse_number(short_token_limits, "123456")
@@ -56,12 +92,11 @@ pub fn number_resource_limits_test() {
   number.parse_number(small_exp_limits, "1e10")
   |> should.equal(Error(number.ExponentOutOfRange))
 
-  let assert Ok(default_limits) = number.number_limits(100, 100, 100)
-  number.parse_number(default_limits, "1.2.3")
+  let assert Ok(def_limits) = number.number_limits(100, 100, 100)
+  number.parse_number(def_limits, "1.2.3")
   |> should.equal(Error(number.InvalidSyntax))
 }
 
-@target(erlang)
 pub fn integer_projection_limits_test() {
   let assert Ok(limits) = number.number_limits(1024, 100, 1000)
   let assert Ok(digit_limit) = number.integer_projection_limit(2)
@@ -75,7 +110,6 @@ pub fn integer_projection_limits_test() {
   |> should.equal(Error(number.IntegerDigitLimitExceeded))
 }
 
-@target(erlang)
 pub fn limits_construction_errors_test() {
   number.number_limits(0, 1, 0)
   |> should.equal(Error(number.TokenLimitMustBePositive))
@@ -90,7 +124,6 @@ pub fn limits_construction_errors_test() {
   |> should.equal(Error(number.IntegerDigitLimitMustBePositive))
 }
 
-@target(erlang)
 pub fn parse_syntax_and_resource_errors_test() {
   let limits = default_limits()
 
@@ -144,7 +177,6 @@ pub fn parse_syntax_and_resource_errors_test() {
   |> should.equal(Error(number.ExponentOutOfRange))
 }
 
-@target(erlang)
 pub fn parse_accepted_numbers_test() {
   let limits = default_limits()
   let proj_limit = default_projection_limit()
@@ -256,8 +288,7 @@ pub fn parse_accepted_numbers_test() {
   let assert Ok(pow2_53) = number.parse_number(limits, "9007199254740992")
   number.number_text(pow2_53) |> should.equal("9.007199254740992e15")
   number.is_integer(pow2_53) |> should.equal(True)
-  number.to_int_exact(pow2_53, proj_limit)
-  |> should.equal(Ok(9_007_199_254_740_992))
+  assert_pow2_53_int_projection(pow2_53, proj_limit)
   number.to_float_exact(pow2_53)
   |> should.equal(Ok(9_007_199_254_740_992.0))
 
@@ -265,8 +296,7 @@ pub fn parse_accepted_numbers_test() {
   let assert Ok(pow2_53_p1) = number.parse_number(limits, "9007199254740993")
   number.number_text(pow2_53_p1) |> should.equal("9.007199254740993e15")
   number.is_integer(pow2_53_p1) |> should.equal(True)
-  number.to_int_exact(pow2_53_p1, proj_limit)
-  |> should.equal(Ok(9_007_199_254_740_993))
+  assert_pow2_53_p1_int_projection(pow2_53_p1, proj_limit)
   number.to_float_exact(pow2_53_p1)
   |> should.equal(Error(number.FloatInexact))
 
@@ -347,7 +377,6 @@ pub fn parse_accepted_numbers_test() {
   |> should.equal(Error(number.FloatInexact))
 }
 
-@target(erlang)
 pub fn compare_cases_test() {
   let limits = default_limits()
   let parse = fn(tok) {
@@ -390,33 +419,32 @@ pub fn compare_cases_test() {
   |> should.equal(number.LessThan)
 }
 
-@target(erlang)
 pub fn from_float_exact_cases_test() {
   // 7 float fixtures from oracle suite + nonfinite check
 
   // 1. Positive Zero (0x0000000000000000)
-  let pos_zero_f = float_from_bits(0x0000000000000000)
+  let pos_zero_f = float_from_hex("0000000000000000")
   let assert Ok(pos_zero_num) = number.from_float_exact(pos_zero_f)
   number.number_text(pos_zero_num) |> should.equal("0")
   let assert Ok(pos_zero_rt) = number.to_float_exact(pos_zero_num)
   float_to_bits_hex(pos_zero_rt) |> should.equal("0000000000000000")
 
   // 2. Negative Zero (0x8000000000000000) -> forgets sign, canonical "0", roundtrip bits 0x0000000000000000
-  let neg_zero_f = float_from_bits(0x8000000000000000)
+  let neg_zero_f = float_from_hex("8000000000000000")
   let assert Ok(neg_zero_num) = number.from_float_exact(neg_zero_f)
   number.number_text(neg_zero_num) |> should.equal("0")
   let assert Ok(neg_zero_rt) = number.to_float_exact(neg_zero_num)
   float_to_bits_hex(neg_zero_rt) |> should.equal("0000000000000000")
 
   // 3. Half (0x3fe0000000000000, 0.5) -> canonical "5e-1", roundtrip bits 0x3fe0000000000000
-  let half_f = float_from_bits(0x3fe0000000000000)
+  let half_f = float_from_hex("3fe0000000000000")
   let assert Ok(half_num) = number.from_float_exact(half_f)
   number.number_text(half_num) |> should.equal("5e-1")
   let assert Ok(half_rt) = number.to_float_exact(half_num)
   float_to_bits_hex(half_rt) |> should.equal("3fe0000000000000")
 
   // 4. Tenth (0x3fb999999999999a) -> exact binary rational decimal, roundtrip bits 0x3fb999999999999a
-  let tenth_f = float_from_bits(0x3fb999999999999a)
+  let tenth_f = float_from_hex("3fb999999999999a")
   let assert Ok(tenth_num) = number.from_float_exact(tenth_f)
   number.number_text(tenth_num)
   |> should.equal("1.000000000000000055511151231257827021181583404541015625e-1")
@@ -424,7 +452,7 @@ pub fn from_float_exact_cases_test() {
   float_to_bits_hex(tenth_rt) |> should.equal("3fb999999999999a")
 
   // 5. Minimum Subnormal (0x0000000000000001, 5e-324) -> exact subnormal decimal, roundtrip bits 0x0000000000000001
-  let subnorm_f = float_from_bits(0x0000000000000001)
+  let subnorm_f = float_from_hex("0000000000000001")
   let assert Ok(subnorm_num) = number.from_float_exact(subnorm_f)
   number.number_text(subnorm_num)
   |> should.equal(
@@ -434,7 +462,7 @@ pub fn from_float_exact_cases_test() {
   float_to_bits_hex(subnorm_rt) |> should.equal("0000000000000001")
 
   // 6. Maximum Finite (0x7fefffffffffffff) -> exact binary64 max decimal, roundtrip bits 0x7fefffffffffffff
-  let max_f = float_from_bits(0x7fefffffffffffff)
+  let max_f = float_from_hex("7fefffffffffffff")
   let assert Ok(max_num) = number.from_float_exact(max_f)
   number.number_text(max_num)
   |> should.equal(
@@ -444,7 +472,7 @@ pub fn from_float_exact_cases_test() {
   float_to_bits_hex(max_rt) |> should.equal("7fefffffffffffff")
 
   // 7. Negative Tenth (0xbfb999999999999a) -> negative exact decimal, roundtrip bits 0xbfb999999999999a
-  let neg_tenth_f = float_from_bits(0xbfb999999999999a)
+  let neg_tenth_f = float_from_hex("bfb999999999999a")
   let assert Ok(neg_tenth_num) = number.from_float_exact(neg_tenth_f)
   number.number_text(neg_tenth_num)
   |> should.equal(
@@ -454,35 +482,87 @@ pub fn from_float_exact_cases_test() {
   float_to_bits_hex(neg_tenth_rt) |> should.equal("bfb999999999999a")
 }
 
-@target(erlang)
 pub fn from_int_cases_test() {
   let proj_limit = default_projection_limit()
 
-  // 5 integer fixtures from oracle suite
-
   // 0 -> canonical "0", int 0
-  let zero = number.from_int(0)
+  let assert Ok(zero) = number.from_int(0)
   number.number_text(zero) |> should.equal("0")
   number.to_int_exact(zero, proj_limit) |> should.equal(Ok(0))
 
   // 12 -> canonical "1.2e1", int 12
-  let twelve = number.from_int(12)
+  let assert Ok(twelve) = number.from_int(12)
   number.number_text(twelve) |> should.equal("1.2e1")
   number.to_int_exact(twelve, proj_limit) |> should.equal(Ok(12))
 
   // 120 -> canonical "1.2e2", int 120
-  let one_twenty = number.from_int(120)
+  let assert Ok(one_twenty) = number.from_int(120)
   number.number_text(one_twenty) |> should.equal("1.2e2")
   number.to_int_exact(one_twenty, proj_limit) |> should.equal(Ok(120))
 
   // -120 -> canonical "-1.2e2", int -120
-  let neg_one_twenty = number.from_int(-120)
+  let assert Ok(neg_one_twenty) = number.from_int(-120)
   number.number_text(neg_one_twenty) |> should.equal("-1.2e2")
   number.to_int_exact(neg_one_twenty, proj_limit) |> should.equal(Ok(-120))
+}
 
+@target(erlang)
+pub fn from_int_large_case_test() {
+  let proj_limit = default_projection_limit()
   // 9_007_199_254_740_993 -> canonical "9.007199254740993e15", int 9_007_199_254_740_993
-  let large_int = number.from_int(9_007_199_254_740_993)
+  let assert Ok(large_int) = number.from_int(9_007_199_254_740_993)
   number.number_text(large_int) |> should.equal("9.007199254740993e15")
   number.to_int_exact(large_int, proj_limit)
   |> should.equal(Ok(9_007_199_254_740_993))
+}
+
+@target(javascript)
+pub fn from_int_large_case_test() {
+  let proj_limit = default_projection_limit()
+  // On JS, the maximum safe native integer is 9_007_199_254_740_991 (2^53 - 1)
+  let assert Ok(max_safe) = number.from_int(9_007_199_254_740_991)
+  number.number_text(max_safe) |> should.equal("9.007199254740991e15")
+  number.to_int_exact(max_safe, proj_limit)
+  |> should.equal(Ok(9_007_199_254_740_991))
+}
+
+@target(javascript)
+pub fn from_int_js_adversarial_guard_test() {
+  call_from_int_raw(number.from_int, "nan")
+  |> should.equal(Error(number.NonFiniteInteger))
+
+  call_from_int_raw(number.from_int, "infinity")
+  |> should.equal(Error(number.NonFiniteInteger))
+
+  call_from_int_raw(number.from_int, "neg_infinity")
+  |> should.equal(Error(number.NonFiniteInteger))
+
+  call_from_int_raw(number.from_int, "fractional")
+  |> should.equal(Error(number.NonIntegerValue))
+
+  call_from_int_raw(number.from_int, "unsafe_int")
+  |> should.equal(Error(number.UnsafeNativeInteger))
+
+  // In JS, 9007199254740993 rounds to 9007199254740992 before construction;
+  // it must be rejected with UnsafeNativeInteger, not silently accepted.
+  call_from_int_raw(number.from_int, "rounded_before_construction")
+  |> should.equal(Error(number.UnsafeNativeInteger))
+
+  call_from_int_raw(number.from_int, "neg_unsafe_int")
+  |> should.equal(Error(number.UnsafeNativeInteger))
+
+  call_from_int_raw(number.from_int, "max_safe")
+  |> should.be_ok
+
+  call_from_int_raw(number.from_int, "min_safe")
+  |> should.be_ok
+}
+
+@target(erlang)
+pub fn from_int_erlang_adversarial_guard_test() {
+  call_from_int_raw(number.from_int, "nan")
+  |> should.equal(Error(number.NonFiniteInteger))
+
+  call_from_int_raw(number.from_int, "fractional")
+  |> should.equal(Error(number.NonIntegerValue))
 }

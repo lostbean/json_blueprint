@@ -1,30 +1,27 @@
-@target(erlang)
 import gleeunit/should
-@target(erlang)
 import json/blueprint/codec
-@target(erlang)
 import json/blueprint/number
-@target(erlang)
 import json/blueprint/value
 
-@target(erlang)
 pub type Priority {
   Low
   Normal
   Urgent
 }
 
-@target(erlang)
 pub type SimpleRecord {
   SimpleRecord(title: String, count: Int, note: codec.Optional(String))
 }
 
-@target(erlang)
 fn cannot_decode(reason: codec.DecodeReason) -> Result(a, codec.DecodeError) {
   Error(codec.CannotDecode(reason))
 }
 
-@target(erlang)
+fn int_num(n: Int) -> number.Number {
+  let assert Ok(num) = number.from_int(n)
+  num
+}
+
 pub fn string_codec_test() {
   let c = codec.string()
   codec.encode(c, "hello")
@@ -40,10 +37,9 @@ pub fn string_codec_test() {
   |> should.equal(Ok(codec.StringSchema))
 }
 
-@target(erlang)
 pub fn int_codec_test() {
   let c = codec.int()
-  let expected_num = number.from_int(42)
+  let expected_num = int_num(42)
 
   codec.encode(c, 42)
   |> should.equal(Ok(value.Number(expected_num)))
@@ -58,10 +54,9 @@ pub fn int_codec_test() {
   |> should.equal(Ok(codec.IntSchema))
 }
 
-@target(erlang)
 pub fn number_codec_test() {
   let c = codec.number()
-  let num = number.from_int(99)
+  let num = int_num(99)
 
   codec.encode(c, num)
   |> should.equal(Ok(value.Number(num)))
@@ -76,7 +71,6 @@ pub fn number_codec_test() {
   |> should.equal(Ok(codec.NumberSchema))
 }
 
-@target(erlang)
 pub fn bool_codec_test() {
   let c = codec.bool()
 
@@ -97,18 +91,17 @@ pub fn bool_codec_test() {
   |> should.equal(Ok(codec.BoolSchema))
 }
 
-@target(erlang)
 pub fn pair_codec_test() {
   let c = codec.pair(codec.string(), codec.int())
 
   codec.encode(c, #("item", 10))
   |> should.equal(
-    Ok(value.Array([value.String("item"), value.Number(number.from_int(10))])),
+    Ok(value.Array([value.String("item"), value.Number(int_num(10))])),
   )
 
   codec.decode(
     c,
-    value.Array([value.String("item"), value.Number(number.from_int(10))]),
+    value.Array([value.String("item"), value.Number(int_num(10))]),
   )
   |> should.equal(Ok(#("item", 10)))
 
@@ -121,10 +114,7 @@ pub fn pair_codec_test() {
   |> should.equal(cannot_decode(codec.DecodeExpectedArray))
 
   // Element error at index
-  codec.decode(
-    c,
-    value.Array([value.Bool(False), value.Number(number.from_int(10))]),
-  )
+  codec.decode(c, value.Array([value.Bool(False), value.Number(int_num(10))]))
   |> should.equal(
     Error(codec.DecodeAtIndex(0, codec.CannotDecode(codec.DecodeExpectedString))),
   )
@@ -133,7 +123,6 @@ pub fn pair_codec_test() {
   |> should.equal(Ok(codec.PairSchema(codec.StringSchema, codec.IntSchema)))
 }
 
-@target(erlang)
 pub fn list_codec_test() {
   let c = codec.list(codec.string())
 
@@ -155,7 +144,6 @@ pub fn list_codec_test() {
   |> should.equal(Ok(codec.ListSchema(codec.StringSchema)))
 }
 
-@target(erlang)
 pub fn nullable_codec_test() {
   let c = codec.nullable(codec.string())
 
@@ -178,7 +166,6 @@ pub fn nullable_codec_test() {
   |> should.equal(Ok(codec.NullableSchema(codec.StringSchema)))
 }
 
-@target(erlang)
 pub fn object_codec_test() {
   let assert Ok(props1) =
     codec.combine(
@@ -207,7 +194,7 @@ pub fn object_codec_test() {
     Ok(
       value.Object([
         #("title", value.String("Book")),
-        #("count", value.Number(number.from_int(5))),
+        #("count", value.Number(int_num(5))),
         #("note", value.String("First edition")),
       ]),
     ),
@@ -219,7 +206,7 @@ pub fn object_codec_test() {
     Ok(
       value.Object([
         #("title", value.String("Book")),
-        #("count", value.Number(number.from_int(5))),
+        #("count", value.Number(int_num(5))),
       ]),
     ),
   )
@@ -229,7 +216,7 @@ pub fn object_codec_test() {
     record_codec,
     value.Object([
       #("title", value.String("Book")),
-      #("count", value.Number(number.from_int(5))),
+      #("count", value.Number(int_num(5))),
       #("note", value.String("First edition")),
     ]),
   )
@@ -240,7 +227,7 @@ pub fn object_codec_test() {
     record_codec,
     value.Object([
       #("title", value.String("Book")),
-      #("count", value.Number(number.from_int(5))),
+      #("count", value.Number(int_num(5))),
     ]),
   )
   |> should.equal(Ok(SimpleRecord("Book", 5, codec.Missing)))
@@ -259,7 +246,7 @@ pub fn object_codec_test() {
     record_codec,
     value.Object([
       #("title", value.String("Book")),
-      #("count", value.Number(number.from_int(5))),
+      #("count", value.Number(int_num(5))),
       #("extra", value.Null),
     ]),
   )
@@ -275,7 +262,7 @@ pub fn object_codec_test() {
     record_codec,
     value.Object([
       #("title", value.String("Book")),
-      #("count", value.Number(number.from_int(5))),
+      #("count", value.Number(int_num(5))),
       #("title", value.String("Another")),
     ]),
   )
@@ -294,7 +281,6 @@ pub fn object_codec_test() {
   |> should.equal(Error(codec.DuplicateProperty("dup")))
 }
 
-@target(erlang)
 pub fn string_enum_test() {
   // Empty enum error
   let empty: Result(codec.Codec(Priority), codec.EnumError) =
@@ -328,14 +314,13 @@ pub fn string_enum_test() {
   |> should.equal(cannot_decode(codec.DecodeUnknownEnumLabel("critical")))
 
   // Non-string wire value
-  codec.decode(priority_codec, value.Number(number.from_int(10)))
+  codec.decode(priority_codec, value.Number(int_num(10)))
   |> should.equal(cannot_decode(codec.DecodeExpectedString))
 
   codec.schema(priority_codec)
   |> should.equal(Ok(codec.StringEnumSchema(["low", "normal", "urgent"])))
 }
 
-@target(erlang)
 pub fn tagged_union_test() {
   // Duplicate tag error
   codec.tagged("dup", codec.string(), "dup", codec.int())
@@ -363,7 +348,7 @@ pub fn tagged_union_test() {
   let expected_right_wire =
     value.Object([
       #("tag", value.String("right")),
-      #("value", value.Number(number.from_int(77))),
+      #("value", value.Number(int_num(77))),
     ])
 
   codec.encode(tagged_codec, right_val)
@@ -402,6 +387,35 @@ pub fn tagged_union_test() {
     )),
   )
 
+  // Present non-string tag returns structured wrong-type error
+  codec.decode(
+    tagged_codec,
+    value.Object([
+      #("tag", value.Number(int_num(123))),
+      #("value", value.String("hello")),
+    ]),
+  )
+  |> should.equal(
+    Error(codec.DecodeAtField(
+      "tag",
+      codec.CannotDecode(codec.DecodeExpectedString),
+    )),
+  )
+
+  codec.decode(
+    tagged_codec,
+    value.Object([
+      #("tag", value.Bool(True)),
+      #("value", value.String("hello")),
+    ]),
+  )
+  |> should.equal(
+    Error(codec.DecodeAtField(
+      "tag",
+      codec.CannotDecode(codec.DecodeExpectedString),
+    )),
+  )
+
   // Schema
   codec.schema(tagged_codec)
   |> should.equal(
@@ -409,7 +423,6 @@ pub fn tagged_union_test() {
   )
 }
 
-@target(erlang)
 pub fn range_codec_test() {
   // Reversed range error
   codec.integer_between(10, 5)
@@ -419,14 +432,14 @@ pub fn range_codec_test() {
 
   // In-bounds
   codec.encode(bounded_int, 5)
-  |> should.equal(Ok(value.Number(number.from_int(5))))
-  codec.decode(bounded_int, value.Number(number.from_int(5)))
+  |> should.equal(Ok(value.Number(int_num(5))))
+  codec.decode(bounded_int, value.Number(int_num(5)))
   |> should.equal(Ok(5))
 
   // Edge in-bounds
-  codec.decode(bounded_int, value.Number(number.from_int(1)))
+  codec.decode(bounded_int, value.Number(int_num(1)))
   |> should.equal(Ok(1))
-  codec.decode(bounded_int, value.Number(number.from_int(10)))
+  codec.decode(bounded_int, value.Number(int_num(10)))
   |> should.equal(Ok(10))
 
   // Out of bounds encode
@@ -440,9 +453,9 @@ pub fn range_codec_test() {
   )
 
   // Out of bounds decode
-  codec.decode(bounded_int, value.Number(number.from_int(0)))
+  codec.decode(bounded_int, value.Number(int_num(0)))
   |> should.equal(cannot_decode(codec.DecodeIntegerOutsideRange(1, 10, 0)))
-  codec.decode(bounded_int, value.Number(number.from_int(11)))
+  codec.decode(bounded_int, value.Number(int_num(11)))
   |> should.equal(cannot_decode(codec.DecodeIntegerOutsideRange(1, 10, 11)))
 
   // Schema
@@ -450,30 +463,25 @@ pub fn range_codec_test() {
   |> should.equal(Ok(codec.IntegerRangeSchema(1, 10)))
 
   // Number range
-  let min_num = number.from_int(-5)
-  let max_num = number.from_int(5)
+  let min_num = int_num(-5)
+  let max_num = int_num(5)
   let assert Ok(bounded_num) = codec.number_between(min_num, max_num)
 
-  codec.encode(bounded_num, number.from_int(0))
-  |> should.equal(Ok(value.Number(number.from_int(0))))
+  codec.encode(bounded_num, int_num(0))
+  |> should.equal(Ok(value.Number(int_num(0))))
 
-  codec.decode(bounded_num, value.Number(number.from_int(0)))
-  |> should.equal(Ok(number.from_int(0)))
+  codec.decode(bounded_num, value.Number(int_num(0)))
+  |> should.equal(Ok(int_num(0)))
 
-  codec.decode(bounded_num, value.Number(number.from_int(6)))
+  codec.decode(bounded_num, value.Number(int_num(6)))
   |> should.equal(
-    cannot_decode(codec.DecodeNumberOutsideRange(
-      min_num,
-      max_num,
-      number.from_int(6),
-    )),
+    cannot_decode(codec.DecodeNumberOutsideRange(min_num, max_num, int_num(6))),
   )
 
   codec.schema(bounded_num)
   |> should.equal(Ok(codec.NumberRangeSchema(min_num, max_num)))
 }
 
-@target(erlang)
 pub fn schema_document_test() {
   let doc = codec.schema_document(codec.StringSchema)
   doc
@@ -490,8 +498,8 @@ pub fn schema_document_test() {
     value.Object([
       #("$schema", value.String("https://json-schema.org/draft/2020-12/schema")),
       #("type", value.String("integer")),
-      #("minimum", value.Number(number.from_int(-2))),
-      #("maximum", value.Number(number.from_int(2))),
+      #("minimum", value.Number(int_num(-2))),
+      #("maximum", value.Number(int_num(2))),
     ]),
   )
 }

@@ -1,15 +1,14 @@
-@target(erlang)
 import gleeunit/should
-@target(erlang)
 import json/blueprint/codec
-@target(erlang)
 import json/blueprint/number
-@target(erlang)
 import json/blueprint/runtime
-@target(erlang)
 import json/blueprint/value
 
-@target(erlang)
+fn int_num(n: Int) -> number.Number {
+  let assert Ok(num) = number.from_int(n)
+  num
+}
+
 pub fn contract_normalization_sorting_test() {
   // Object properties should normalize in alphabetical order
   let unsorted_schema =
@@ -59,15 +58,14 @@ pub fn contract_normalization_sorting_test() {
   |> should.equal(True)
 }
 
-@target(erlang)
 pub fn contract_normalization_invariants_test() {
   // Reversed integer range
   runtime.from_schema(codec.IntegerRangeSchema(10, 5))
   |> should.equal(Error(runtime.ReversedIntegerRange(10, 5)))
 
   // Reversed number range
-  let min = number.from_int(20)
-  let max = number.from_int(10)
+  let min = int_num(20)
+  let max = int_num(10)
   runtime.from_schema(codec.NumberRangeSchema(min, max))
   |> should.equal(Error(runtime.ReversedNumberRange(min, max)))
 
@@ -98,11 +96,10 @@ pub fn contract_normalization_invariants_test() {
   |> should.equal(Error(runtime.DuplicateSchemaEnumLabel("a")))
 }
 
-@target(erlang)
 pub fn validation_located_errors_test() {
   // Root error
   let assert Ok(str_contract) = runtime.from_schema(codec.StringSchema)
-  runtime.validate(str_contract, value.Number(number.from_int(123)))
+  runtime.validate(str_contract, value.Number(int_num(123)))
   |> should.equal(Error(runtime.ValidationError([], runtime.ExpectedString)))
 
   // Nested object field error
@@ -205,7 +202,7 @@ pub fn validation_located_errors_test() {
   let valid_tagged =
     value.Object([
       #("tag", value.String("approve")),
-      #("value", value.Object([#("qty", value.Number(number.from_int(5)))])),
+      #("value", value.Object([#("qty", value.Number(int_num(5)))])),
     ])
   let assert Ok(validated) = runtime.validate(tagged_contract, valid_tagged)
   runtime.encoded(validated)
@@ -217,7 +214,7 @@ pub fn validation_located_errors_test() {
   let invalid_tagged =
     value.Object([
       #("tag", value.String("approve")),
-      #("value", value.Object([#("qty", value.Number(number.from_int(0)))])),
+      #("value", value.Object([#("qty", value.Number(int_num(0)))])),
     ])
   runtime.validate(tagged_contract, invalid_tagged)
   |> should.equal(
@@ -247,13 +244,11 @@ pub fn validation_located_errors_test() {
   )
 }
 
-@target(erlang)
 pub fn runtime_decode_test() {
   let c = codec.pair(codec.string(), codec.int())
   let assert Ok(contract) = runtime.from_codec(c)
 
-  let raw =
-    value.Array([value.String("item"), value.Number(number.from_int(42))])
+  let raw = value.Array([value.String("item"), value.Number(int_num(42))])
   let assert Ok(validated) = runtime.validate(contract, raw)
 
   runtime.decode(c, validated)

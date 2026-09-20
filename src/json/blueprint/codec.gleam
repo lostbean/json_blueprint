@@ -123,18 +123,31 @@ pub fn string() -> Codec(String) {
 
 pub fn int() -> Codec(Int) {
   let codec =
-    new(fn(n) { Ok(value.Number(number.from_int(n))) }, fn(v) {
-      case v {
-        value.Number(num) -> {
-          let assert Ok(limit) = number.integer_projection_limit(24)
-          case number.to_int_exact(num, limit) {
-            Ok(i) -> Ok(i)
-            Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-          }
+    new(
+      fn(n) {
+        case number.from_int(n) {
+          Ok(num) -> Ok(value.Number(num))
+          Error(number.NonFiniteInteger) ->
+            Error(CannotEncode(EncodeInvalidNativeValue("NonFiniteInteger")))
+          Error(number.NonIntegerValue) ->
+            Error(CannotEncode(EncodeInvalidNativeValue("NonIntegerValue")))
+          Error(number.UnsafeNativeInteger) ->
+            Error(CannotEncode(EncodeInvalidNativeValue("UnsafeNativeInteger")))
         }
-        _ -> Error(CannotDecode(DecodeExpectedInt))
-      }
-    })
+      },
+      fn(v) {
+        case v {
+          value.Number(num) -> {
+            let assert Ok(limit) = number.integer_projection_limit(24)
+            case number.to_int_exact(num, limit) {
+              Ok(i) -> Ok(i)
+              Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+            }
+          }
+          _ -> Error(CannotDecode(DecodeExpectedInt))
+        }
+      },
+    )
   Codec(..codec, schema: Ok(IntSchema))
 }
 
@@ -695,7 +708,10 @@ fn tagged_parts(raw: Value) -> Result(#(String, Value), DecodeError) {
                 "value",
                 CannotDecode(DecodeMissingTagPayload("Missing payload")),
               ))
-            _, _ -> Error(DecodeAtField("tag", CannotDecode(DecodeMissingTag)))
+            Present(_), _ ->
+              Error(DecodeAtField("tag", CannotDecode(DecodeExpectedString)))
+            Missing, _ ->
+              Error(DecodeAtField("tag", CannotDecode(DecodeMissingTag)))
           }
       }
     _ -> Error(CannotDecode(DecodeExpectedTaggedObject))
@@ -714,30 +730,43 @@ pub fn integer_between(
   case min > max {
     True -> Error(InvalidIntegerBounds(min, max))
     False ->
-      Ok(Codec(
-        fn(item) {
-          case item >= min && item <= max {
-            True -> Ok(value.Number(number.from_int(item)))
-            False ->
-              Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
-          }
-        },
-        fn(raw) {
-          case raw {
-            value.Number(num) -> {
-              let assert Ok(limit) = number.integer_projection_limit(24)
-              case number.to_int_exact(num, limit) {
-                Ok(item) if item >= min && item <= max -> Ok(item)
-                Ok(item) ->
-                  Error(CannotDecode(DecodeIntegerOutsideRange(min, max, item)))
-                Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+      case number.from_int(min), number.from_int(max) {
+        Ok(_), Ok(_) ->
+          Ok(Codec(
+            fn(item) {
+              case item >= min && item <= max {
+                True ->
+                  case number.from_int(item) {
+                    Ok(num) -> Ok(value.Number(num))
+                    Error(_) ->
+                      Error(
+                        CannotEncode(EncodeIntegerOutsideRange(min, max, item)),
+                      )
+                  }
+                False ->
+                  Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
               }
-            }
-            _ -> Error(CannotDecode(DecodeExpectedInt))
-          }
-        },
-        Ok(IntegerRangeSchema(min, max)),
-      ))
+            },
+            fn(raw) {
+              case raw {
+                value.Number(num) -> {
+                  let assert Ok(limit) = number.integer_projection_limit(24)
+                  case number.to_int_exact(num, limit) {
+                    Ok(item) if item >= min && item <= max -> Ok(item)
+                    Ok(item) ->
+                      Error(
+                        CannotDecode(DecodeIntegerOutsideRange(min, max, item)),
+                      )
+                    Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+                  }
+                }
+                _ -> Error(CannotDecode(DecodeExpectedInt))
+              }
+            },
+            Ok(IntegerRangeSchema(min, max)),
+          ))
+        _, _ -> Error(InvalidIntegerBounds(min, max))
+      }
   }
 }
 
@@ -789,13 +818,15 @@ pub fn schema_value(schema: Schema) -> Value {
     IntSchema -> value.Object([#("type", value.String("integer"))])
     NumberSchema -> value.Object([#("type", value.String("number"))])
     BoolSchema -> value.Object([#("type", value.String("boolean"))])
-    PairSchema(a, b) ->
+    PairSchema(a, b) -> {
+      let assert Ok(two) = number.from_int(2)
       value.Object([
         #("type", value.String("array")),
         #("prefixItems", value.Array([schema_value(a), schema_value(b)])),
-        #("minItems", value.Number(number.from_int(2))),
-        #("maxItems", value.Number(number.from_int(2))),
+        #("minItems", value.Number(two)),
+        #("maxItems", value.Number(two)),
       ])
+    }
     FieldSchema(name, inner) ->
       value.Object([
         #("type", value.String("object")),
@@ -836,12 +867,15 @@ pub fn schema_value(schema: Schema) -> Value {
           ]),
         ),
       ])
-    IntegerRangeSchema(min, max) ->
+    IntegerRangeSchema(min, max) -> {
+      let assert Ok(min_num) = number.from_int(min)
+      let assert Ok(max_num) = number.from_int(max)
       value.Object([
         #("type", value.String("integer")),
-        #("minimum", value.Number(number.from_int(min))),
-        #("maximum", value.Number(number.from_int(max))),
+        #("minimum", value.Number(min_num)),
+        #("maximum", value.Number(max_num)),
       ])
+    }
     NumberRangeSchema(min, max) ->
       value.Object([
         #("type", value.String("number")),

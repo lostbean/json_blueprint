@@ -1,28 +1,24 @@
-@target(erlang)
 import gleam/io
-@target(erlang)
 import gleam/list
-@target(erlang)
 import json/blueprint/codec
-@target(erlang)
 import json/blueprint/document
-@target(erlang)
 import json/blueprint/number
-@target(erlang)
 import json/blueprint/runtime
-@target(erlang)
 import json/blueprint/value
-@target(erlang)
 import schema_oracle_test.{
   Approve, Decline, EmptyLabel, Low, Normal, PriorityRequest, QuotedUnicodeLabel,
   UpdateRecord, Urgent, value_to_json_string,
 }
 
-@target(erlang)
+fn int_num(n: Int) -> number.Number {
+  let assert Ok(num) = number.from_int(n)
+  num
+}
+
 fn emit_cases(
-  label: String,
+  family: String,
   c: codec.Codec(a),
-  instances: List(value.Value),
+  cases: List(#(String, value.Value)),
 ) -> Nil {
   let assert Ok(schema) = codec.schema(c)
   let assert Ok(contract) = runtime.from_codec(c)
@@ -31,7 +27,9 @@ fn emit_cases(
   let assert True = runtime.same_schema(contract, loaded)
   let normalized_doc = codec.schema_document(runtime.schema(contract))
 
-  list.each(instances, fn(instance) {
+  list.each(cases, fn(item) {
+    let #(case_name, instance) = item
+    let case_id = family <> "/" <> case_name
     let accepted = case codec.decode(c, instance) {
       Ok(_) -> True
       Error(_) -> False
@@ -43,7 +41,8 @@ fn emit_cases(
 
     let payload =
       value.Object([
-        #("label", value.String(label)),
+        #("case_id", value.String(case_id)),
+        #("label", value.String(family)),
         #("schema", schema_doc),
         #("normalized_schema", normalized_doc),
         #("instance", instance),
@@ -53,9 +52,9 @@ fn emit_cases(
 
     io.println(value_to_json_string(payload))
   })
+  Nil
 }
 
-@target(erlang)
 pub fn main() -> Nil {
   // 1. finite-priority (8 cases)
   let assert Ok(priority) =
@@ -65,14 +64,14 @@ pub fn main() -> Nil {
       #("urgent", Urgent),
     ])
   emit_cases("finite-priority", priority, [
-    value.String("low"),
-    value.String("normal"),
-    value.String("urgent"),
-    value.String("LOW"),
-    value.String("critical"),
-    value.String(""),
-    value.Number(number.from_int(1)),
-    value.Null,
+    #("valid-low", value.String("low")),
+    #("valid-normal", value.String("normal")),
+    #("valid-urgent", value.String("urgent")),
+    #("rejected-uppercase", value.String("LOW")),
+    #("rejected-unknown-enum", value.String("critical")),
+    #("rejected-empty-string", value.String("")),
+    #("rejected-type-integer", value.Number(int_num(1))),
+    #("rejected-type-null", value.Null),
   ])
 
   // 2. finite-unusual-labels (4 cases)
@@ -82,10 +81,10 @@ pub fn main() -> Nil {
       #("quoted \"雪猫", QuotedUnicodeLabel),
     ])
   emit_cases("finite-unusual-labels", decorative, [
-    value.String(""),
-    value.String("quoted \"雪猫"),
-    value.String("雪猫"),
-    value.Bool(True),
+    #("valid-empty-label", value.String("")),
+    #("valid-quoted-unicode", value.String("quoted \"雪猫")),
+    #("rejected-missing-prefix", value.String("雪猫")),
+    #("rejected-type-bool", value.Bool(True)),
   ])
 
   // 3. finite-object (7 cases)
@@ -101,73 +100,109 @@ pub fn main() -> Nil {
       fn(req) { #(req.priority, req.note) },
     )
   emit_cases("finite-object", priority_request, [
-    value.Object([#("priority", value.String("urgent"))]),
-    value.Object([#("priority", value.String("normal")), #("note", value.Null)]),
-    value.Object([
-      #("priority", value.String("low")),
-      #("note", value.String("hello")),
-    ]),
-    value.Object([#("priority", value.String("critical"))]),
-    value.Object([#("priority", value.Null)]),
-    value.Object([#("priority", value.String("low")), #("extra", value.Null)]),
-    value.Object([]),
+    #(
+      "valid-required-only",
+      value.Object([#("priority", value.String("urgent"))]),
+    ),
+    #(
+      "valid-with-null-note",
+      value.Object([
+        #("priority", value.String("normal")),
+        #("note", value.Null),
+      ]),
+    ),
+    #(
+      "valid-with-string-note",
+      value.Object([
+        #("priority", value.String("low")),
+        #("note", value.String("hello")),
+      ]),
+    ),
+    #(
+      "rejected-invalid-enum-field",
+      value.Object([#("priority", value.String("critical"))]),
+    ),
+    #("rejected-null-required-field", value.Object([#("priority", value.Null)])),
+    #(
+      "rejected-extra-property",
+      value.Object([#("priority", value.String("low")), #("extra", value.Null)]),
+    ),
+    #("rejected-missing-required-field", value.Object([])),
   ])
 
   // 4. finite-list-nullable (4 cases)
   let list_nullable_priority = codec.list(codec.nullable(priority))
   emit_cases("finite-list-nullable", list_nullable_priority, [
-    value.Array([]),
-    value.Array([value.String("low"), value.Null, value.String("urgent")]),
-    value.Array([value.String("normal"), value.String("critical")]),
-    value.Null,
+    #("valid-empty-list", value.Array([])),
+    #(
+      "valid-mixed-elements",
+      value.Array([value.String("low"), value.Null, value.String("urgent")]),
+    ),
+    #(
+      "rejected-invalid-element",
+      value.Array([value.String("normal"), value.String("critical")]),
+    ),
+    #("rejected-type-null", value.Null),
   ])
 
   // 5. text (3 cases)
   emit_cases("text", codec.string(), [
-    value.String("hello"),
-    value.Number(number.from_int(1)),
-    value.Null,
+    #("valid-string", value.String("hello")),
+    #("rejected-type-number", value.Number(int_num(1))),
+    #("rejected-type-null", value.Null),
   ])
 
   // 6. integer (3 cases)
   emit_cases("integer", codec.int(), [
-    value.Number(number.from_int(0)),
-    value.String("1"),
-    value.Bool(True),
+    #("valid-zero", value.Number(int_num(0))),
+    #("rejected-type-string", value.String("1")),
+    #("rejected-type-bool", value.Bool(True)),
   ])
 
   // 7. boolean (2 cases)
   emit_cases("boolean", codec.bool(), [
-    value.Bool(False),
-    value.Number(number.from_int(0)),
+    #("valid-false", value.Bool(False)),
+    #("rejected-type-number", value.Number(int_num(0))),
   ])
 
   // 8. pair (5 cases)
   emit_cases("pair", codec.pair(codec.string(), codec.int()), [
-    value.Array([value.String("a"), value.Number(number.from_int(1))]),
-    value.Array([]),
-    value.Array([value.String("a")]),
-    value.Array([
-      value.String("a"),
-      value.Number(number.from_int(1)),
-      value.Number(number.from_int(2)),
-    ]),
-    value.Array([value.Number(number.from_int(1)), value.String("a")]),
+    #(
+      "valid-string-int-pair",
+      value.Array([value.String("a"), value.Number(int_num(1))]),
+    ),
+    #("rejected-empty-array", value.Array([])),
+    #("rejected-single-element", value.Array([value.String("a")])),
+    #(
+      "rejected-three-elements",
+      value.Array([
+        value.String("a"),
+        value.Number(int_num(1)),
+        value.Number(int_num(2)),
+      ]),
+    ),
+    #(
+      "rejected-reversed-element-types",
+      value.Array([value.Number(int_num(1)), value.String("a")]),
+    ),
   ])
 
   // 9. list-nullable (4 cases)
   emit_cases("list-nullable", codec.list(codec.nullable(codec.int())), [
-    value.Array([]),
-    value.Array([value.Null, value.Number(number.from_int(2))]),
-    value.Array([value.String("bad")]),
-    value.Null,
+    #("valid-empty-list", value.Array([])),
+    #("valid-null-and-int", value.Array([value.Null, value.Number(int_num(2))])),
+    #("rejected-string-element", value.Array([value.String("bad")])),
+    #("rejected-type-null", value.Null),
   ])
 
   // 10. empty-object (3 cases)
   emit_cases("empty-object", codec.object(codec.empty()), [
-    value.Object([]),
-    value.Object([#("x", value.Number(number.from_int(1)))]),
-    value.Null,
+    #("valid-empty-object", value.Object([])),
+    #(
+      "rejected-with-property",
+      value.Object([#("x", value.Number(int_num(1)))]),
+    ),
+    #("rejected-type-null", value.Null),
   ])
 
   // 11. optional-nullable-record (6 cases)
@@ -183,29 +218,41 @@ pub fn main() -> Nil {
       fn(rec) { #(rec.name, rec.note) },
     )
   emit_cases("optional-nullable-record", update_codec, [
-    value.Object([#("name", value.String("Ada"))]),
-    value.Object([#("name", value.String("Ada")), #("note", value.Null)]),
-    value.Object([
-      #("name", value.String("Ada")),
-      #("note", value.String("hello")),
-    ]),
-    value.Object([
-      #("name", value.String("Ada")),
-      #("note", value.Number(number.from_int(1))),
-    ]),
-    value.Object([#("name", value.String("Ada")), #("unknown", value.Null)]),
-    value.Object([]),
+    #("valid-required-only", value.Object([#("name", value.String("Ada"))])),
+    #(
+      "valid-null-optional",
+      value.Object([#("name", value.String("Ada")), #("note", value.Null)]),
+    ),
+    #(
+      "valid-present-optional",
+      value.Object([
+        #("name", value.String("Ada")),
+        #("note", value.String("hello")),
+      ]),
+    ),
+    #(
+      "rejected-wrong-type-optional",
+      value.Object([
+        #("name", value.String("Ada")),
+        #("note", value.Number(int_num(1))),
+      ]),
+    ),
+    #(
+      "rejected-unknown-property",
+      value.Object([#("name", value.String("Ada")), #("unknown", value.Null)]),
+    ),
+    #("rejected-missing-required-field", value.Object([])),
   ])
 
   // 12. inclusive-bounds (6 cases)
   let assert Ok(range) = codec.integer_between(-2, 2)
   emit_cases("inclusive-bounds", range, [
-    value.Number(number.from_int(-3)),
-    value.Number(number.from_int(-2)),
-    value.Number(number.from_int(0)),
-    value.Number(number.from_int(2)),
-    value.Number(number.from_int(3)),
-    value.String("2"),
+    #("rejected-below-minimum", value.Number(int_num(-3))),
+    #("valid-minimum-boundary", value.Number(int_num(-2))),
+    #("valid-middle-value", value.Number(int_num(0))),
+    #("valid-maximum-boundary", value.Number(int_num(2))),
+    #("rejected-above-maximum", value.Number(int_num(3))),
+    #("rejected-type-string", value.String("2")),
   ])
 
   // 13. tagged-decision (6 cases)
@@ -234,35 +281,47 @@ pub fn main() -> Nil {
       },
     )
   emit_cases("tagged-decision", decision_codec, [
-    value.Object([
-      #("tag", value.String("approve")),
-      #(
-        "value",
-        value.Object([#("quantity", value.Number(number.from_int(1)))]),
-      ),
-    ]),
-    value.Object([
-      #("tag", value.String("approve")),
-      #(
-        "value",
-        value.Object([#("quantity", value.Number(number.from_int(0)))]),
-      ),
-    ]),
-    value.Object([
-      #("tag", value.String("decline")),
-      #("value", value.Object([#("reason", value.String("stock"))])),
-    ]),
-    value.Object([#("tag", value.String("unknown")), #("value", value.Null)]),
-    value.Object([#("tag", value.String("approve"))]),
-    value.Object([
-      #("tag", value.String("decline")),
-      #(
-        "value",
-        value.Object([
-          #("reason", value.String("stock")),
-          #("extra", value.Bool(True)),
-        ]),
-      ),
-    ]),
+    #(
+      "valid-approve-branch",
+      value.Object([
+        #("tag", value.String("approve")),
+        #("value", value.Object([#("quantity", value.Number(int_num(1)))])),
+      ]),
+    ),
+    #(
+      "rejected-approve-out-of-range",
+      value.Object([
+        #("tag", value.String("approve")),
+        #("value", value.Object([#("quantity", value.Number(int_num(0)))])),
+      ]),
+    ),
+    #(
+      "valid-decline-branch",
+      value.Object([
+        #("tag", value.String("decline")),
+        #("value", value.Object([#("reason", value.String("stock"))])),
+      ]),
+    ),
+    #(
+      "rejected-unknown-tag",
+      value.Object([#("tag", value.String("unknown")), #("value", value.Null)]),
+    ),
+    #(
+      "rejected-missing-value-field",
+      value.Object([#("tag", value.String("approve"))]),
+    ),
+    #(
+      "rejected-extra-property-in-branch",
+      value.Object([
+        #("tag", value.String("decline")),
+        #(
+          "value",
+          value.Object([
+            #("reason", value.String("stock")),
+            #("extra", value.Bool(True)),
+          ]),
+        ),
+      ]),
+    ),
   ])
 }
