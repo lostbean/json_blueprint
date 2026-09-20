@@ -76,24 +76,6 @@ pub fn integer_projection_limit(
   }
 }
 
-pub fn from_int(_value: Int) -> Number {
-  todo as "construct exact number from native integer"
-}
-
-pub fn is_integer(_number: Number) -> Bool {
-  todo as "classify mathematical integrality"
-}
-
-pub fn from_float_exact(
-  _value: Float,
-) -> Result(Number, FloatConstructionError) {
-  todo as "construct exact number from finite binary64 float"
-}
-
-pub fn to_float_exact(_number: Number) -> Result(Float, FloatProjectionError) {
-  todo as "project exact number to binary64 float"
-}
-
 // ---------------------------------------------------------------------------
 // JavaScript target definitions (honest named todos, no throwing FFI)
 // ---------------------------------------------------------------------------
@@ -124,9 +106,44 @@ pub fn to_int_exact(
   todo as "JavaScript exact integer projection not implemented"
 }
 
+@target(javascript)
+pub fn from_int(_value: Int) -> Number {
+  todo as "JavaScript exact number from_int not implemented"
+}
+
+@target(javascript)
+pub fn is_integer(_number: Number) -> Bool {
+  todo as "JavaScript exact number is_integer not implemented"
+}
+
+@target(javascript)
+pub fn from_float_exact(
+  _value: Float,
+) -> Result(Number, FloatConstructionError) {
+  todo as "JavaScript exact number from_float_exact not implemented"
+}
+
+@target(javascript)
+pub fn to_float_exact(_number: Number) -> Result(Float, FloatProjectionError) {
+  todo as "JavaScript exact number to_float_exact not implemented"
+}
+
 // ---------------------------------------------------------------------------
-// Erlang target implementation (focused exact-number vertical)
+// Erlang target implementation (complete exact-number kernel)
 // ---------------------------------------------------------------------------
+
+@target(erlang)
+type FloatParts {
+  FiniteParts(negative: Bool, significand: Int, exponent2: Int)
+  NonFiniteParts
+}
+
+@target(erlang)
+type FloatCandidate {
+  CandidateValue(Float)
+  CandidateOverflow
+  CandidateInvalid
+}
 
 @target(erlang)
 @external(erlang, "json_number_ffi", "byte_length")
@@ -151,6 +168,14 @@ fn native_integer_divide(dividend: Int, divisor: Int) -> Int
 @target(erlang)
 @external(erlang, "json_number_ffi", "integer_remainder")
 fn native_integer_remainder(dividend: Int, divisor: Int) -> Int
+
+@target(erlang)
+@external(erlang, "json_number_ffi", "float_parts")
+fn native_float_parts(value: Float) -> FloatParts
+
+@target(erlang)
+@external(erlang, "json_number_ffi", "parse_float_candidate")
+fn native_parse_float_candidate(value: String) -> FloatCandidate
 
 @target(erlang)
 type ExponentPart {
@@ -403,6 +428,131 @@ pub fn to_int_exact(
           }
         }
       }
+  }
+}
+
+@target(erlang)
+pub fn is_integer(number: Number) -> Bool {
+  let Number(_, coefficient, exponent10) = number
+  coefficient == [48] || exponent10 >= 0
+}
+
+@target(erlang)
+pub fn from_int(value: Int) -> Number {
+  let text = native_integer_to_string(value)
+  let chars = native_byte_codes(text)
+  let #(negative, digits) = strip_negative_sign(chars)
+  let normalized_digits = drop_leading_zeroes(digits)
+  case normalized_digits {
+    [] -> Number(False, [48], 0)
+    _ -> {
+      let #(coefficient, exponent10) =
+        trim_trailing_zeroes(normalized_digits, 0)
+      Number(negative, coefficient, exponent10)
+    }
+  }
+}
+
+@target(erlang)
+pub fn from_float_exact(
+  value: Float,
+) -> Result(Number, FloatConstructionError) {
+  case native_float_parts(value) {
+    NonFiniteParts -> Error(NonFiniteFloat)
+    FiniteParts(_, 0, _) -> Ok(Number(False, [48], 0))
+    FiniteParts(negative, significand, exponent2) -> {
+      let #(coefficient, exponent10) = case exponent2 {
+        exponent2 if exponent2 >= 0 -> #(significand * power(2, exponent2), 0)
+        exponent2 -> #(significand * power(5, -exponent2), exponent2)
+      }
+      let #(normalized_digits, normalized_exponent) =
+        trim_trailing_zeroes(
+          native_byte_codes(native_integer_to_string(coefficient)),
+          exponent10,
+        )
+      Ok(Number(negative, normalized_digits, normalized_exponent))
+    }
+  }
+}
+
+@target(erlang)
+pub fn to_float_exact(number: Number) -> Result(Float, FloatProjectionError) {
+  let Number(negative, coefficient, exponent10) = number
+  case coefficient == [48] {
+    True -> Ok(0.0)
+    False ->
+      case native_parse_float_candidate(number_text(number)) {
+        CandidateOverflow -> Error(FloatOverflow)
+        CandidateInvalid -> Error(InvalidFloatCandidate)
+        CandidateValue(candidate) ->
+          case native_float_parts(candidate) {
+            NonFiniteParts -> Error(FloatOverflow)
+            FiniteParts(_, 0, _) -> Error(FloatUnderflow)
+            FiniteParts(candidate_negative, significand, exponent2) ->
+              case
+                decimal_equals_binary_float(
+                  negative,
+                  coefficient,
+                  exponent10,
+                  candidate_negative,
+                  significand,
+                  exponent2,
+                )
+              {
+                True -> Ok(candidate)
+                False -> Error(FloatInexact)
+              }
+          }
+      }
+  }
+}
+
+@target(erlang)
+fn decimal_equals_binary_float(
+  decimal_negative: Bool,
+  decimal_digits: List(Int),
+  decimal_exponent: Int,
+  binary_negative: Bool,
+  binary_significand: Int,
+  binary_exponent: Int,
+) -> Bool {
+  case decimal_negative == binary_negative {
+    False -> False
+    True -> {
+      let #(normalized_significand, normalized_binary_exponent) =
+        remove_binary_trailing_zeroes(binary_significand, binary_exponent)
+      let decimal_significand = decimal_digits_to_int(decimal_digits)
+      case decimal_exponent >= 0, normalized_binary_exponent >= 0 {
+        True, True ->
+          decimal_significand * power(10, decimal_exponent)
+          == normalized_significand * power(2, normalized_binary_exponent)
+        True, False -> False
+        False, True -> False
+        False, False -> {
+          let decimal_denominator_exponent = -decimal_exponent
+          let binary_denominator_exponent = -normalized_binary_exponent
+          decimal_significand * power(2, binary_denominator_exponent)
+          == normalized_significand
+          * power(2, decimal_denominator_exponent)
+          * power(5, decimal_denominator_exponent)
+        }
+      }
+    }
+  }
+}
+
+@target(erlang)
+fn remove_binary_trailing_zeroes(
+  significand: Int,
+  exponent2: Int,
+) -> #(Int, Int) {
+  case native_integer_remainder(significand, 2) {
+    0 ->
+      remove_binary_trailing_zeroes(
+        native_integer_divide(significand, 2),
+        exponent2 + 1,
+      )
+    _ -> #(significand, exponent2)
   }
 }
 
