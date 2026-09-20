@@ -1,3 +1,4 @@
+import gleam/list
 import json/blueprint/number.{type Number}
 
 pub type Value {
@@ -17,9 +18,49 @@ pub type ValueError {
   DuplicateObjectKey(String)
 }
 
+pub fn null() -> Value {
+  Null
+}
+
+pub fn bool(b: Bool) -> Value {
+  Bool(b)
+}
+
+pub fn string(s: String) -> Value {
+  String(s)
+}
+
+pub fn number(n: Number) -> Value {
+  Number(n)
+}
+
+pub fn array(items: List(Value)) -> Value {
+  Array(items)
+}
+
 pub fn object(
-  _entries: List(#(String, Value)),
-  _policy: ObjectKeyPolicy,
+  entries: List(#(String, Value)),
+  policy: ObjectKeyPolicy,
 ) -> Result(Value, ValueError) {
-  todo as "construct validated object with key policy"
+  case policy {
+    RejectDuplicates ->
+      case find_duplicate_key(entries, []) {
+        Error(key) -> Error(DuplicateObjectKey(key))
+        Ok(Nil) -> Ok(Object(entries))
+      }
+  }
+}
+
+fn find_duplicate_key(
+  entries: List(#(String, Value)),
+  seen: List(String),
+) -> Result(Nil, String) {
+  case entries {
+    [] -> Ok(Nil)
+    [#(key, _), ..rest] ->
+      case list.contains(seen, key) {
+        True -> Error(key)
+        False -> find_duplicate_key(rest, [key, ..seen])
+      }
+  }
 }
