@@ -1,4 +1,5 @@
 import json/blueprint/codec
+import json/blueprint/codegen
 import json/blueprint/number
 import json/blueprint/value
 
@@ -7,6 +8,7 @@ pub type OrderStatus {
   Processing
   ShippedQuoted
   DeliveredUnicode
+  Unmapped
 }
 
 pub type Order {
@@ -19,48 +21,96 @@ pub type Order {
   )
 }
 
-pub fn build_order_codec() -> codec.Codec(Order) {
-  let assert Ok(status_c) =
-    codec.string_enum([
-      #("pending", Pending),
-      #("processing", Processing),
-      #("shipped\n\r\f\t\"quoted\"", ShippedQuoted),
-      #("delivered 🚀 fn", DeliveredUnicode),
+pub fn order_from_fields(
+  raw: #(
+    #(
+      #(#(Int, List(#(String, Int))), codec.Optional(codec.Nullable(String))),
+      Bool,
+    ),
+    OrderStatus,
+  ),
+) -> Order {
+  Order(raw.0.0.0.0, raw.0.0.0.1, raw.0.0.1, raw.0.1, raw.1)
+}
+
+pub fn order_to_fields(
+  order: Order,
+) -> #(
+  #(
+    #(#(Int, List(#(String, Int))), codec.Optional(codec.Nullable(String))),
+    Bool,
+  ),
+  OrderStatus,
+) {
+  #(
+    #(#(#(order.order_id, order.items), order.note), order.active),
+    order.status,
+  )
+}
+
+pub fn order_definition() -> codegen.Definition(Order) {
+  let assert Ok(pending) =
+    codegen.enum_variant("pending", Pending, "materialize_fixtures.Pending")
+  let assert Ok(processing) =
+    codegen.enum_variant(
+      "processing",
+      Processing,
+      "materialize_fixtures.Processing",
+    )
+  let assert Ok(shipped) =
+    codegen.enum_variant(
+      "shipped\n\r\f\t\"quoted\"",
+      ShippedQuoted,
+      "materialize_fixtures.ShippedQuoted",
+    )
+  let assert Ok(delivered) =
+    codegen.enum_variant(
+      "delivered 🚀 fn",
+      DeliveredUnicode,
+      "materialize_fixtures.DeliveredUnicode",
+    )
+  let assert Ok(status) =
+    codegen.string_enum("materialize_fixtures.OrderStatus", [
+      pending,
+      processing,
+      shipped,
+      delivered,
     ])
 
-  let assert Ok(id_c) = codec.integer_between(1, 999_999)
-  let items_c = codec.list(codec.pair(codec.string(), codec.int()))
-  let note_c = codec.nullable(codec.string())
+  let assert Ok(id) = codegen.integer_between(1, 999_999)
+  let items = codegen.list(codegen.pair(codegen.string(), codegen.int()))
+  let note = codegen.nullable(codegen.string())
 
   let assert Ok(p1) =
-    codec.combine(
-      codec.required("order_id", id_c),
-      codec.required("items_\"list\"", items_c),
+    codegen.combine(
+      codegen.required("order_id", id),
+      codegen.required("items_\"list\"", items),
     )
   let assert Ok(p2) =
-    codec.combine(p1, codec.optional("customer\n\r\f\t\\note", note_c))
-  let assert Ok(p3) = codec.combine(p2, codec.required("type", codec.bool()))
-  let assert Ok(full_props) =
-    codec.combine(p3, codec.required("status", status_c))
+    codegen.combine(p1, codegen.optional("customer\n\r\f\t\\note", note))
+  let assert Ok(p3) =
+    codegen.combine(p2, codegen.required("type", codegen.bool()))
+  let assert Ok(properties) =
+    codegen.combine(p3, codegen.required("status", status))
 
-  codec.imap(
-    codec.object(full_props),
-    fn(
-      raw: #(
-        #(
-          #(
-            #(Int, List(#(String, Int))),
-            codec.Optional(codec.Nullable(String)),
-          ),
-          Bool,
-        ),
-        OrderStatus,
-      ),
-    ) {
-      Order(raw.0.0.0.0, raw.0.0.0.1, raw.0.0.1, raw.0.1, raw.1)
-    },
-    fn(o: Order) { #(#(#(#(o.order_id, o.items), o.note), o.active), o.status) },
-  )
+  let assert Ok(mapping) =
+    codegen.named_mapping(
+      order_from_fields,
+      "materialize_fixtures.order_from_fields",
+      order_to_fields,
+      "materialize_fixtures.order_to_fields",
+    )
+  let assert Ok(definition) =
+    codegen.imap(
+      codegen.object(properties),
+      "materialize_fixtures.Order",
+      mapping,
+    )
+  definition
+}
+
+pub fn build_order_codec() -> codec.Codec(Order) {
+  codegen.runtime(order_definition())
 }
 
 pub type ApprovePayload {

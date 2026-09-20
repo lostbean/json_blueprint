@@ -1,5 +1,12 @@
+import gleam/dict
+import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
+import gleam/json
 import gleam/list
-import json/blueprint/number.{type Number}
+import gleam/option.{type Option, None, Some}
+import json/blueprint/internal/parser_core
+import json/blueprint/json_text
+import json/blueprint/number.{type Number, type NumberError}
 import json/blueprint/value.{type Value}
 
 pub type EncodeReason {
@@ -48,6 +55,37 @@ pub type DecodeError {
   DecodeAtIndex(index: Int, inner: DecodeError)
 }
 
+pub type JsonDecodeError {
+  BlueprintParserFailure(BlueprintJsonParseFailure)
+  NativeJsonFailure(json.DecodeError)
+  TypedCodecFailure(DecodeError)
+}
+
+pub type BlueprintJsonParseFailure {
+  BlueprintJsonParseFailure(
+    location: BlueprintJsonLocation,
+    reason: BlueprintJsonParseReason,
+  )
+}
+
+pub type BlueprintJsonLocation {
+  BlueprintJsonLocation(byte_offset: Int, line: Int, column: Int)
+}
+
+pub type BlueprintJsonParseReason {
+  BlueprintUnexpectedByte(String)
+  BlueprintUnexpectedEndOfInput
+  BlueprintInvalidUtf8
+  BlueprintByteLimitExceeded(max: Int)
+  BlueprintDepthLimitExceeded(max: Int)
+  BlueprintInvalidNumberToken(NumberError)
+  BlueprintDuplicateObjectKey(key: String)
+  BlueprintUnterminatedString
+  BlueprintInvalidEscapeSequence
+  BlueprintInvalidUnicodeEscape
+  BlueprintTrailingContent
+}
+
 pub type SchemaError {
   UnknownSchema
 }
@@ -76,6 +114,8 @@ pub opaque type Codec(a) {
   Codec(
     encoder: fn(a) -> Result(Value, EncodeError),
     decoder: fn(Value) -> Result(a, DecodeError),
+    json_encoder: fn(a) -> Result(String, EncodeError),
+    json_decoder: fn(String) -> Result(a, JsonDecodeError),
     schema: Result(Schema, SchemaError),
   )
 }
@@ -84,7 +124,120 @@ pub fn new(
   encode: fn(a) -> Result(Value, EncodeError),
   decode: fn(Value) -> Result(a, DecodeError),
 ) -> Codec(a) {
-  Codec(encode, decode, Error(UnknownSchema))
+  runtime_codec(encode, decode, Error(UnknownSchema))
+}
+
+pub fn from_parts(
+  encode: fn(a) -> Result(Value, EncodeError),
+  decode: fn(Value) -> Result(a, DecodeError),
+  schema: Schema,
+) -> Codec(a) {
+  runtime_codec(encode, decode, Ok(schema))
+}
+
+/// Construct a codec with native JSON text operations.
+///
+/// The supplied text decoder owns JSON syntax admission. For generated codecs
+/// this is gleam/json, whose number normalization and duplicate-key behavior
+/// may differ from the stricter Blueprint parser used by runtime codecs.
+pub fn from_json_parts(
+  value_encode: fn(a) -> Result(Value, EncodeError),
+  value_decode: fn(Value) -> Result(a, DecodeError),
+  json_encode: fn(a) -> Result(String, EncodeError),
+  json_decode: fn(String) -> Result(a, JsonDecodeError),
+  schema: Schema,
+) -> Codec(a) {
+  Codec(value_encode, value_decode, json_encode, json_decode, Ok(schema))
+}
+
+fn runtime_codec(
+  value_encode: fn(a) -> Result(Value, EncodeError),
+  value_decode: fn(Value) -> Result(a, DecodeError),
+  schema: Result(Schema, SchemaError),
+) -> Codec(a) {
+  let limits = parser_core.default_limits()
+  Codec(
+    value_encode,
+    value_decode,
+    fn(item) { encode_json_with(value_encode, item) },
+    fn(source) { decode_json_with(value_decode, limits, source) },
+    schema,
+  )
+}
+
+/// Encode JSON text using this codec's backend.
+///
+/// Runtime codecs render Blueprint Values; native-backed codecs call their
+/// supplied JSON encoder directly.
+pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
+  codec.json_encoder(item)
+}
+
+/// Decode JSON text using this codec's backend.
+///
+/// Runtime codecs use Blueprint's parser, including duplicate-key rejection.
+/// Native-backed codecs use their supplied parser and inherit its syntax
+/// normalization and duplicate-key behavior; typed decoding still applies.
+pub fn decode_json(
+  codec: Codec(a),
+  source: String,
+) -> Result(a, JsonDecodeError) {
+  codec.json_decoder(source)
+}
+
+fn encode_json_with(
+  value_encode: fn(a) -> Result(Value, EncodeError),
+  item: a,
+) -> Result(String, EncodeError) {
+  case value_encode(item) {
+    Ok(encoded) -> Ok(json_text.render_value(encoded))
+    Error(error) -> Error(error)
+  }
+}
+
+fn decode_json_with(
+  value_decode: fn(Value) -> Result(a, DecodeError),
+  limits: parser_core.ParserLimits,
+  source: String,
+) -> Result(a, JsonDecodeError) {
+  case parser_core.parse_value_from_string(limits, source) {
+    Error(error) ->
+      Error(BlueprintParserFailure(translate_json_parse_error(error)))
+    Ok(parsed) ->
+      case value_decode(parsed) {
+        Ok(item) -> Ok(item)
+        Error(error) -> Error(TypedCodecFailure(error))
+      }
+  }
+}
+
+fn translate_json_parse_error(
+  error: parser_core.ParseError,
+) -> BlueprintJsonParseFailure {
+  let parser_core.ParseError(location, reason) = error
+  let parser_core.Location(byte_offset, line, column) = location
+  BlueprintJsonParseFailure(
+    BlueprintJsonLocation(byte_offset, line, column),
+    translate_json_parse_reason(reason),
+  )
+}
+
+fn translate_json_parse_reason(
+  reason: parser_core.ParseErrorKind,
+) -> BlueprintJsonParseReason {
+  case reason {
+    parser_core.UnexpectedByte(byte) -> BlueprintUnexpectedByte(byte)
+    parser_core.UnexpectedEndOfInput -> BlueprintUnexpectedEndOfInput
+    parser_core.InvalidUtf8 -> BlueprintInvalidUtf8
+    parser_core.ByteLimitExceeded(max) -> BlueprintByteLimitExceeded(max)
+    parser_core.DepthLimitExceeded(max) -> BlueprintDepthLimitExceeded(max)
+    parser_core.InvalidNumberToken(error) -> BlueprintInvalidNumberToken(error)
+    parser_core.DuplicateObjectKey(key) -> BlueprintDuplicateObjectKey(key)
+    parser_core.UnterminatedString -> BlueprintUnterminatedString
+    parser_core.InvalidEscapeSequence -> BlueprintInvalidEscapeSequence
+    parser_core.InvalidUnicodeEscape -> BlueprintInvalidUnicodeEscape
+    parser_core.TrailingContent -> BlueprintTrailingContent
+  }
 }
 
 pub fn encode(codec: Codec(a), item: a) -> Result(Value, EncodeError) {
@@ -99,109 +252,726 @@ pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
   codec.schema
 }
 
-pub fn imap(codec: Codec(a), from: fn(a) -> b, to: fn(b) -> a) -> Codec(b) {
-  let mapped =
-    new(fn(value) { encode(codec, to(value)) }, fn(raw) {
-      case decode(codec, raw) {
-        Ok(value) -> Ok(from(value))
+// These operations are the allocation-light targets used by generated codecs.
+// They mirror the corresponding runtime combinators but accept functions rather
+// than already-constructed Codec values.
+pub fn encode_string_value(item: String) -> Result(Value, EncodeError) {
+  Ok(value.String(item))
+}
+
+pub fn decode_string_value(raw: Value) -> Result(String, DecodeError) {
+  case raw {
+    value.String(item) -> Ok(item)
+    _ -> Error(CannotDecode(DecodeExpectedString))
+  }
+}
+
+pub fn encode_int_value(item: Int) -> Result(Value, EncodeError) {
+  case native_integer_number(item) {
+    Ok(num) -> Ok(value.Number(num))
+    Error(error) -> Error(error)
+  }
+}
+
+pub fn encode_native_int(item: Int) -> Result(json.Json, EncodeError) {
+  case native_integer_number(item) {
+    Ok(_) -> Ok(json.int(item))
+    Error(error) -> Error(error)
+  }
+}
+
+fn native_integer_number(item: Int) -> Result(Number, EncodeError) {
+  case number.from_int(item) {
+    Ok(num) -> Ok(num)
+    Error(number.NonFiniteInteger) ->
+      Error(CannotEncode(EncodeInvalidNativeValue("NonFiniteInteger")))
+    Error(number.NonIntegerValue) ->
+      Error(CannotEncode(EncodeInvalidNativeValue("NonIntegerValue")))
+    Error(number.UnsafeNativeInteger) ->
+      Error(CannotEncode(EncodeInvalidNativeValue("UnsafeNativeInteger")))
+  }
+}
+
+pub fn decode_int_value(raw: Value) -> Result(Int, DecodeError) {
+  case raw {
+    value.Number(num) -> {
+      let assert Ok(limit) = number.integer_projection_limit(24)
+      case number.to_int_exact(num, limit) {
+        Ok(item) -> Ok(item)
+        Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+      }
+    }
+    _ -> Error(CannotDecode(DecodeExpectedInt))
+  }
+}
+
+pub fn encode_number_value(item: Number) -> Result(Value, EncodeError) {
+  Ok(value.Number(item))
+}
+
+pub fn decode_number_value(raw: Value) -> Result(Number, DecodeError) {
+  case raw {
+    value.Number(item) -> Ok(item)
+    _ -> Error(CannotDecode(DecodeExpectedNumber))
+  }
+}
+
+pub fn encode_bool_value(item: Bool) -> Result(Value, EncodeError) {
+  Ok(value.Bool(item))
+}
+
+pub fn decode_bool_value(raw: Value) -> Result(Bool, DecodeError) {
+  case raw {
+    value.Bool(item) -> Ok(item)
+    _ -> Error(CannotDecode(DecodeExpectedBool))
+  }
+}
+
+pub fn encode_integer_between_value(
+  min: Int,
+  max: Int,
+  item: Int,
+) -> Result(Value, EncodeError) {
+  case item >= min && item <= max {
+    True ->
+      case number.from_int(item) {
+        Ok(num) -> Ok(value.Number(num))
+        Error(_) ->
+          Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
+      }
+    False -> Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
+  }
+}
+
+pub fn encode_native_integer_between(
+  min: Int,
+  max: Int,
+  item: Int,
+) -> Result(json.Json, EncodeError) {
+  case item >= min && item <= max {
+    True ->
+      case native_integer_number(item) {
+        Ok(_) -> Ok(json.int(item))
+        Error(_) ->
+          Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
+      }
+    False -> Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
+  }
+}
+
+pub fn decode_integer_between_value(
+  min: Int,
+  max: Int,
+  raw: Value,
+) -> Result(Int, DecodeError) {
+  case raw {
+    value.Number(num) -> {
+      let assert Ok(limit) = number.integer_projection_limit(24)
+      case number.to_int_exact(num, limit) {
+        Ok(item) if item >= min && item <= max -> Ok(item)
+        Ok(item) ->
+          Error(CannotDecode(DecodeIntegerOutsideRange(min, max, item)))
+        Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+      }
+    }
+    _ -> Error(CannotDecode(DecodeExpectedInt))
+  }
+}
+
+pub fn encode_pair_with(
+  encode_left: fn(a) -> Result(Value, EncodeError),
+  encode_right: fn(b) -> Result(Value, EncodeError),
+  pair: #(a, b),
+) -> Result(Value, EncodeError) {
+  case encode_left(pair.0) {
+    Error(error) -> Error(EncodeAtIndex(0, error))
+    Ok(left) ->
+      case encode_right(pair.1) {
+        Error(error) -> Error(EncodeAtIndex(1, error))
+        Ok(right) -> Ok(value.Array([left, right]))
+      }
+  }
+}
+
+pub fn decode_pair_with(
+  decode_left: fn(Value) -> Result(a, DecodeError),
+  decode_right: fn(Value) -> Result(b, DecodeError),
+  raw: Value,
+) -> Result(#(a, b), DecodeError) {
+  case raw {
+    value.Array([left, right]) ->
+      case decode_left(left) {
+        Error(error) -> Error(DecodeAtIndex(0, error))
+        Ok(left) ->
+          case decode_right(right) {
+            Error(error) -> Error(DecodeAtIndex(1, error))
+            Ok(right) -> Ok(#(left, right))
+          }
+      }
+    value.Array(items) ->
+      Error(CannotDecode(DecodeWrongTupleLength(2, list.length(items))))
+    _ -> Error(CannotDecode(DecodeExpectedArray))
+  }
+}
+
+pub fn encode_list_with(
+  encode_item: fn(a) -> Result(Value, EncodeError),
+  items: List(a),
+) -> Result(Value, EncodeError) {
+  case encode_list_values(encode_item, items, 0) {
+    Ok(values) -> Ok(value.Array(values))
+    Error(error) -> Error(error)
+  }
+}
+
+fn encode_list_values(
+  encode_item: fn(a) -> Result(Value, EncodeError),
+  items: List(a),
+  index: Int,
+) -> Result(List(Value), EncodeError) {
+  case items {
+    [] -> Ok([])
+    [item, ..rest] ->
+      case encode_item(item) {
+        Error(error) -> Error(EncodeAtIndex(index, error))
+        Ok(raw) ->
+          case encode_list_values(encode_item, rest, index + 1) {
+            Ok(encoded_rest) -> Ok([raw, ..encoded_rest])
+            Error(error) -> Error(error)
+          }
+      }
+  }
+}
+
+pub fn decode_list_with(
+  decode_item: fn(Value) -> Result(a, DecodeError),
+  raw: Value,
+) -> Result(List(a), DecodeError) {
+  case raw {
+    value.Array(items) -> decode_list_values(decode_item, items, 0)
+    _ -> Error(CannotDecode(DecodeExpectedArray))
+  }
+}
+
+fn decode_list_values(
+  decode_item: fn(Value) -> Result(a, DecodeError),
+  items: List(Value),
+  index: Int,
+) -> Result(List(a), DecodeError) {
+  case items {
+    [] -> Ok([])
+    [item, ..rest] ->
+      case decode_item(item) {
+        Error(error) -> Error(DecodeAtIndex(index, error))
+        Ok(decoded) ->
+          case decode_list_values(decode_item, rest, index + 1) {
+            Ok(decoded_rest) -> Ok([decoded, ..decoded_rest])
+            Error(error) -> Error(error)
+          }
+      }
+  }
+}
+
+pub fn encode_nullable_with(
+  encode_inner: fn(a) -> Result(Value, EncodeError),
+  item: Nullable(a),
+) -> Result(Value, EncodeError) {
+  case item {
+    Null -> Ok(value.Null)
+    NonNull(item) ->
+      case encode_inner(item) {
+        Ok(value.Null) ->
+          Error(
+            CannotEncode(CustomEncodeReason(
+              "NonNull must encode a non-null value",
+            )),
+          )
+        other -> other
+      }
+  }
+}
+
+pub fn decode_nullable_with(
+  decode_inner: fn(Value) -> Result(a, DecodeError),
+  raw: Value,
+) -> Result(Nullable(a), DecodeError) {
+  case raw {
+    value.Null -> Ok(Null)
+    _ ->
+      case decode_inner(raw) {
+        Ok(item) -> Ok(NonNull(item))
         Error(error) -> Error(error)
       }
+  }
+}
+
+pub fn encode_required_property_with(
+  name: String,
+  encode_item: fn(a) -> Result(Value, EncodeError),
+  item: a,
+) -> Result(List(#(String, Value)), EncodeError) {
+  case encode_item(item) {
+    Ok(raw) -> Ok([#(name, raw)])
+    Error(error) -> Error(EncodeAtField(name, error))
+  }
+}
+
+pub fn encode_optional_property_with(
+  name: String,
+  encode_item: fn(a) -> Result(Value, EncodeError),
+  item: Optional(a),
+) -> Result(List(#(String, Value)), EncodeError) {
+  case item {
+    Missing -> Ok([])
+    Present(item) -> encode_required_property_with(name, encode_item, item)
+  }
+}
+
+pub fn decode_required_property_with(
+  name: String,
+  fields: List(#(String, Value)),
+  decode_item: fn(Value) -> Result(a, DecodeError),
+) -> Result(a, DecodeError) {
+  case lookup(fields, name) {
+    Missing ->
+      Error(DecodeAtField(name, CannotDecode(DecodeMissingProperty(name))))
+    Present(raw) ->
+      case decode_item(raw) {
+        Ok(item) -> Ok(item)
+        Error(error) -> Error(DecodeAtField(name, error))
+      }
+  }
+}
+
+pub fn decode_optional_property_with(
+  name: String,
+  fields: List(#(String, Value)),
+  decode_item: fn(Value) -> Result(a, DecodeError),
+) -> Result(Optional(a), DecodeError) {
+  case lookup(fields, name) {
+    Missing -> Ok(Missing)
+    Present(raw) ->
+      case decode_item(raw) {
+        Ok(item) -> Ok(Present(item))
+        Error(error) -> Error(DecodeAtField(name, error))
+      }
+  }
+}
+
+pub fn encode_properties_pair_with(
+  encode_left: fn(a) -> Result(List(#(String, Value)), EncodeError),
+  encode_right: fn(b) -> Result(List(#(String, Value)), EncodeError),
+  items: #(a, b),
+) -> Result(List(#(String, Value)), EncodeError) {
+  case encode_left(items.0) {
+    Error(error) -> Error(error)
+    Ok(left) ->
+      case encode_right(items.1) {
+        Error(error) -> Error(error)
+        Ok(right) -> Ok(list.append(left, right))
+      }
+  }
+}
+
+pub fn decode_properties_pair_with(
+  decode_left: fn(List(#(String, Value))) -> Result(a, DecodeError),
+  decode_right: fn(List(#(String, Value))) -> Result(b, DecodeError),
+  fields: List(#(String, Value)),
+) -> Result(#(a, b), DecodeError) {
+  case decode_left(fields) {
+    Error(error) -> Error(error)
+    Ok(left) ->
+      case decode_right(fields) {
+        Error(error) -> Error(error)
+        Ok(right) -> Ok(#(left, right))
+      }
+  }
+}
+
+pub fn encode_object_with(
+  encode_fields: fn(a) -> Result(List(#(String, Value)), EncodeError),
+  item: a,
+) -> Result(Value, EncodeError) {
+  case encode_fields(item) {
+    Ok(fields) -> Ok(value.Object(fields))
+    Error(error) -> Error(error)
+  }
+}
+
+pub fn decode_object_with(
+  names: List(String),
+  decode_fields: fn(List(#(String, Value))) -> Result(a, DecodeError),
+  raw: Value,
+) -> Result(a, DecodeError) {
+  case raw {
+    value.Object(fields) ->
+      case check_object_keys(fields, names, []) {
+        Ok(Nil) -> decode_fields(fields)
+        Error(error) -> Error(error)
+      }
+    _ -> Error(CannotDecode(DecodeExpectedObject))
+  }
+}
+
+pub fn encode_native_pair_with(
+  encode_left: fn(a) -> Result(json.Json, EncodeError),
+  encode_right: fn(b) -> Result(json.Json, EncodeError),
+  items: #(a, b),
+) -> Result(json.Json, EncodeError) {
+  case encode_left(items.0) {
+    Error(error) -> Error(EncodeAtIndex(0, error))
+    Ok(left) ->
+      case encode_right(items.1) {
+        Error(error) -> Error(EncodeAtIndex(1, error))
+        Ok(right) -> Ok(json.preprocessed_array([left, right]))
+      }
+  }
+}
+
+pub fn encode_native_list_with(
+  encode_item: fn(a) -> Result(json.Json, EncodeError),
+  items: List(a),
+) -> Result(json.Json, EncodeError) {
+  case encode_native_list_values(encode_item, items, 0, []) {
+    Ok(values) -> Ok(json.preprocessed_array(values))
+    Error(error) -> Error(error)
+  }
+}
+
+fn encode_native_list_values(
+  encode_item: fn(a) -> Result(json.Json, EncodeError),
+  items: List(a),
+  index: Int,
+  acc: List(json.Json),
+) -> Result(List(json.Json), EncodeError) {
+  case items {
+    [] -> Ok(list.reverse(acc))
+    [item, ..rest] ->
+      case encode_item(item) {
+        Error(error) -> Error(EncodeAtIndex(index, error))
+        Ok(encoded) ->
+          encode_native_list_values(encode_item, rest, index + 1, [
+            encoded,
+            ..acc
+          ])
+      }
+  }
+}
+
+pub fn encode_native_nullable_with(
+  encode_inner: fn(a) -> Result(json.Json, EncodeError),
+  item: Nullable(a),
+) -> Result(json.Json, EncodeError) {
+  case item {
+    Null -> Ok(json.null())
+    NonNull(item) ->
+      case encode_inner(item) {
+        Error(error) -> Error(error)
+        Ok(encoded) ->
+          case encoded == json.null() {
+            True ->
+              Error(
+                CannotEncode(CustomEncodeReason(
+                  "NonNull must encode a non-null value",
+                )),
+              )
+            False -> Ok(encoded)
+          }
+      }
+  }
+}
+
+pub fn encode_native_required_property_with(
+  name: String,
+  encode_item: fn(a) -> Result(json.Json, EncodeError),
+  item: a,
+) -> Result(List(#(String, json.Json)), EncodeError) {
+  case encode_item(item) {
+    Ok(raw) -> Ok([#(name, raw)])
+    Error(error) -> Error(EncodeAtField(name, error))
+  }
+}
+
+pub fn encode_native_optional_property_with(
+  name: String,
+  encode_item: fn(a) -> Result(json.Json, EncodeError),
+  item: Optional(a),
+) -> Result(List(#(String, json.Json)), EncodeError) {
+  case item {
+    Missing -> Ok([])
+    Present(item) ->
+      encode_native_required_property_with(name, encode_item, item)
+  }
+}
+
+pub fn encode_native_properties_pair_with(
+  encode_left: fn(a) -> Result(List(#(String, json.Json)), EncodeError),
+  encode_right: fn(b) -> Result(List(#(String, json.Json)), EncodeError),
+  items: #(a, b),
+) -> Result(List(#(String, json.Json)), EncodeError) {
+  case encode_left(items.0) {
+    Error(error) -> Error(error)
+    Ok(left) ->
+      case encode_right(items.1) {
+        Error(error) -> Error(error)
+        Ok(right) -> Ok(list.append(left, right))
+      }
+  }
+}
+
+pub fn encode_native_object_with(
+  encode_fields: fn(a) -> Result(List(#(String, json.Json)), EncodeError),
+  item: a,
+) -> Result(json.Json, EncodeError) {
+  case encode_fields(item) {
+    Ok(fields) -> Ok(json.object(fields))
+    Error(error) -> Error(error)
+  }
+}
+
+pub fn decode_native_string(raw: Dynamic) -> Result(String, DecodeError) {
+  case decode.run(raw, decode.string) {
+    Ok(item) -> Ok(item)
+    Error(_) -> Error(CannotDecode(DecodeExpectedString))
+  }
+}
+
+/// Decode a native JSON number using exact integer projection.
+///
+/// JSON parsers normalize numeric tokens before this function sees them. In
+/// particular, JavaScript may round a fractional token to an integer first, so
+/// the original lexical fraction cannot always be recovered here.
+pub fn decode_native_int(raw: Dynamic) -> Result(Int, DecodeError) {
+  case decode.run(raw, decode.int) {
+    Ok(item) -> exact_native_int(item)
+    Error(_) ->
+      case decode.run(raw, decode.float) {
+        Ok(item) ->
+          case number.from_float_exact(item) {
+            Ok(parsed) -> project_native_int(parsed)
+            Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+          }
+        Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+      }
+  }
+}
+
+fn exact_native_int(item: Int) -> Result(Int, DecodeError) {
+  case number.from_int(item) {
+    Ok(parsed) -> project_native_int(parsed)
+    Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+  }
+}
+
+fn project_native_int(item: Number) -> Result(Int, DecodeError) {
+  let assert Ok(limit) = number.integer_projection_limit(24)
+  case number.to_int_exact(item, limit) {
+    Ok(projected) -> Ok(projected)
+    Error(_) -> Error(CannotDecode(DecodeExpectedInt))
+  }
+}
+
+pub fn decode_native_bool(raw: Dynamic) -> Result(Bool, DecodeError) {
+  case decode.run(raw, decode.bool) {
+    Ok(item) -> Ok(item)
+    Error(_) -> Error(CannotDecode(DecodeExpectedBool))
+  }
+}
+
+pub fn decode_native_pair_with(
+  decode_left: fn(Dynamic) -> Result(a, DecodeError),
+  decode_right: fn(Dynamic) -> Result(b, DecodeError),
+  raw: Dynamic,
+) -> Result(#(a, b), DecodeError) {
+  case decode.run(raw, decode.list(of: decode.dynamic)) {
+    Error(_) -> Error(CannotDecode(DecodeExpectedArray))
+    Ok([left, right]) ->
+      case decode_left(left) {
+        Error(error) -> Error(DecodeAtIndex(0, error))
+        Ok(left) ->
+          case decode_right(right) {
+            Error(error) -> Error(DecodeAtIndex(1, error))
+            Ok(right) -> Ok(#(left, right))
+          }
+      }
+    Ok(items) ->
+      Error(CannotDecode(DecodeWrongTupleLength(2, list.length(items))))
+  }
+}
+
+pub fn decode_native_list_with(
+  decode_item: fn(Dynamic) -> Result(a, DecodeError),
+  raw: Dynamic,
+) -> Result(List(a), DecodeError) {
+  case decode.run(raw, decode.list(of: decode.dynamic)) {
+    Error(_) -> Error(CannotDecode(DecodeExpectedArray))
+    Ok(items) -> decode_native_list_items(decode_item, items, 0, [])
+  }
+}
+
+fn decode_native_list_items(
+  decode_item: fn(Dynamic) -> Result(a, DecodeError),
+  items: List(Dynamic),
+  index: Int,
+  acc: List(a),
+) -> Result(List(a), DecodeError) {
+  case items {
+    [] -> Ok(list.reverse(acc))
+    [item, ..rest] ->
+      case decode_item(item) {
+        Error(error) -> Error(DecodeAtIndex(index, error))
+        Ok(decoded) ->
+          decode_native_list_items(decode_item, rest, index + 1, [
+            decoded,
+            ..acc
+          ])
+      }
+  }
+}
+
+pub fn decode_native_nullable_with(
+  decode_inner: fn(Dynamic) -> Result(a, DecodeError),
+  raw: Dynamic,
+) -> Result(Nullable(a), DecodeError) {
+  case decode.run(raw, decode.optional(decode.dynamic)) {
+    Error(_) ->
+      Error(CannotDecode(DecodeInvalidWireValue("invalid nullable value")))
+    Ok(None) -> Ok(Null)
+    Ok(Some(inner)) ->
+      case decode_inner(inner) {
+        Ok(item) -> Ok(NonNull(item))
+        Error(error) -> Error(error)
+      }
+  }
+}
+
+pub fn decode_native_required_property_with(
+  name: String,
+  fields: dict.Dict(String, Dynamic),
+  decode_item: fn(Dynamic) -> Result(a, DecodeError),
+) -> Result(a, DecodeError) {
+  case dict.get(fields, name) {
+    Error(_) ->
+      Error(DecodeAtField(name, CannotDecode(DecodeMissingProperty(name))))
+    Ok(raw) ->
+      case decode_item(raw) {
+        Ok(item) -> Ok(item)
+        Error(error) -> Error(DecodeAtField(name, error))
+      }
+  }
+}
+
+pub fn decode_native_optional_property_with(
+  name: String,
+  fields: dict.Dict(String, Dynamic),
+  decode_item: fn(Dynamic) -> Result(a, DecodeError),
+) -> Result(Optional(a), DecodeError) {
+  case dict.get(fields, name) {
+    Error(_) -> Ok(Missing)
+    Ok(raw) ->
+      case decode_item(raw) {
+        Ok(item) -> Ok(Present(item))
+        Error(error) -> Error(DecodeAtField(name, error))
+      }
+  }
+}
+
+pub fn decode_native_properties_pair_with(
+  decode_left: fn(dict.Dict(String, Dynamic)) -> Result(a, DecodeError),
+  decode_right: fn(dict.Dict(String, Dynamic)) -> Result(b, DecodeError),
+  fields: dict.Dict(String, Dynamic),
+) -> Result(#(a, b), DecodeError) {
+  case decode_left(fields) {
+    Error(error) -> Error(error)
+    Ok(left) ->
+      case decode_right(fields) {
+        Error(error) -> Error(error)
+        Ok(right) -> Ok(#(left, right))
+      }
+  }
+}
+
+pub fn decode_native_object_with(
+  names: List(String),
+  decode_fields: fn(dict.Dict(String, Dynamic)) -> Result(a, DecodeError),
+  raw: Dynamic,
+) -> Result(a, DecodeError) {
+  case decode.run(raw, decode.dict(decode.string, decode.dynamic)) {
+    Error(_) -> Error(CannotDecode(DecodeExpectedObject))
+    Ok(fields) ->
+      case first_unknown_native_property(dict.keys(fields), names) {
+        Some(name) -> Error(CannotDecode(DecodeUnknownProperty(name)))
+        None -> decode_fields(fields)
+      }
+  }
+}
+
+fn first_unknown_native_property(
+  names: List(String),
+  allowed: List(String),
+) -> Option(String) {
+  case names {
+    [] -> None
+    [name, ..rest] ->
+      case list.contains(allowed, name) {
+        True -> first_unknown_native_property(rest, allowed)
+        False -> Some(name)
+      }
+  }
+}
+
+pub fn encode_mapped_with(
+  encode_inner: fn(a) -> Result(Value, EncodeError),
+  to_inner: fn(b) -> a,
+  item: b,
+) -> Result(Value, EncodeError) {
+  encode_inner(to_inner(item))
+}
+
+pub fn decode_mapped_with(
+  decode_inner: fn(Value) -> Result(a, DecodeError),
+  from_inner: fn(a) -> b,
+  raw: Value,
+) -> Result(b, DecodeError) {
+  case decode_inner(raw) {
+    Ok(item) -> Ok(from_inner(item))
+    Error(error) -> Error(error)
+  }
+}
+
+pub fn imap(codec: Codec(a), from: fn(a) -> b, to: fn(b) -> a) -> Codec(b) {
+  let mapped =
+    new(fn(value) { encode_mapped_with(codec.encoder, to, value) }, fn(raw) {
+      decode_mapped_with(codec.decoder, from, raw)
     })
   Codec(..mapped, schema: codec.schema)
 }
 
 pub fn string() -> Codec(String) {
-  let codec =
-    new(fn(s) { Ok(value.String(s)) }, fn(v) {
-      case v {
-        value.String(s) -> Ok(s)
-        _ -> Error(CannotDecode(DecodeExpectedString))
-      }
-    })
+  let codec = new(encode_string_value, decode_string_value)
   Codec(..codec, schema: Ok(StringSchema))
 }
 
 pub fn int() -> Codec(Int) {
-  let codec =
-    new(
-      fn(n) {
-        case number.from_int(n) {
-          Ok(num) -> Ok(value.Number(num))
-          Error(number.NonFiniteInteger) ->
-            Error(CannotEncode(EncodeInvalidNativeValue("NonFiniteInteger")))
-          Error(number.NonIntegerValue) ->
-            Error(CannotEncode(EncodeInvalidNativeValue("NonIntegerValue")))
-          Error(number.UnsafeNativeInteger) ->
-            Error(CannotEncode(EncodeInvalidNativeValue("UnsafeNativeInteger")))
-        }
-      },
-      fn(v) {
-        case v {
-          value.Number(num) -> {
-            let assert Ok(limit) = number.integer_projection_limit(24)
-            case number.to_int_exact(num, limit) {
-              Ok(i) -> Ok(i)
-              Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-            }
-          }
-          _ -> Error(CannotDecode(DecodeExpectedInt))
-        }
-      },
-    )
+  let codec = new(encode_int_value, decode_int_value)
   Codec(..codec, schema: Ok(IntSchema))
 }
 
 pub fn number() -> Codec(Number) {
-  let codec =
-    new(fn(n) { Ok(value.Number(n)) }, fn(v) {
-      case v {
-        value.Number(n) -> Ok(n)
-        _ -> Error(CannotDecode(DecodeExpectedNumber))
-      }
-    })
+  let codec = new(encode_number_value, decode_number_value)
   Codec(..codec, schema: Ok(NumberSchema))
 }
 
 pub fn bool() -> Codec(Bool) {
-  let codec =
-    new(fn(b) { Ok(value.Bool(b)) }, fn(v) {
-      case v {
-        value.Bool(b) -> Ok(b)
-        _ -> Error(CannotDecode(DecodeExpectedBool))
-      }
-    })
+  let codec = new(encode_bool_value, decode_bool_value)
   Codec(..codec, schema: Ok(BoolSchema))
 }
 
 pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
   let paired =
     new(
-      fn(p: #(a, b)) {
-        case encode(left, p.0) {
-          Error(error) -> Error(EncodeAtIndex(0, error))
-          Ok(a) ->
-            case encode(right, p.1) {
-              Error(error) -> Error(EncodeAtIndex(1, error))
-              Ok(b) -> Ok(value.Array([a, b]))
-            }
-        }
-      },
-      fn(raw) {
-        case raw {
-          value.Array([a, b]) ->
-            case decode(left, a) {
-              Error(error) -> Error(DecodeAtIndex(0, error))
-              Ok(a) ->
-                case decode(right, b) {
-                  Error(error) -> Error(DecodeAtIndex(1, error))
-                  Ok(b) -> Ok(#(a, b))
-                }
-            }
-          value.Array(items) ->
-            Error(CannotDecode(DecodeWrongTupleLength(2, list.length(items))))
-          _ -> Error(CannotDecode(DecodeExpectedArray))
-        }
-      },
+      fn(items) { encode_pair_with(left.encoder, right.encoder, items) },
+      fn(raw) { decode_pair_with(left.decoder, right.decoder, raw) },
     )
   let description = case left.schema, right.schema {
     Ok(a), Ok(b) -> Ok(PairSchema(a, b))
@@ -213,63 +983,14 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
 
 pub fn list(inner: Codec(a)) -> Codec(List(a)) {
   let codec =
-    new(
-      fn(items) {
-        case encode_items(inner, items, 0) {
-          Ok(items) -> Ok(value.Array(items))
-          Error(error) -> Error(error)
-        }
-      },
-      fn(raw) {
-        case raw {
-          value.Array(items) -> decode_items(inner, items, 0)
-          _ -> Error(CannotDecode(DecodeExpectedArray))
-        }
-      },
-    )
+    new(fn(items) { encode_list_with(inner.encoder, items) }, fn(raw) {
+      decode_list_with(inner.decoder, raw)
+    })
   let description = case inner.schema {
     Ok(schema) -> Ok(ListSchema(schema))
     Error(error) -> Error(error)
   }
   Codec(..codec, schema: description)
-}
-
-fn encode_items(
-  codec: Codec(a),
-  items: List(a),
-  index: Int,
-) -> Result(List(Value), EncodeError) {
-  case items {
-    [] -> Ok([])
-    [item, ..rest] ->
-      case encode(codec, item) {
-        Error(error) -> Error(EncodeAtIndex(index, error))
-        Ok(raw) ->
-          case encode_items(codec, rest, index + 1) {
-            Ok(rest) -> Ok([raw, ..rest])
-            Error(error) -> Error(error)
-          }
-      }
-  }
-}
-
-fn decode_items(
-  codec: Codec(a),
-  items: List(Value),
-  index: Int,
-) -> Result(List(a), DecodeError) {
-  case items {
-    [] -> Ok([])
-    [item, ..rest] ->
-      case decode(codec, item) {
-        Error(error) -> Error(DecodeAtIndex(index, error))
-        Ok(decoded) ->
-          case decode_items(codec, rest, index + 1) {
-            Ok(rest) -> Ok([decoded, ..rest])
-            Error(error) -> Error(error)
-          }
-      }
-  }
 }
 
 pub type Nullable(a) {
@@ -279,33 +1000,9 @@ pub type Nullable(a) {
 
 pub fn nullable(inner: Codec(a)) -> Codec(Nullable(a)) {
   let codec =
-    new(
-      fn(item) {
-        case item {
-          Null -> Ok(value.Null)
-          NonNull(item) ->
-            case encode(inner, item) {
-              Ok(value.Null) ->
-                Error(
-                  CannotEncode(CustomEncodeReason(
-                    "NonNull must encode a non-null value",
-                  )),
-                )
-              other -> other
-            }
-        }
-      },
-      fn(raw) {
-        case raw {
-          value.Null -> Ok(Null)
-          _ ->
-            case decode(inner, raw) {
-              Ok(item) -> Ok(NonNull(item))
-              Error(error) -> Error(error)
-            }
-        }
-      },
-    )
+    new(fn(item) { encode_nullable_with(inner.encoder, item) }, fn(raw) {
+      decode_nullable_with(inner.decoder, raw)
+    })
   let description = case inner.schema {
     Ok(schema) -> Ok(NullableSchema(schema))
     Error(error) -> Error(error)
@@ -337,14 +1034,8 @@ pub fn empty() -> Properties(Nil) {
 
 pub fn required(name: String, codec: Codec(a)) -> Properties(a) {
   Properties(
-    fn(item) { encode_property(name, codec, item) },
-    fn(fields) {
-      case lookup(fields, name) {
-        Missing ->
-          Error(DecodeAtField(name, CannotDecode(DecodeMissingProperty(name))))
-        Present(raw) -> decode_property(name, codec, raw)
-      }
-    },
+    fn(item) { encode_required_property_with(name, codec.encoder, item) },
+    fn(fields) { decode_required_property_with(name, fields, codec.decoder) },
     [name],
     property_description(name, True, codec),
   )
@@ -352,22 +1043,8 @@ pub fn required(name: String, codec: Codec(a)) -> Properties(a) {
 
 pub fn optional(name: String, codec: Codec(a)) -> Properties(Optional(a)) {
   Properties(
-    fn(item) {
-      case item {
-        Missing -> Ok([])
-        Present(item) -> encode_property(name, codec, item)
-      }
-    },
-    fn(fields) {
-      case lookup(fields, name) {
-        Missing -> Ok(Missing)
-        Present(raw) ->
-          case decode_property(name, codec, raw) {
-            Ok(item) -> Ok(Present(item))
-            Error(error) -> Error(error)
-          }
-      }
-    },
+    fn(item) { encode_optional_property_with(name, codec.encoder, item) },
+    fn(fields) { decode_optional_property_with(name, fields, codec.decoder) },
     [name],
     property_description(name, False, codec),
   )
@@ -382,25 +1059,11 @@ pub fn combine(
     Missing ->
       Ok(
         Properties(
-          fn(items: #(a, b)) {
-            case left.encode(items.0) {
-              Error(error) -> Error(error)
-              Ok(a) ->
-                case right.encode(items.1) {
-                  Error(error) -> Error(error)
-                  Ok(b) -> Ok(list.append(a, b))
-                }
-            }
+          fn(items) {
+            encode_properties_pair_with(left.encode, right.encode, items)
           },
           fn(fields) {
-            case left.decode(fields) {
-              Error(error) -> Error(error)
-              Ok(a) ->
-                case right.decode(fields) {
-                  Error(error) -> Error(error)
-                  Ok(b) -> Ok(#(a, b))
-                }
-            }
+            decode_properties_pair_with(left.decode, right.decode, fields)
           },
           list.append(left.names, right.names),
           case left.schemas, right.schemas {
@@ -414,23 +1077,9 @@ pub fn combine(
 }
 
 pub fn object(properties: Properties(a)) -> Codec(a) {
-  Codec(
-    fn(item) {
-      case properties.encode(item) {
-        Ok(fields) -> Ok(value.Object(fields))
-        Error(error) -> Error(error)
-      }
-    },
-    fn(raw) {
-      case raw {
-        value.Object(fields) ->
-          case check_object_keys(fields, properties.names, []) {
-            Ok(Nil) -> properties.decode(fields)
-            Error(error) -> Error(error)
-          }
-        _ -> Error(CannotDecode(DecodeExpectedObject))
-      }
-    },
+  runtime_codec(
+    fn(item) { encode_object_with(properties.encode, item) },
+    fn(raw) { decode_object_with(properties.names, properties.decode, raw) },
     case properties.schemas {
       Ok(props) -> Ok(ObjectSchema(props))
       Error(error) -> Error(error)
@@ -455,17 +1104,6 @@ fn property_description(
   case codec.schema {
     Ok(schema) -> Ok([PropertySchema(name, required, schema)])
     Error(error) -> Error(error)
-  }
-}
-
-fn encode_property(
-  name: String,
-  codec: Codec(a),
-  item: a,
-) -> Result(List(#(String, Value)), EncodeError) {
-  case encode(codec, item) {
-    Ok(raw) -> Ok([#(name, raw)])
-    Error(error) -> Error(EncodeAtField(name, error))
   }
 }
 
@@ -642,45 +1280,45 @@ pub fn tagged(
 ) -> Result(Codec(Either(a, b)), UnionError) {
   case left_tag == right_tag {
     True -> Error(DuplicateTag(left_tag))
-    False ->
-      Ok(
-        Codec(
-          fn(item) {
-            case item {
-              Left(item) -> encode_tagged(left_tag, left, item)
-              Right(item) -> encode_tagged(right_tag, right, item)
-            }
-          },
-          fn(raw) {
-            case tagged_parts(raw) {
-              Error(error) -> Error(error)
-              Ok(#(tag, payload)) ->
-                case tag {
-                  tag if tag == left_tag ->
-                    case decode_property("value", left, payload) {
-                      Ok(item) -> Ok(Left(item))
-                      Error(error) -> Error(error)
-                    }
-                  tag if tag == right_tag ->
-                    case decode_property("value", right, payload) {
-                      Ok(item) -> Ok(Right(item))
-                      Error(error) -> Error(error)
-                    }
-                  _ ->
-                    Error(DecodeAtField(
-                      "tag",
-                      CannotDecode(DecodeUnknownTag(tag)),
-                    ))
-                }
-            }
-          },
-          case left.schema, right.schema {
-            Ok(a), Ok(b) -> Ok(TaggedSchema(left_tag, a, right_tag, b))
-            Error(error), _ -> Error(error)
-            _, Error(error) -> Error(error)
-          },
-        ),
-      )
+    False -> {
+      let description = case left.schema, right.schema {
+        Ok(a), Ok(b) -> Ok(TaggedSchema(left_tag, a, right_tag, b))
+        Error(error), _ -> Error(error)
+        _, Error(error) -> Error(error)
+      }
+      Ok(runtime_codec(
+        fn(item) {
+          case item {
+            Left(item) -> encode_tagged(left_tag, left, item)
+            Right(item) -> encode_tagged(right_tag, right, item)
+          }
+        },
+        fn(raw) {
+          case tagged_parts(raw) {
+            Error(error) -> Error(error)
+            Ok(#(tag, payload)) ->
+              case tag {
+                tag if tag == left_tag ->
+                  case decode_property("value", left, payload) {
+                    Ok(item) -> Ok(Left(item))
+                    Error(error) -> Error(error)
+                  }
+                tag if tag == right_tag ->
+                  case decode_property("value", right, payload) {
+                    Ok(item) -> Ok(Right(item))
+                    Error(error) -> Error(error)
+                  }
+                _ ->
+                  Error(DecodeAtField(
+                    "tag",
+                    CannotDecode(DecodeUnknownTag(tag)),
+                  ))
+              }
+          }
+        },
+        description,
+      ))
+    }
   }
 }
 
@@ -732,37 +1370,9 @@ pub fn integer_between(
     False ->
       case number.from_int(min), number.from_int(max) {
         Ok(_), Ok(_) ->
-          Ok(Codec(
-            fn(item) {
-              case item >= min && item <= max {
-                True ->
-                  case number.from_int(item) {
-                    Ok(num) -> Ok(value.Number(num))
-                    Error(_) ->
-                      Error(
-                        CannotEncode(EncodeIntegerOutsideRange(min, max, item)),
-                      )
-                  }
-                False ->
-                  Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
-              }
-            },
-            fn(raw) {
-              case raw {
-                value.Number(num) -> {
-                  let assert Ok(limit) = number.integer_projection_limit(24)
-                  case number.to_int_exact(num, limit) {
-                    Ok(item) if item >= min && item <= max -> Ok(item)
-                    Ok(item) ->
-                      Error(
-                        CannotDecode(DecodeIntegerOutsideRange(min, max, item)),
-                      )
-                    Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-                  }
-                }
-                _ -> Error(CannotDecode(DecodeExpectedInt))
-              }
-            },
+          Ok(runtime_codec(
+            fn(item) { encode_integer_between_value(min, max, item) },
+            fn(raw) { decode_integer_between_value(min, max, raw) },
             Ok(IntegerRangeSchema(min, max)),
           ))
         _, _ -> Error(InvalidIntegerBounds(min, max))
@@ -777,7 +1387,7 @@ pub fn number_between(
   case number.compare(min, max) {
     number.GreaterThan -> Error(ReversedNumberBounds(min, max))
     _ ->
-      Ok(Codec(
+      Ok(runtime_codec(
         fn(item) {
           case
             number.compare(item, min) != number.LessThan

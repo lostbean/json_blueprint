@@ -1,6 +1,6 @@
 import gleam/io
+import json/blueprint/internal/schema_materialize
 import materialize_fixtures
-import schema_materialize
 
 @external(erlang, "file_test_ffi", "write_file")
 @external(javascript, "./file_test_ffi.mjs", "write_file")

@@ -41,7 +41,6 @@ gleam add json_blueprint
 ### Documented Design-Deferred Families (Retained Future Scope)
 
 These capabilities are explicitly outside the initial release facade (per `PUBLIC-API.md`) rather than hidden behind incomplete todos:
-- **Source Code Generation**: Experimental dev-time code generator paused for application naming research.
 - **Recursive References (`$ref`, `$defs`)**: Deferred pending resource and cycle policies.
 - **Arbitrary Unions**: Untagged unions (`anyOf`, general `oneOf`) deferred pending subtyping policy.
 - **Pattern / Regex**: String format regex validation deferred.
@@ -104,6 +103,42 @@ pub fn run_task_pipeline() -> Result(Task, String) {
   |> result.map_error(fn(_) { "Decoding failure" })
 }
 ```
+
+### Runtime and Build-Time Codecs
+
+Define a codec once with `json/blueprint/codegen` combinators. The same typed `Definition(a)` is the input to the runtime codec and to generated encoder, decoder, and schema artifacts; keep the definition and its mappings as the single maintained source.
+
+For example, `order_definition()` below is the application's canonical nested `Order` definition:
+
+With `import generated/order_codec as generated_order_codec`, imports for `json/blueprint/codec` and `json/blueprint/codegen`, and the module that owns `Order` and `order_definition()`:
+
+```gleam
+pub fn runtime_and_generated_order_example(
+  order: materialize_fixtures.Order,
+  json_text: String,
+) {
+  let definition = materialize_fixtures.order_definition()
+
+  // Runtime construction: use when the application wants a dynamic codec.
+  let runtime_codec = codegen.runtime(definition)
+
+  // Generated module: construct once and use interchangeably as a Codec(Order).
+  let generated_codec = generated_order_codec.order_codec()
+  let _ = codec.encode_json(generated_codec, order)
+  let _ = codec.decode_json(generated_codec, json_text)
+
+  // Direct generated operations avoid constructing the wrapper Codec.
+  let _ = generated_order_codec.encode_order_json(order)
+  let _ = generated_order_codec.decode_order_json(json_text)
+  let _ = generated_order_codec.order_schema()
+  let _ = codec.encode_json(runtime_codec, order)
+  Nil
+}
+```
+
+To generate at build time, call `codegen.compile("generated/order_codec", "order", order_definition())`. It returns a `GeneratedModule` containing the module path, Gleam source content, and a fingerprint. The application's build/generation task writes that content to `src/generated/order_codec.gleam`, then runs `gleam format src/generated/order_codec.gleam` before compiling the application. Check the generated module into source control and add a freshness test that recompiles the canonical definition and compares the result with the checked-in source; this catches stale output without maintaining the generated implementation by hand.
+
+Generated native text functions use `gleam/json` for rendering and parsing. A definition containing arbitrary `number.Number` values is currently refused by `codegen.compile` with `NativeNumberUnsupported`, since the native JSON representation cannot preserve Blueprint's exact arbitrary-precision number contract. Also, the native parser inherits `gleam/json` number normalization and duplicate-object-key behavior; it does not have the stricter lexical number and duplicate-key admission behavior of Blueprint's runtime parser. Use the runtime codec when those parser guarantees are required.
 
 ### Legacy 1.7.1 Migration Contract
 

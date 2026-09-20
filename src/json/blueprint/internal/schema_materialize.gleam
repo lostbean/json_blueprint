@@ -19,6 +19,35 @@ pub type GeneratedModule {
   GeneratedModule(path: String, content: String)
 }
 
+pub fn format_int_literal(value: Int) -> String {
+  let digits = string.to_graphemes(int.to_string(value))
+  case digits {
+    ["-", ..rest] -> "-" <> format_integer_digits(list.reverse(rest), 0, [])
+    _ -> format_integer_digits(list.reverse(digits), 0, [])
+  }
+}
+
+fn format_integer_digits(
+  reversed_digits: List(String),
+  digits_in_group: Int,
+  acc: List(String),
+) -> String {
+  case reversed_digits {
+    [] -> string.join(acc, "")
+    [digit, ..rest] -> {
+      let next_acc = [digit, ..acc]
+      case digits_in_group {
+        2 ->
+          case rest {
+            [] -> string.join(next_acc, "")
+            _ -> format_integer_digits(rest, 0, ["_", ..next_acc])
+          }
+        _ -> format_integer_digits(rest, digits_in_group + 1, next_acc)
+      }
+    }
+  }
+}
+
 const gleam_keywords = [
   "as", "assert", "auto", "case", "const", "echo", "else", "external", "fn",
   "if", "import", "let", "opaque", "panic", "pub", "todo", "try", "type", "use",
@@ -242,9 +271,9 @@ pub fn emit_schema_expression(
     codec.IntegerRangeSchema(min, max) ->
       Ok(
         "codec.IntegerRangeSchema("
-        <> int.to_string(min)
+        <> format_int_literal(min)
         <> ", "
-        <> int.to_string(max)
+        <> format_int_literal(max)
         <> ")",
       )
     codec.NumberRangeSchema(_, _) ->

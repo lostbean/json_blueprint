@@ -1,3 +1,4 @@
+import generated/order_codec as generated_order_codec
 import gleam/bit_array
 import gleam/list
 import gleam/result
@@ -5,15 +6,41 @@ import gleam/string
 import gleeunit/should
 import json/blueprint as legacy
 import json/blueprint/codec
+import json/blueprint/codegen
 import json/blueprint/migration
 import json/blueprint/number
 import json/blueprint/parser
 import json/blueprint/runtime
 import json/blueprint/value
+import materialize_fixtures
 
 @external(erlang, "readme_test_ffi", "read_file_to_string")
 @external(javascript, "./readme_test_ffi.mjs", "read_file_to_string")
 fn read_file_to_string(path: String) -> Result(String, String)
+
+// --- Snippet 3: Runtime and Build-Time Codecs ---
+
+pub fn runtime_and_generated_order_example(
+  order: materialize_fixtures.Order,
+  json_text: String,
+) {
+  let definition = materialize_fixtures.order_definition()
+
+  // Runtime construction: use when the application wants a dynamic codec.
+  let runtime_codec = codegen.runtime(definition)
+
+  // Generated module: construct once and use interchangeably as a Codec(Order).
+  let generated_codec = generated_order_codec.order_codec()
+  let _ = codec.encode_json(generated_codec, order)
+  let _ = codec.decode_json(generated_codec, json_text)
+
+  // Direct generated operations avoid constructing the wrapper Codec.
+  let _ = generated_order_codec.encode_order_json(order)
+  let _ = generated_order_codec.decode_order_json(json_text)
+  let _ = generated_order_codec.order_schema()
+  let _ = codec.encode_json(runtime_codec, order)
+  Nil
+}
 
 // --- Snippet 1: Schema-Aware Core Pipeline ---
 
@@ -131,9 +158,9 @@ pub fn readme_snippets_exact_match_test() {
   let normalized_source = string.replace(test_source_str, "\r\n", "\n")
   let snippets = extract_gleam_snippets(readme_str)
 
-  // We require the primary schema-aware snippet and migration snippet to match verbatim
-  let modern_snippets = list.take(snippets, 2)
-  list.length(modern_snippets) |> should.equal(2)
+  // Keep the schema, migration, and generated-code examples executable.
+  let modern_snippets = list.take(snippets, 3)
+  list.length(modern_snippets) |> should.equal(3)
 
   list.each(modern_snippets, fn(snippet) {
     let normalized_snippet = string.replace(snippet, "\r\n", "\n")

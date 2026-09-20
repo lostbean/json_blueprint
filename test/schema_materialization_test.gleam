@@ -2,12 +2,12 @@ import gleam/list
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec
-import materialize_fixtures
-import schema_materialization_runner
-import schema_materialize.{
+import json/blueprint/internal/schema_materialize.{
   DuplicateAccessor, InvalidAccessorName, SchemaExport, UnknownSchema,
   UnsupportedConstructor,
 }
+import materialize_fixtures
+import schema_materialization_runner
 
 pub fn validate_module_path_valid_test() {
   schema_materialize.validate_module_path("generated/schema_catalog")
