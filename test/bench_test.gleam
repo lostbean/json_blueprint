@@ -8,7 +8,7 @@ import gleam/string
 import gleeunit/should
 import json/blueprint/codec
 import json/blueprint/codegen
-import json/blueprint/migration
+import json/blueprint/json_text
 import json/blueprint/number
 import json/blueprint/parser
 import json/blueprint/runtime
@@ -351,7 +351,7 @@ pub fn vanilla_order_baseline_matches_blueprint_wire_shape_test() {
     let assert Ok(blueprint_value) = codec.encode(runtime, order)
     let assert Ok(generated_value) = codec.encode(generated, order)
     let assert Ok(vanilla_json) = vanilla_order.encode(order)
-    let wire = migration.value_to_json_string(blueprint_value)
+    let wire = json_text.render_value(blueprint_value)
     should.equal(generated_value, blueprint_value)
     should.equal(json.to_string(vanilla_json), wire)
 
@@ -382,7 +382,7 @@ pub fn vanilla_order_baseline_matches_blueprint_wire_shape_test() {
 
   let assert [valid_order, ..] = candidates
   let assert Ok(valid_value) = codec.encode(runtime, valid_order)
-  let valid_wire = migration.value_to_json_string(valid_value)
+  let valid_wire = json_text.render_value(valid_value)
   let out_of_range_wire =
     string.replace(
       valid_wire,
@@ -431,7 +431,7 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
 
   let limits = parser.default_limits()
   let assert Ok(runtime_value) = codec.encode(runtime_codec, order)
-  let legacy_wire = migration.value_to_json_string(runtime_value)
+  let legacy_wire = json_text.render_value(runtime_value)
   should.equal(legacy_wire, wire_json)
   let assert Ok(blueprint_input) =
     parser.parse_value_from_string(limits, legacy_wire)

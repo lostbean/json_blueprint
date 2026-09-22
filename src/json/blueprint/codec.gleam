@@ -252,6 +252,17 @@ pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
   codec.schema
 }
 
+/// Render the codec's complete Draft 2020-12 schema document as exact JSON.
+///
+/// Codecs without a known schema return `UnknownSchema`.
+pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
+  case schema(codec) {
+    Ok(description) ->
+      Ok(description |> schema_document |> json_text.render_value)
+    Error(error) -> Error(error)
+  }
+}
+
 // These operations are the allocation-light targets used by generated codecs.
 // They mirror the corresponding runtime combinators but accept functions rather
 // than already-constructed Codec values.
@@ -1085,6 +1096,68 @@ pub fn object(properties: Properties(a)) -> Codec(a) {
       Error(error) -> Error(error)
     },
   )
+}
+
+/// Build a two-property native record codec without tuple mapping at the call site.
+///
+/// Each property may be `required` or `optional`. Property order is preserved,
+/// and duplicate names return `DuplicateProperty` before a codec is created.
+pub fn record2(
+  first: Properties(a),
+  second: Properties(b),
+  construct: fn(a, b) -> record,
+  first_value: fn(record) -> a,
+  second_value: fn(record) -> b,
+) -> Result(Codec(record), PropertyError) {
+  case combine(first, second) {
+    Ok(properties) ->
+      Ok(
+        imap(
+          object(properties),
+          fn(items) {
+            let #(a, b) = items
+            construct(a, b)
+          },
+          fn(item) { #(first_value(item), second_value(item)) },
+        ),
+      )
+    Error(error) -> Error(error)
+  }
+}
+
+/// Build a three-property native record codec without nested tuple mapping.
+///
+/// Each property may be `required` or `optional`. Property order is preserved,
+/// and duplicate names return `DuplicateProperty` before a codec is created.
+pub fn record3(
+  first: Properties(a),
+  second: Properties(b),
+  third: Properties(c),
+  construct: fn(a, b, c) -> record,
+  first_value: fn(record) -> a,
+  second_value: fn(record) -> b,
+  third_value: fn(record) -> c,
+) -> Result(Codec(record), PropertyError) {
+  case combine(first, second) {
+    Error(error) -> Error(error)
+    Ok(first_two) ->
+      case combine(first_two, third) {
+        Error(error) -> Error(error)
+        Ok(properties) ->
+          Ok(
+            imap(
+              object(properties),
+              fn(items) {
+                let #(#(a, b), c) = items
+                construct(a, b, c)
+              },
+              fn(item) {
+                #(#(first_value(item), second_value(item)), third_value(item))
+              },
+            ),
+          )
+      }
+  }
 }
 
 pub fn field(name: String, inner: Codec(a)) -> Codec(a) {

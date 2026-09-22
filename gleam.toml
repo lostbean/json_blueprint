@@ -1,5 +1,6 @@
 name = "json_blueprint"
 version = "1.7.1"
+internal_modules = ["json/blueprint/internal", "json/blueprint/internal/*"]
 
 description = "Simplify JSON encoding/decoding while automatically generating JSON schemas for your data types."
 licences = ["MIT"]

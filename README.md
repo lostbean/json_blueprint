@@ -18,14 +18,14 @@ gleam add json_blueprint
 - **`RuntimeContract`**: Validated schema contract for runtime schema matching and value validation.
 - **`Document`**: Finite Draft 2020-12 schema document loader from parsed values or raw bytes.
 - **`Parser`**: Bounded whole-document byte admission parser enforcing byte size, depth, number token, significand, and exponent limits, with duplicate key rejection and structured location errors.
-- **`Migration`**: Explicit adapter bridging legacy 1.7.1 decoders into modern `Codec(a)` contracts while preserving wire envelopes and reporting unavailable schema.
+- **Advanced `Decoder`**: The released one-way decoder remains available for recursive types and its existing `$ref`/`$defs` schema output, which the finite `Codec` schema does not represent.
 
 ### Target Support Matrix
 
 | Target | Status | Exact Number Model | Native Integer Bounds | Binary64 Float Projections | Exercised Environment |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **BEAM / Erlang** | Full Support | Arbitrary-precision decimal | Unlimited (bignum) | Exact binary64 conversions | OTP 28 (all 95 tests pass) |
-| **JavaScript (Node.js)** | Full Support | Arbitrary-precision decimal | `[-9007199254740991, 9007199254740991]` (typed `UnsafeNativeInteger` construction refusal / `UnsupportedNativeInteger` projection refusal) | Exact binary64 conversions via BigInt | Node.js v24.15 (all 95 tests pass) |
+| **BEAM / Erlang** | Full Support | Arbitrary-precision decimal | Unlimited (bignum) | Exact binary64 conversions | Verified on OTP 28 |
+| **JavaScript (Node.js)** | Full Support | Arbitrary-precision decimal | `[-9007199254740991, 9007199254740991]` (typed `UnsafeNativeInteger` construction refusal / `UnsupportedNativeInteger` projection refusal) | Exact binary64 conversions via BigInt | Verified on Node.js v24.19.0 |
 | **JavaScript (Browser)** | Unverified | Target-neutral ESM (`TextEncoder`, `DataView`, `BigInt`), but unverified in test suite | Same as Node.js | Same as Node.js | Untested in CI |
 
 ### Supported Finite Draft 2020-12 Profile
@@ -47,7 +47,7 @@ These capabilities are explicitly outside the initial release facade (per `PUBLI
 
 ### Schema-Aware Core Quickstart
 
-A complete end-to-end example defining a bounded schema-aware codec, validating input bytes against Draft 2020-12 runtime contracts, and decoding into a typed domain record (tested verbatim in `test/readme_example_test.gleam`):
+A complete example using one codec for a native record, JSON text, and a Draft 2020-12 schema document (tested verbatim in `test/readme_example_test.gleam`):
 
 ```gleam
 pub type Task {
@@ -55,54 +55,43 @@ pub type Task {
 }
 
 pub fn run_task_pipeline() -> Result(Task, String) {
-  // 1. Build bidirectional codec with bounded integer range
+  // One bidirectional codec defines the record's JSON and schema.
   use id_codec <- result.try(
     codec.integer_between(1, 100_000)
     |> result.map_error(fn(_) { "Invalid id range" }),
   )
-  use task_props <- result.try(
-    codec.combine(
+  use task_codec <- result.try(
+    codec.record2(
       codec.required("id", id_codec),
       codec.required("title", codec.string()),
+      Task,
+      fn(task) { task.id },
+      fn(task) { task.title },
     )
-    |> result.map_error(fn(_) { "Invalid properties combination" }),
-  )
-  let task_codec =
-    codec.imap(
-      codec.object(task_props),
-      fn(pair: #(Int, String)) { Task(pair.0, pair.1) },
-      fn(task: Task) { #(task.id, task.title) },
-    )
-
-  // 2. Parse untrusted JSON bytes with bounded parser limits
-  let limits = parser.default_limits()
-  let input_bytes =
-    bit_array.from_string("{\"id\": 42, \"title\": \"Verify Blueprint\"}")
-
-  use parsed_val <- result.try(
-    parser.parse_value(limits, input_bytes)
-    |> result.map_error(fn(_) { "JSON parse error" }),
+    |> result.map_error(fn(_) { "Invalid record properties" }),
   )
 
-  // 3. Derive Draft 2020-12 runtime contract and validate
-  use schema <- result.try(
-    codec.schema(task_codec)
+  use task <- result.try(
+    codec.decode_json(task_codec, "{\"id\":42,\"title\":\"Verify Blueprint\"}")
+    |> result.map_error(fn(_) { "Invalid task JSON" }),
+  )
+  use _encoded <- result.try(
+    codec.encode_json(task_codec, task)
+    |> result.map_error(fn(_) { "Cannot encode task" }),
+  )
+  use _schema_json <- result.try(
+    codec.schema_json(task_codec)
     |> result.map_error(fn(_) { "Unknown schema" }),
   )
-  use contract <- result.try(
-    runtime.from_schema(schema)
-    |> result.map_error(fn(_) { "Invalid schema contract" }),
-  )
-  use _validated <- result.try(
-    runtime.validate(contract, parsed_val)
-    |> result.map_error(fn(_) { "Schema validation failure" }),
-  )
-
-  // 4. Decode into typed domain record
-  codec.decode(task_codec, parsed_val)
-  |> result.map_error(fn(_) { "Decoding failure" })
+  Ok(task)
 }
 ```
+
+`codec.record2` and `codec.record3` accept `required` or `optional` properties, a native constructor, and one accessor per property. They return `Result(Codec(a), PropertyError)` so duplicate names fail during construction. The underlying object stays closed and retains declaration order. `codec.Optional(a)` distinguishes a missing property from a present value; use `codec.nullable` separately when JSON `null` is allowed. For larger records, compose `Properties` with `codec.combine`, then map the tuple with `codec.imap`.
+
+`codec.schema_json` renders the full Draft 2020-12 document from a known codec schema. A custom codec built without a schema returns `Error(codec.UnknownSchema)`. Runtime JSON decoding uses Blueprint's stricter parser; native-backed text decoding retains the native parser's behavior, including its number normalization and duplicate-key handling.
+
+For separate byte limits, schema validation, or runtime contract inspection, use the advanced `json/blueprint/parser` and `json/blueprint/runtime` modules with the same `Codec(a)`. The ordinary typed text path is `codec.decode_json` and `codec.encode_json`.
 
 ### Runtime and Build-Time Codecs
 
@@ -140,50 +129,36 @@ To generate at build time, call `codegen.compile("generated/order_codec", "order
 
 Generated native text functions use `gleam/json` for rendering and parsing. A definition containing arbitrary `number.Number` values is currently refused by `codegen.compile` with `NativeNumberUnsupported`, since the native JSON representation cannot preserve Blueprint's exact arbitrary-precision number contract. Also, the native parser inherits `gleam/json` number normalization and duplicate-object-key behavior; it does not have the stricter lexical number and duplicate-key admission behavior of Blueprint's runtime parser. Use the runtime codec when those parser guarantees are required.
 
-### Legacy 1.7.1 Migration Contract
+### Moving from 1.x decoders to Codec
 
-Existing 1.7.1 decoders (`json/blueprint.Decoder(a)`) can be adapted to modern `Codec(a)` using `json/blueprint/migration.adapt`. All errors (including safe native integer bounds) are handled honestly:
+For ordinary application records, replace the one-way `json/blueprint.Decoder(a)` definition with one `json/blueprint/codec.Codec(a)`. The codec supplies both directions and a known Draft 2020-12 schema. This example is compiled in `test/readme_example_test.gleam`:
+
 
 ```gleam
 pub type MyRecord {
   MyRecord(name: String, count: Int)
 }
 
-pub fn example() {
-  let legacy_decoder =
-    legacy.decode2(
+pub fn example() -> codec.Codec(MyRecord) {
+  let assert Ok(record_codec) =
+    codec.record2(
+      codec.required("name", codec.string()),
+      codec.required("count", codec.int()),
       MyRecord,
-      legacy.field("name", legacy.string()),
-      legacy.field("count", legacy.int()),
+      fn(record) { record.name },
+      fn(record) { record.count },
     )
-
-  let my_encoder = fn(record: MyRecord) {
-    case number.from_int(record.count) {
-      Error(_) ->
-        Error(
-          codec.CannotEncode(codec.CustomEncodeReason("Safe integer overflow")),
-        )
-      Ok(count_num) ->
-        Ok(
-          value.Object([
-            #("name", value.String(record.name)),
-            #("count", value.Number(count_num)),
-          ]),
-        )
-    }
-  }
-
-  // Adapts legacy decoder with explicit encoder; reports codec.UnknownSchema
-  let modern_codec = migration.adapt(legacy_decoder, my_encoder)
-  modern_codec
+  record_codec
 }
 ```
 
+The released root `json/blueprint.Decoder` remains supported for recursive typed decoding and its existing `$ref`/`$defs` schema output. `Codec.Schema` has no recursive reference constructor, so a recursive decoder does not have an equivalent finite codec definition. See [the 2.0 migration guide](docs/migration-2.0.md) for API mappings, missing/null behavior, and the removed adapter.
+
 ---
 
-## Legacy 1.7.1 Usage (Preserved for Compatibility)
+## Advanced recursive Decoder and legacy schema output
 
-json_blueprint preserves legacy utilities for encoding and decoding JSON data with union types under Draft 7:
+The released decoder and schema modules remain available when recursive decoding or constraints beyond the finite codec schema are needed. Their renderer labels output as Draft-07 and currently uses `$defs`; consumers that need strict dialect interoperability should inspect the generated document. Prefer `Codec` for ordinary bidirectional application data.
 
 ## Examples
 

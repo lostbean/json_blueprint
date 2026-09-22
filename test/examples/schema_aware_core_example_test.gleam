@@ -1,12 +1,9 @@
 import gleam/bit_array
 import gleeunit/should
-import json/blueprint as legacy
 import json/blueprint/codec
-import json/blueprint/migration
 import json/blueprint/number
 import json/blueprint/parser
 import json/blueprint/runtime
-import json/blueprint/value
 
 pub type Task {
   Task(id: Int, title: String, priority: codec.Optional(String))
@@ -63,79 +60,4 @@ pub fn schema_aware_core_example_test() {
   let assert Ok(parsed_val) = parser.parse_value(limits, json_bytes)
   let assert Ok(parsed_task) = codec.decode(task_codec, parsed_val)
   parsed_task |> should.equal(task)
-
-  // 7. Legacy 1.7.1 Migration
-  let legacy_decoder =
-    legacy.decode2(
-      fn(id, title) { Task(id, title, codec.Missing) },
-      legacy.field("id", legacy.int()),
-      legacy.field("title", legacy.string()),
-    )
-  let legacy_encoder = fn(t: Task) {
-    case number.from_int(t.id) {
-      Error(_) ->
-        Error(
-          codec.CannotEncode(codec.CustomEncodeReason("Safe integer overflow")),
-        )
-      Ok(id_num) ->
-        Ok(
-          value.Object([
-            #("id", value.Number(id_num)),
-            #("title", value.String(t.title)),
-          ]),
-        )
-    }
-  }
-  let adapted_codec = migration.adapt(legacy_decoder, legacy_encoder)
-  codec.schema(adapted_codec) |> should.equal(Error(codec.UnknownSchema))
-  let assert Ok(num42) = number.from_int(42)
-  let assert Ok(legacy_decoded) =
-    codec.decode(
-      adapted_codec,
-      value.Object([
-        #("id", value.Number(num42)),
-        #("title", value.String("Migrated task")),
-      ]),
-    )
-  legacy_decoded
-  |> should.equal(Task(42, "Migrated task", codec.Missing))
-}
-
-pub type MyRecord {
-  MyRecord(name: String, count: Int)
-}
-
-pub fn readme_migration_example_test() {
-  let legacy_decoder =
-    legacy.decode2(
-      MyRecord,
-      legacy.field("name", legacy.string()),
-      legacy.field("count", legacy.int()),
-    )
-
-  let my_encoder = fn(record: MyRecord) {
-    case number.from_int(record.count) {
-      Error(_) ->
-        Error(
-          codec.CannotEncode(codec.CustomEncodeReason("Safe integer overflow")),
-        )
-      Ok(count_num) ->
-        Ok(
-          value.Object([
-            #("name", value.String(record.name)),
-            #("count", value.Number(count_num)),
-          ]),
-        )
-    }
-  }
-
-  // Adapts legacy decoder with explicit encoder; reports codec.UnknownSchema
-  let modern_codec = migration.adapt(legacy_decoder, my_encoder)
-  codec.schema(modern_codec)
-  |> should.equal(Error(codec.UnknownSchema))
-
-  let test_record = MyRecord("item", 42)
-  let assert Ok(wire) = codec.encode(modern_codec, test_record)
-  codec.decode(modern_codec, wire)
-  |> should.equal(Ok(test_record))
 }

@@ -1,17 +1,10 @@
 import generated/order_codec as generated_order_codec
-import gleam/bit_array
 import gleam/list
 import gleam/result
 import gleam/string
 import gleeunit/should
-import json/blueprint as legacy
 import json/blueprint/codec
 import json/blueprint/codegen
-import json/blueprint/migration
-import json/blueprint/number
-import json/blueprint/parser
-import json/blueprint/runtime
-import json/blueprint/value
 import materialize_fixtures
 
 @external(erlang, "readme_test_ffi", "read_file_to_string")
@@ -49,87 +42,53 @@ pub type Task {
 }
 
 pub fn run_task_pipeline() -> Result(Task, String) {
-  // 1. Build bidirectional codec with bounded integer range
+  // One bidirectional codec defines the record's JSON and schema.
   use id_codec <- result.try(
     codec.integer_between(1, 100_000)
     |> result.map_error(fn(_) { "Invalid id range" }),
   )
-  use task_props <- result.try(
-    codec.combine(
+  use task_codec <- result.try(
+    codec.record2(
       codec.required("id", id_codec),
       codec.required("title", codec.string()),
+      Task,
+      fn(task) { task.id },
+      fn(task) { task.title },
     )
-    |> result.map_error(fn(_) { "Invalid properties combination" }),
-  )
-  let task_codec =
-    codec.imap(
-      codec.object(task_props),
-      fn(pair: #(Int, String)) { Task(pair.0, pair.1) },
-      fn(task: Task) { #(task.id, task.title) },
-    )
-
-  // 2. Parse untrusted JSON bytes with bounded parser limits
-  let limits = parser.default_limits()
-  let input_bytes =
-    bit_array.from_string("{\"id\": 42, \"title\": \"Verify Blueprint\"}")
-
-  use parsed_val <- result.try(
-    parser.parse_value(limits, input_bytes)
-    |> result.map_error(fn(_) { "JSON parse error" }),
+    |> result.map_error(fn(_) { "Invalid record properties" }),
   )
 
-  // 3. Derive Draft 2020-12 runtime contract and validate
-  use schema <- result.try(
-    codec.schema(task_codec)
+  use task <- result.try(
+    codec.decode_json(task_codec, "{\"id\":42,\"title\":\"Verify Blueprint\"}")
+    |> result.map_error(fn(_) { "Invalid task JSON" }),
+  )
+  use _encoded <- result.try(
+    codec.encode_json(task_codec, task)
+    |> result.map_error(fn(_) { "Cannot encode task" }),
+  )
+  use _schema_json <- result.try(
+    codec.schema_json(task_codec)
     |> result.map_error(fn(_) { "Unknown schema" }),
   )
-  use contract <- result.try(
-    runtime.from_schema(schema)
-    |> result.map_error(fn(_) { "Invalid schema contract" }),
-  )
-  use _validated <- result.try(
-    runtime.validate(contract, parsed_val)
-    |> result.map_error(fn(_) { "Schema validation failure" }),
-  )
-
-  // 4. Decode into typed domain record
-  codec.decode(task_codec, parsed_val)
-  |> result.map_error(fn(_) { "Decoding failure" })
+  Ok(task)
 }
 
-// --- Snippet 2: Legacy 1.7.1 Migration ---
+// --- Snippet 2: Migration to a schema-bearing Codec ---
 
 pub type MyRecord {
   MyRecord(name: String, count: Int)
 }
 
-pub fn example() {
-  let legacy_decoder =
-    legacy.decode2(
+pub fn example() -> codec.Codec(MyRecord) {
+  let assert Ok(record_codec) =
+    codec.record2(
+      codec.required("name", codec.string()),
+      codec.required("count", codec.int()),
       MyRecord,
-      legacy.field("name", legacy.string()),
-      legacy.field("count", legacy.int()),
+      fn(record) { record.name },
+      fn(record) { record.count },
     )
-
-  let my_encoder = fn(record: MyRecord) {
-    case number.from_int(record.count) {
-      Error(_) ->
-        Error(
-          codec.CannotEncode(codec.CustomEncodeReason("Safe integer overflow")),
-        )
-      Ok(count_num) ->
-        Ok(
-          value.Object([
-            #("name", value.String(record.name)),
-            #("count", value.Number(count_num)),
-          ]),
-        )
-    }
-  }
-
-  // Adapts legacy decoder with explicit encoder; reports codec.UnknownSchema
-  let modern_codec = migration.adapt(legacy_decoder, my_encoder)
-  modern_codec
+  record_codec
 }
 
 // --- Runnable Tests ---
@@ -141,8 +100,7 @@ pub fn readme_pipeline_execution_test() {
 
 pub fn readme_migration_execution_test() {
   let modern_codec = example()
-  codec.schema(modern_codec)
-  |> should.equal(Error(codec.UnknownSchema))
+  codec.schema(modern_codec) |> should.be_ok
 
   let record = MyRecord("test", 100)
   let assert Ok(encoded) = codec.encode(modern_codec, record)

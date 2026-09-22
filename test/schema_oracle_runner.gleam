@@ -2,12 +2,13 @@ import gleam/io
 import gleam/list
 import json/blueprint/codec
 import json/blueprint/document
+import json/blueprint/json_text
 import json/blueprint/number
 import json/blueprint/runtime
 import json/blueprint/value
 import schema_oracle_test.{
   Approve, Decline, EmptyLabel, Low, Normal, PriorityRequest, QuotedUnicodeLabel,
-  UpdateRecord, Urgent, value_to_json_string,
+  UpdateRecord, Urgent,
 }
 
 fn int_num(n: Int) -> number.Number {
@@ -50,7 +51,7 @@ fn emit_cases(
         #("runtime_accepted", value.Bool(runtime_accepted)),
       ])
 
-    io.println(value_to_json_string(payload))
+    io.println(json_text.render_value(payload))
   })
   Nil
 }

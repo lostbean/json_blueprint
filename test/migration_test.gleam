@@ -1,93 +1,45 @@
 import gleeunit/should
 import json/blueprint as legacy
 import json/blueprint/codec
-import json/blueprint/migration
-import json/blueprint/number
-import json/blueprint/value
 
-pub type LegacyPerson {
-  LegacyPerson(name: String, age: Int)
+pub type Person {
+  Person(name: String, age: Int)
 }
 
-pub type LegacyMessage {
-  LegacyMessage(msg_type: String, data: String)
+pub fn person_codec() -> codec.Codec(Person) {
+  let assert Ok(person) =
+    codec.record2(
+      codec.required("name", codec.string()),
+      codec.required("age", codec.int()),
+      Person,
+      fn(person) { person.name },
+      fn(person) { person.age },
+    )
+  person
 }
 
-fn int_num(n: Int) -> number.Number {
-  let assert Ok(num) = number.from_int(n)
-  num
-}
-
-pub fn legacy_migration_contract_test() {
-  let legacy_person_decoder =
+pub fn one_way_decoder_to_schema_bearing_codec_test() {
+  let legacy_decoder =
     legacy.decode2(
-      LegacyPerson,
+      Person,
       legacy.field("name", legacy.string()),
       legacy.field("age", legacy.int()),
     )
 
-  let person_encoder = fn(p: LegacyPerson) {
-    Ok(
-      value.Object([
-        #("name", value.String(p.name)),
-        #("age", value.Number(int_num(p.age))),
-      ]),
-    )
-  }
+  let json = "{\"name\":\"Alice\",\"age\":30}"
+  legacy.decode(using: legacy_decoder, from: json)
+  |> should.equal(Ok(Person("Alice", 30)))
 
-  let adapted = migration.adapt(legacy_person_decoder, person_encoder)
+  let modern_codec = person_codec()
+  codec.decode_json(modern_codec, json)
+  |> should.equal(Ok(Person("Alice", 30)))
+  codec.encode_json(modern_codec, Person("Alice", 30))
+  |> should.equal(Ok(json))
+  codec.schema_json(modern_codec) |> should.be_ok
 
-  // 1. Schema unavailable
-  codec.schema(adapted)
-  |> should.equal(Error(codec.UnknownSchema))
-
-  // 2. Exact roundtrip through adapted codec
-  let alice = LegacyPerson("Alice", 30)
-  let assert Ok(encoded) = codec.encode(adapted, alice)
-  codec.decode(adapted, encoded)
-  |> should.equal(Ok(alice))
-
-  // 3. 1.7.1 permissive extra fields acceptance preserved
-  let input_with_extra =
-    value.Object([
-      #("name", value.String("Bob")),
-      #("age", value.Number(int_num(25))),
-      #("extra_field", value.String("ignored_by_1_7_1")),
-    ])
-  codec.decode(adapted, input_with_extra)
-  |> should.equal(Ok(LegacyPerson("Bob", 25)))
-
-  // 4. Missing required field rejected
-  let input_missing_age = value.Object([#("name", value.String("Charlie"))])
-  codec.decode(adapted, input_missing_age)
-  |> should.equal(
-    Error(
-      codec.CannotDecode(codec.CustomDecodeReason(
-        "json_blueprint 1.7.1 rejected the Value",
-      )),
-    ),
-  )
-
-  // 5. Legacy type/data envelope preserved
-  let legacy_msg_decoder =
-    legacy.decode2(
-      LegacyMessage,
-      legacy.field("type", legacy.string()),
-      legacy.field("data", legacy.string()),
-    )
-
-  let msg_encoder = fn(m: LegacyMessage) {
-    Ok(
-      value.Object([
-        #("type", value.String(m.msg_type)),
-        #("data", value.String(m.data)),
-      ]),
-    )
-  }
-
-  let adapted_msg = migration.adapt(legacy_msg_decoder, msg_encoder)
-  let msg = LegacyMessage("greeting", "hello world")
-  let assert Ok(encoded_msg) = codec.encode(adapted_msg, msg)
-  codec.decode(adapted_msg, encoded_msg)
-  |> should.equal(Ok(msg))
+  // Legacy object decoders accepted unrelated fields. Codec objects are closed.
+  let extra = "{\"name\":\"Alice\",\"age\":30,\"extra\":true}"
+  legacy.decode(using: legacy_decoder, from: extra)
+  |> should.equal(Ok(Person("Alice", 30)))
+  codec.decode_json(modern_codec, extra) |> should.be_error
 }

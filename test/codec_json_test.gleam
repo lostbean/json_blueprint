@@ -2,7 +2,7 @@ import gleam/dynamic/decode
 import gleam/json
 import gleeunit/should
 import json/blueprint/codec
-import json/blueprint/migration
+import json/blueprint/json_text
 import json/blueprint/number
 import json/blueprint/value
 import materialize_fixtures
@@ -11,7 +11,7 @@ pub fn runtime_nested_codec_json_matches_value_renderer_test() {
   let runtime = materialize_fixtures.build_order_codec()
   let order = sample_order()
   let assert Ok(encoded_value) = codec.encode(runtime, order)
-  let expected_json = migration.value_to_json_string(encoded_value)
+  let expected_json = json_text.render_value(encoded_value)
 
   codec.encode_json(runtime, order)
   |> should.equal(Ok(expected_json))
@@ -27,8 +27,8 @@ pub fn runtime_json_operations_preserve_arbitrary_numbers_test() {
   let assert Ok(encoded_value) = codec.encode(number_codec, arbitrary)
 
   codec.encode_json(number_codec, arbitrary)
-  |> should.equal(Ok(migration.value_to_json_string(encoded_value)))
-  codec.decode_json(number_codec, migration.value_to_json_string(encoded_value))
+  |> should.equal(Ok(json_text.render_value(encoded_value)))
+  codec.decode_json(number_codec, json_text.render_value(encoded_value))
   |> should.equal(Ok(arbitrary))
 }
 
@@ -97,6 +97,10 @@ pub fn native_json_backend_is_interchangeable_without_value_conversion_test() {
   |> should.equal(Ok("value-decoded:wire"))
   codec.schema(native)
   |> should.equal(Ok(codec.StringSchema))
+  codec.schema_json(native)
+  |> should.equal(Ok(
+    "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"string\"}",
+  ))
 
   case codec.decode_json(native, "{}") {
     Error(codec.NativeJsonFailure(_)) -> True
