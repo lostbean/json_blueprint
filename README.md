@@ -9,9 +9,10 @@ json_blueprint is a Gleam library that simplifies JSON encoding and decoding whi
 gleam add json_blueprint
 ```
 
-## Schema-Aware Core (Release-Ready Initial Facade)
+## Schema-aware core (planned 2.0 facade)
 
-`json_blueprint` provides a production-grade, schema-aware JSON core for Gleam applications:
+`json_blueprint` provides a schema-aware JSON core for Gleam applications. These APIs are on the implementation branch and are planned for 2.0; the package manifest still identifies the published 1.7.1 release. See [unreleased changes](CHANGELOG.md) and the [migration guide](docs/migration-2.0.md).
+
 - **`Value`**: Explicit, JSON-exact value model (`Null`, `Bool`, `String`, `Number`, `Array`, `Object`) with duplicate key preservation until rejection.
 - **Exact `Number`**: Canonical arbitrary-precision decimal representation representing all numeric values. Native `Int` and `Float` are checked projections.
 - **`Codec(a)`**: Bidirectional typed combinator deriving encoder, decoder, and Draft 2020-12 schema from a single definition.
@@ -22,18 +23,20 @@ gleam add json_blueprint
 
 ### Target Support Matrix
 
-| Target | Status | Exact Number Model | Native Integer Bounds | Binary64 Float Projections | Exercised Environment |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **BEAM / Erlang** | Full Support | Arbitrary-precision decimal | Unlimited (bignum) | Exact binary64 conversions | Verified on OTP 28 |
-| **JavaScript (Node.js)** | Full Support | Arbitrary-precision decimal | `[-9007199254740991, 9007199254740991]` (typed `UnsafeNativeInteger` construction refusal / `UnsupportedNativeInteger` projection refusal) | Exact binary64 conversions via BigInt | Verified on Node.js v24.19.0 |
-| **JavaScript (Browser)** | Unverified | Target-neutral ESM (`TextEncoder`, `DataView`, `BigInt`), but unverified in test suite | Same as Node.js | Same as Node.js | Untested in CI |
+| Target                   | Status       | Exact Number Model                                                                     | Native Integer Bounds                                                                                                                      | Binary64 Float Projections            | Exercised Environment        |
+| :----------------------- | :----------- | :------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------ | :--------------------------- |
+| **BEAM / Erlang**        | Full Support | Arbitrary-precision decimal                                                            | Unlimited (bignum)                                                                                                                         | Exact binary64 conversions            | Verified on OTP 28           |
+| **JavaScript (Node.js)** | Full Support | Arbitrary-precision decimal                                                            | `[-9007199254740991, 9007199254740991]` (typed `UnsafeNativeInteger` construction refusal / `UnsupportedNativeInteger` projection refusal) | Exact binary64 conversions via BigInt | Verified on Node.js v24.19.0 |
+| **JavaScript (Browser)** | Unverified   | Target-neutral ESM (`TextEncoder`, `DataView`, `BigInt`), but unverified in test suite | Same as Node.js                                                                                                                            | Same as Node.js                       | Untested in CI               |
 
-### Supported Finite Draft 2020-12 Profile
+The CI matrix exercises Gleam 1.17.0, OTP 28, and Node.js 24. The browser target is not exercised there.
+
+### Supported finite Draft 2020-12 profile
 
 - **Closed Objects**: `ObjectSchema(properties)` with explicit required and optional fields.
 - **Exact Pairs**: `PairSchema(left, right)` representing fixed 2-element tuples.
 - **Collections**: `ListSchema(element)` representing homogenous arrays.
-- **Nullable Values**: `NullableSchema(inner)` representing optional/nullable values.
+- **Nullable Values**: `NullableSchema(inner)` accepts JSON `null` or an inner value. Object property presence is modeled separately with `codec.optional`.
 - **Bounded Integers**: `IntegerRangeSchema(min, max)` enforcing integer bounds.
 - **String Enums**: `StringEnumSchema(labels)` representing finite string variants.
 - **Tagged Alternatives**: `TaggedSchema(tag1, s1, tag2, s2)` representing discriminated unions.
@@ -41,6 +44,7 @@ gleam add json_blueprint
 ### Documented Design-Deferred Families (Retained Future Scope)
 
 These capabilities are explicitly outside the initial release facade (per `PUBLIC-API.md`) rather than hidden behind incomplete todos:
+
 - **Recursive References (`$ref`, `$defs`)**: Deferred pending resource and cycle policies.
 - **Arbitrary Unions**: Untagged unions (`anyOf`, general `oneOf`) deferred pending subtyping policy.
 - **Pattern / Regex**: String format regex validation deferred.
@@ -97,9 +101,7 @@ For schema validation or runtime contract inspection, use the advanced `json/blu
 
 Define a codec once with `json/blueprint/codegen` combinators. The same typed `Definition(a)` is the input to the runtime codec and to generated encoder, decoder, and schema artifacts; keep the definition and its mappings as the single maintained source.
 
-For example, `order_definition()` below is the application's canonical nested `Order` definition:
-
-With `import generated/order_codec as generated_order_codec`, imports for `json/blueprint/codec` and `json/blueprint/codegen`, and the module that owns `Order` and `order_definition()`:
+For example, `order_definition()` below is the application's canonical nested `Order` definition. The following compiled fixture uses `materialize_fixtures` as its application data module and `generated/order_codec` as its generated module. Replace both module names with the corresponding modules in your application:
 
 ```gleam
 pub fn runtime_and_generated_order_example(
@@ -133,7 +135,6 @@ Generated text encoders use `gleam/json` for rendering. Ordinary generated decod
 
 For ordinary application records, replace the one-way `json/blueprint.Decoder(a)` definition with one `json/blueprint/codec.Codec(a)`. The codec supplies both directions and a known Draft 2020-12 schema. This example is compiled in `test/readme_example_test.gleam`:
 
-
 ```gleam
 pub type MyRecord {
   MyRecord(name: String, count: Int)
@@ -164,7 +165,7 @@ The released decoder and schema modules remain available when recursive decoding
 
 <details>
   <summary>Encoding Union Types</summary>
-  
+
 Here's an example of encoding a union type to JSON:
 
 ```gleam
@@ -326,7 +327,7 @@ This will encode your union types into a standardized JSON format with `type` an
 
 <details>
   <summary>Type aliases and optional fields</summary>
-  
+
 And here's an example using type aliases, optional fields, and single constructor types:
 
 ```gleam
@@ -489,7 +490,7 @@ pub fn drawing_test() {
 
 <details>
   <summary>Recursive data types</summary>
-  
+
 And here's an example using type aliases, optional fields, and single constructor types:
 
 ```gleam
