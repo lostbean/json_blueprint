@@ -87,11 +87,11 @@ pub fn run_task_pipeline() -> Result(Task, String) {
 }
 ```
 
-`codec.record2` and `codec.record3` accept `required` or `optional` properties, a native constructor, and one accessor per property. They return `Result(Codec(a), PropertyError)` so duplicate names fail during construction. The underlying object stays closed and retains declaration order. `codec.Optional(a)` distinguishes a missing property from a present value; use `codec.nullable` separately when JSON `null` is allowed. For larger records, compose `Properties` with `codec.combine`, then map the tuple with `codec.imap`.
+`codec.record2` and `codec.record3` accept `required` or `optional` properties, a native constructor, and one accessor per property. They return `Result(Codec(a), PropertyError)` so duplicate names fail during construction. The underlying object stays closed and retains declaration order. `codec.Optional(a)` distinguishes a missing property from a present value; use `codec.nullable` separately when JSON `null` is allowed. `codec.optional_option` and `codegen.optional_option` use standard `gleam/option.Option(a)` for optional properties. With a nullable inner codec, `None`, `Some(codec.Null)`, and `Some(codec.NonNull(value))` remain distinct. For larger records, compose `Properties` with `codec.combine`, then map the tuple with `codec.imap`. Use `codec.try_imap` when either native conversion may fail; its callbacks return `codec.DecodeError` and `codec.EncodeError`, and the base wire schema is retained.
 
-`codec.schema_json` renders the full Draft 2020-12 document from a known codec schema. A custom codec built without a schema returns `Error(codec.UnknownSchema)`. Runtime JSON decoding uses Blueprint's stricter parser; native-backed text decoding retains the native parser's behavior, including its number normalization and duplicate-key handling.
+`codec.schema_json` renders the full Draft 2020-12 document from a known codec schema. A custom codec built without a schema returns `Error(codec.UnknownSchema)`. `codec.decode_json` always uses Blueprint's strict parser, including for generated and mapped codecs. It rejects duplicate keys and retains exact number tokens. `codec.decode_json_with_limits(codec, limits, source)` accepts a `parser.ParserLimits` value when the application needs a smaller byte, depth, or number bound. Start with `parser.default_limits()` and use `parser_limits.with_max_bytes`, `with_max_depth`, or `with_number_limits` to adjust one policy. The ordinary default allows exact finite-float decimal expansions, including subnormal values, while retaining finite resource limits.
 
-For separate byte limits, schema validation, or runtime contract inspection, use the advanced `json/blueprint/parser` and `json/blueprint/runtime` modules with the same `Codec(a)`. The ordinary typed text path is `codec.decode_json` and `codec.encode_json`.
+For schema validation or runtime contract inspection, use the advanced `json/blueprint/parser` and `json/blueprint/runtime` modules with the same `Codec(a)`. The ordinary typed text path is `codec.decode_json` and `codec.encode_json`.
 
 ### Runtime and Build-Time Codecs
 
@@ -116,7 +116,7 @@ pub fn runtime_and_generated_order_example(
   let _ = codec.encode_json(generated_codec, order)
   let _ = codec.decode_json(generated_codec, json_text)
 
-  // Direct generated operations avoid constructing the wrapper Codec.
+  // Direct generated operations expose the same strict text admission.
   let _ = generated_order_codec.encode_order_json(order)
   let _ = generated_order_codec.decode_order_json(json_text)
   let _ = generated_order_codec.order_schema()
@@ -127,7 +127,7 @@ pub fn runtime_and_generated_order_example(
 
 To generate at build time, call `codegen.compile("generated/order_codec", "order", order_definition())`. It returns a `GeneratedModule` containing the module path, Gleam source content, and a fingerprint. The application's build/generation task writes that content to `src/generated/order_codec.gleam`, then runs `gleam format src/generated/order_codec.gleam` before compiling the application. Check the generated module into source control and add a freshness test that recompiles the canonical definition and compares the result with the checked-in source; this catches stale output without maintaining the generated implementation by hand.
 
-Generated native text functions use `gleam/json` for rendering and parsing. A definition containing arbitrary `number.Number` values is currently refused by `codegen.compile` with `NativeNumberUnsupported`, since the native JSON representation cannot preserve Blueprint's exact arbitrary-precision number contract. Also, the native parser inherits `gleam/json` number normalization and duplicate-object-key behavior; it does not have the stricter lexical number and duplicate-key admission behavior of Blueprint's runtime parser. Use the runtime codec when those parser guarantees are required.
+Generated text encoders use `gleam/json` for rendering. Ordinary generated decoders use Blueprint's strict parser. For the distinct performance and parser behavior of `gleam/json`, call the generated `decode_<name>_json_native` function or `codec.decode_json_native(generated_codec, source)` explicitly; the native parser may normalize number tokens and collapse duplicate keys. A definition containing arbitrary `number.Number` values is refused by `codegen.compile` with `NativeNumberUnsupported`, since native JSON cannot preserve Blueprint's exact arbitrary-precision number contract.
 
 ### Moving from 1.x decoders to Codec
 

@@ -16,6 +16,7 @@ import {
 import { DecodeError } from "./json/blueprint/dynamic.mjs";
 import { Some, None } from "../gleam_stdlib/gleam/option.mjs";
 import Dict from "../gleam_stdlib/dict.mjs";
+import { get as dict_get } from "../gleam_stdlib/gleam/dict.mjs";
 
 const Nil = undefined;
 
@@ -196,16 +197,17 @@ export function decode_option(data, decoder) {
 export function decode_field(value, name) {
   const not_a_map_error = () => decoder_error("Dict", value);
 
-  if (
-    value instanceof Dict ||
-    value instanceof WeakMap ||
-    value instanceof Map
-  ) {
-    const entry = map_get(value, name);
+  if (value instanceof Dict) {
+    const entry = dict_get(value, name);
     return new Ok(entry.isOk() ? new Some(entry[0]) : new None());
-  } else if (value === null) {
+  } else if (value instanceof WeakMap || value instanceof Map) {
+    return new Ok(value.has(name) ? new Some(value.get(name)) : new None());
+  } else if (value === null || value === undefined) {
     return not_a_map_error();
-  } else if (Object.getPrototypeOf(value) == Object.prototype) {
+  } else if (
+    Object.getPrototypeOf(value) === Object.prototype ||
+    Object.getPrototypeOf(value) === null
+  ) {
     return try_get_field(value, name, () => new Ok(new None()));
   } else {
     return try_get_field(value, name, not_a_map_error);

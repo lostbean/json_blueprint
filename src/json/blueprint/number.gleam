@@ -83,6 +83,61 @@ pub fn integer_projection_limit(
   }
 }
 
+/// Size an integer projection from the admitted native bounds.
+pub fn integer_projection_limit_for_bounds(
+  minimum: Int,
+  maximum: Int,
+) -> IntegerProjectionLimit {
+  let minimum_digits = native_integer_digits(minimum)
+  let maximum_digits = native_integer_digits(maximum)
+  case minimum_digits >= maximum_digits {
+    True -> IntegerProjectionLimit(minimum_digits)
+    False -> IntegerProjectionLimit(maximum_digits)
+  }
+}
+
+/// Use admitted bounds for valid values. For an out-of-range value, allow
+/// native projection so a caller can report the actual integer in its error.
+pub fn integer_projection_limit_for_range_value(
+  value: Number,
+  minimum: Int,
+  maximum: Int,
+) -> IntegerProjectionLimit {
+  let bounded = integer_projection_limit_for_bounds(minimum, maximum)
+  case from_int(minimum), from_int(maximum) {
+    Ok(lower), Ok(upper) ->
+      case
+        compare(value, lower) == LessThan
+        || compare(value, upper) == GreaterThan
+      {
+        True -> integer_projection_limit_for_number(value)
+        False -> bounded
+      }
+    _, _ -> bounded
+  }
+}
+
+/// Size a projection for a parsed schema bound. The native projection still
+/// rejects values unsupported by the host runtime.
+pub fn integer_projection_limit_for_number(
+  number: Number,
+) -> IntegerProjectionLimit {
+  let Number(_, coefficient, exponent10) = number
+  let digits = list_length(coefficient) + exponent10
+  case digits > 0 {
+    True -> IntegerProjectionLimit(digits)
+    False -> IntegerProjectionLimit(1)
+  }
+}
+
+fn native_integer_digits(value: Int) -> Int {
+  let length = list_length(native_byte_codes(native_integer_to_string(value)))
+  case value < 0 {
+    True -> length - 1
+    False -> length
+  }
+}
+
 pub type FloatCandidate {
   CandidateValue(Float)
   CandidateOverflow

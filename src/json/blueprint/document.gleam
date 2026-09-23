@@ -689,7 +689,7 @@ fn expect_integer(
 ) -> Result(Int, DocumentError) {
   case val {
     value.Number(num) -> {
-      let assert Ok(limit) = number.integer_projection_limit(24)
+      let limit = number.integer_projection_limit_for_number(num)
       case number.to_int_exact(num, limit) {
         Ok(integer) -> Ok(integer)
         Error(_) -> Error(MalformedDocument(path, ExpectedInteger))

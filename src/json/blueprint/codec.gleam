@@ -7,6 +7,7 @@ import gleam/option.{type Option, None, Some}
 import json/blueprint/internal/parser_core
 import json/blueprint/json_text
 import json/blueprint/number.{type Number, type NumberError}
+import json/blueprint/parser_limits
 import json/blueprint/value.{type Value}
 
 pub type EncodeReason {
@@ -135,11 +136,9 @@ pub fn from_parts(
   runtime_codec(encode, decode, Ok(schema))
 }
 
-/// Construct a codec with native JSON text operations.
-///
-/// The supplied text decoder owns JSON syntax admission. For generated codecs
-/// this is gleam/json, whose number normalization and duplicate-key behavior
-/// may differ from the stricter Blueprint parser used by runtime codecs.
+/// Construct a codec with native JSON text operations. Ordinary decoding uses
+/// Blueprint's strict parser; the supplied decoder is available through
+/// `decode_json_native` when its native parsing behavior is desired.
 pub fn from_json_parts(
   value_encode: fn(a) -> Result(Value, EncodeError),
   value_decode: fn(Value) -> Result(a, DecodeError),
@@ -155,12 +154,13 @@ fn runtime_codec(
   value_decode: fn(Value) -> Result(a, DecodeError),
   schema: Result(Schema, SchemaError),
 ) -> Codec(a) {
-  let limits = parser_core.default_limits()
   Codec(
     value_encode,
     value_decode,
     fn(item) { encode_json_with(value_encode, item) },
-    fn(source) { decode_json_with(value_decode, limits, source) },
+    fn(source) {
+      decode_json_with(value_decode, parser_limits.default(), source)
+    },
     schema,
   )
 }
@@ -173,12 +173,30 @@ pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
   codec.json_encoder(item)
 }
 
-/// Decode JSON text using this codec's backend.
+/// Decode JSON text with Blueprint's strict parser.
 ///
-/// Runtime codecs use Blueprint's parser, including duplicate-key rejection.
-/// Native-backed codecs use their supplied parser and inherit its syntax
-/// normalization and duplicate-key behavior; typed decoding still applies.
+/// All codecs use Blueprint's parser, including duplicate-key rejection and
+/// exact number admission.
 pub fn decode_json(
+  codec: Codec(a),
+  source: String,
+) -> Result(a, JsonDecodeError) {
+  decode_json_with_limits(codec, parser_limits.default(), source)
+}
+
+/// Decode using caller-supplied parser limits. `parser.ParserLimits` is an
+/// alias of the shared limit type accepted here.
+pub fn decode_json_with_limits(
+  codec: Codec(a),
+  limits: parser_limits.ParserLimits,
+  source: String,
+) -> Result(a, JsonDecodeError) {
+  decode_json_with(codec.decoder, limits, source)
+}
+
+/// Use a codec's native JSON parser when its distinct performance and parser
+/// semantics are explicitly required. Generated codecs use `gleam/json` here.
+pub fn decode_json_native(
   codec: Codec(a),
   source: String,
 ) -> Result(a, JsonDecodeError) {
@@ -197,7 +215,7 @@ fn encode_json_with(
 
 fn decode_json_with(
   value_decode: fn(Value) -> Result(a, DecodeError),
-  limits: parser_core.ParserLimits,
+  limits: parser_limits.ParserLimits,
   source: String,
 ) -> Result(a, JsonDecodeError) {
   case parser_core.parse_value_from_string(limits, source) {
@@ -377,7 +395,7 @@ pub fn decode_integer_between_value(
 ) -> Result(Int, DecodeError) {
   case raw {
     value.Number(num) -> {
-      let assert Ok(limit) = number.integer_projection_limit(24)
+      let limit = number.integer_projection_limit_for_range_value(num, min, max)
       case number.to_int_exact(num, limit) {
         Ok(item) if item >= min && item <= max -> Ok(item)
         Ok(item) ->
@@ -958,6 +976,31 @@ pub fn imap(codec: Codec(a), from: fn(a) -> b, to: fn(b) -> a) -> Codec(b) {
   Codec(..mapped, schema: codec.schema)
 }
 
+/// Map a codec through fallible application conversions in both directions.
+/// Conversion failures use the same located errors as the base codec.
+pub fn try_imap(
+  codec: Codec(a),
+  from: fn(a) -> Result(b, DecodeError),
+  to: fn(b) -> Result(a, EncodeError),
+) -> Codec(b) {
+  let mapped =
+    new(
+      fn(item) {
+        case to(item) {
+          Ok(inner) -> codec.encoder(inner)
+          Error(error) -> Error(error)
+        }
+      },
+      fn(raw) {
+        case codec.decoder(raw) {
+          Ok(inner) -> from(inner)
+          Error(error) -> Error(error)
+        }
+      },
+    )
+  Codec(..mapped, schema: codec.schema)
+}
+
 pub fn string() -> Codec(String) {
   let codec = new(encode_string_value, decode_string_value)
   Codec(..codec, schema: Ok(StringSchema))
@@ -1058,6 +1101,29 @@ pub fn optional(name: String, codec: Codec(a)) -> Properties(Optional(a)) {
     fn(fields) { decode_optional_property_with(name, fields, codec.decoder) },
     [name],
     property_description(name, False, codec),
+  )
+}
+
+/// Represent an optional property with `gleam/option.Option`. Wrap the inner
+/// codec in `nullable` when explicit JSON null must be distinct from absence.
+pub fn optional_option(name: String, codec: Codec(a)) -> Properties(Option(a)) {
+  let Properties(encode, decode, names, schemas) = optional(name, codec)
+  Properties(
+    fn(item) {
+      case item {
+        None -> encode(Missing)
+        Some(value) -> encode(Present(value))
+      }
+    },
+    fn(fields) {
+      case decode(fields) {
+        Ok(Missing) -> Ok(None)
+        Ok(Present(value)) -> Ok(Some(value))
+        Error(error) -> Error(error)
+      }
+    },
+    names,
+    schemas,
   )
 }
 

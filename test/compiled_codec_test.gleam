@@ -156,7 +156,7 @@ pub fn generated_native_json_matches_handwritten_json_and_decodes_test() {
 
 pub fn generated_native_json_returns_typed_codec_errors_test() {
   let wrong_type = order_json(Some(json.string("42")), "pending", False)
-  order_codec.decode_order_json(wrong_type)
+  order_codec.decode_order_json_native(wrong_type)
   |> should.equal(
     Error(
       codec.TypedCodecFailure(codec.DecodeAtField(
@@ -167,7 +167,7 @@ pub fn generated_native_json_returns_typed_codec_errors_test() {
   )
 
   let missing_id = order_json(None, "pending", False)
-  order_codec.decode_order_json(missing_id)
+  order_codec.decode_order_json_native(missing_id)
   |> should.equal(
     Error(
       codec.TypedCodecFailure(codec.DecodeAtField(
@@ -178,7 +178,7 @@ pub fn generated_native_json_returns_typed_codec_errors_test() {
   )
 
   let unknown_field = order_json(Some(json.int(42)), "pending", True)
-  order_codec.decode_order_json(unknown_field)
+  order_codec.decode_order_json_native(unknown_field)
   |> should.equal(
     Error(
       codec.TypedCodecFailure(
@@ -188,7 +188,7 @@ pub fn generated_native_json_returns_typed_codec_errors_test() {
   )
 
   let unknown_status = order_json(Some(json.int(42)), "unrecognized", False)
-  order_codec.decode_order_json(unknown_status)
+  order_codec.decode_order_json_native(unknown_status)
   |> should.equal(
     Error(
       codec.TypedCodecFailure(codec.DecodeAtField(
@@ -199,7 +199,7 @@ pub fn generated_native_json_returns_typed_codec_errors_test() {
   )
 
   let out_of_range = order_json(Some(json.int(1_000_000)), "pending", False)
-  order_codec.decode_order_json(out_of_range)
+  order_codec.decode_order_json_native(out_of_range)
   |> should.equal(
     Error(
       codec.TypedCodecFailure(codec.DecodeAtField(
@@ -213,7 +213,7 @@ pub fn generated_native_json_returns_typed_codec_errors_test() {
     ),
   )
 
-  order_codec.decode_order_json("{")
+  order_codec.decode_order_json_native("{")
   |> should.be_error
 }
 
@@ -264,7 +264,7 @@ pub fn generated_native_int_decoder_rejects_unsafe_integer_results_test() {
   let unsafe = 9_007_199_254_740_991 + 1
   let unsafe_integer =
     "{\"order_id\":9007199254740992,\"items_\\\"list\\\"\":[],\"type\":true,\"status\":\"pending\"}"
-  let result = order_codec.decode_order_json(unsafe_integer)
+  let result = order_codec.decode_order_json_native(unsafe_integer)
 
   case number.from_int(unsafe) {
     Error(number.UnsafeNativeInteger) ->
@@ -335,14 +335,16 @@ pub fn generated_native_nested_integer_encoding_preserves_safety_errors_test() {
 }
 
 pub fn native_json_integer_parser_normalization_is_observable_test() {
-  // gleam/json normalizes JSON numbers before Blueprint sees their lexical
-  // token. A decimal just above 1 can therefore arrive as the native value 1.
+  // Explicit native parsing normalizes this decimal to 1; ordinary generated
+  // decoding keeps the exact token and rejects it as a fractional integer.
   let source = order_json_source("1.0000000000000001")
   let runtime = materialize_fixtures.build_order_codec()
 
   codec.decode_json(runtime, source)
   |> should.be_error
   order_codec.decode_order_json(source)
+  |> should.be_error
+  order_codec.decode_order_json_native(source)
   |> should.equal(Ok(empty_order(1)))
 }
 
@@ -359,14 +361,15 @@ pub fn native_duplicate_keys_follow_backend_parser_semantics_test() {
     _ -> should.be_true(False)
   }
 
-  // Runtime Blueprint rejects duplicate keys; gleam/json first collapses the
-  // object according to the target parser, which the generated codec inherits.
+  order_codec.decode_order_json(duplicate_id) |> should.be_error
+  // The named native decoder retains the target parser's collapse policy.
   let assert Ok(parser_id) =
     json.parse(from: duplicate_id, using: {
       use id <- decode.field("order_id", decode.int)
       decode.success(id)
     })
-  let assert Ok(native_order) = order_codec.decode_order_json(duplicate_id)
+  let assert Ok(native_order) =
+    order_codec.decode_order_json_native(duplicate_id)
   native_order.order_id |> should.equal(parser_id)
 }
 

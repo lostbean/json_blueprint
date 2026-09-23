@@ -2,35 +2,12 @@ import gleam/bit_array
 import gleam/dict
 import gleam/list
 import gleam/string
-import json/blueprint/number.{type NumberError, type NumberLimits}
+import json/blueprint/number.{type NumberError}
+import json/blueprint/parser_limits
 import json/blueprint/value.{type Value}
 
-pub opaque type ParserLimits {
-  ParserLimits(max_bytes: Int, max_depth: Int, number_limits: NumberLimits)
-}
-
-pub type LimitsError {
-  MaxBytesMustBePositive
-  MaxDepthMustBePositive
-}
-
-pub fn parser_limits(
-  max_bytes: Int,
-  max_depth: Int,
-  number_limits: NumberLimits,
-) -> Result(ParserLimits, LimitsError) {
-  case max_bytes > 0, max_depth > 0 {
-    False, _ -> Error(MaxBytesMustBePositive)
-    _, False -> Error(MaxDepthMustBePositive)
-    True, True -> Ok(ParserLimits(max_bytes, max_depth, number_limits))
-  }
-}
-
-pub fn default_limits() -> ParserLimits {
-  let assert Ok(num_limits) = number.number_limits(1024, 100, 1000)
-  let assert Ok(limits) = parser_limits(10_485_760, 128, num_limits)
-  limits
-}
+pub type ParserLimits =
+  parser_limits.ParserLimits
 
 pub type Location {
   Location(byte_offset: Int, line: Int, column: Int)
@@ -69,7 +46,7 @@ pub fn parse_value(
   limits: ParserLimits,
   bytes: BitArray,
 ) -> Result(Value, ParseError) {
-  let ParserLimits(max_bytes, _, _) = limits
+  let max_bytes = parser_limits.max_bytes(limits)
   let byte_size = bit_array.byte_size(bytes)
   case byte_size > max_bytes {
     True -> Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(max_bytes)))
@@ -89,7 +66,7 @@ pub fn parse_value_from_string(
   limits: ParserLimits,
   source: String,
 ) -> Result(Value, ParseError) {
-  let ParserLimits(max_bytes, _, _) = limits
+  let max_bytes = parser_limits.max_bytes(limits)
   let byte_size = string.byte_size(source)
   case byte_size > max_bytes {
     True -> Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(max_bytes)))
@@ -203,7 +180,7 @@ fn parse_number_literal(state: State) -> Result(#(Value, State), ParseError) {
   let loc = current_location(state)
   let #(token_chars, state_after) = scan_number_chars(state, [])
   let token = string.concat(list.reverse(token_chars))
-  let ParserLimits(_, _, num_limits) = state.limits
+  let num_limits = parser_limits.number_limits(state.limits)
   case number.parse_number(num_limits, token) {
     Error(err) -> Error(ParseError(loc, InvalidNumberToken(err)))
     Ok(num) -> Ok(#(value.Number(num), state_after))
@@ -455,7 +432,7 @@ fn hex_val(c: String) -> Result(Int, Nil) {
 
 fn parse_array_literal(state: State) -> Result(#(Value, State), ParseError) {
   let loc = current_location(state)
-  let ParserLimits(_, max_depth, _) = state.limits
+  let max_depth = parser_limits.max_depth(state.limits)
   case state.depth + 1 > max_depth {
     True -> Error(ParseError(loc, DepthLimitExceeded(max_depth)))
     False ->
@@ -517,7 +494,7 @@ fn parse_array_elements(
 
 fn parse_object_literal(state: State) -> Result(#(Value, State), ParseError) {
   let loc = current_location(state)
-  let ParserLimits(_, max_depth, _) = state.limits
+  let max_depth = parser_limits.max_depth(state.limits)
   case state.depth + 1 > max_depth {
     True -> Error(ParseError(loc, DepthLimitExceeded(max_depth)))
     False ->

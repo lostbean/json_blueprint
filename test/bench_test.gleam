@@ -544,7 +544,7 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
       5,
       200,
       fn() {
-        let assert Ok(_) = order_codec.decode_order_json(wire_json)
+        let assert Ok(_) = order_codec.decode_order_json_native(wire_json)
         Nil
       },
     ),
@@ -564,7 +564,7 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
       5,
       200,
       fn() {
-        let assert Ok(_) = codec.decode_json(generated_codec, wire_json)
+        let assert Ok(_) = codec.decode_json_native(generated_codec, wire_json)
         Nil
       },
     ),

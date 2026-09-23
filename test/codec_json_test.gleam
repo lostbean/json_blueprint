@@ -65,7 +65,7 @@ pub fn runtime_json_decode_preserves_parser_and_codec_errors_test() {
 }
 
 pub fn runtime_json_decode_preserves_number_parser_limits_test() {
-  codec.decode_json(codec.number(), "1e1001")
+  codec.decode_json(codec.number(), "1e1201")
   |> should.equal(
     Error(
       codec.BlueprintParserFailure(codec.BlueprintJsonParseFailure(
@@ -89,6 +89,12 @@ pub fn native_json_backend_is_interchangeable_without_value_conversion_test() {
   codec.encode_json(native, "Gleam")
   |> should.equal(Ok("{\"native\":\"Gleam\"}"))
   codec.decode_json(native, "{\"native\":\"Gleam\"}")
+  |> should.equal(
+    Error(
+      codec.TypedCodecFailure(codec.CannotDecode(codec.DecodeExpectedString)),
+    ),
+  )
+  codec.decode_json_native(native, "{\"native\":\"Gleam\"}")
   |> should.equal(Ok("Gleam"))
 
   codec.encode(native, "Gleam")
@@ -102,7 +108,7 @@ pub fn native_json_backend_is_interchangeable_without_value_conversion_test() {
     "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"string\"}",
   ))
 
-  case codec.decode_json(native, "{}") {
+  case codec.decode_json_native(native, "{}") {
     Error(codec.NativeJsonFailure(_)) -> True
     _ -> False
   }

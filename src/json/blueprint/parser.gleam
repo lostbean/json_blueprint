@@ -1,12 +1,12 @@
 import json/blueprint/document.{type DocumentError}
 import json/blueprint/internal/parser_core
 import json/blueprint/number.{type NumberError, type NumberLimits}
+import json/blueprint/parser_limits
 import json/blueprint/runtime.{type RuntimeContract}
 import json/blueprint/value.{type Value}
 
-pub opaque type ParserLimits {
-  ParserLimits(max_bytes: Int, max_depth: Int, number_limits: NumberLimits)
-}
+pub type ParserLimits =
+  parser_limits.ParserLimits
 
 pub type LimitsError {
   MaxBytesMustBePositive
@@ -18,17 +18,15 @@ pub fn parser_limits(
   max_depth: Int,
   number_limits: NumberLimits,
 ) -> Result(ParserLimits, LimitsError) {
-  case max_bytes > 0, max_depth > 0 {
-    False, _ -> Error(MaxBytesMustBePositive)
-    _, False -> Error(MaxDepthMustBePositive)
-    True, True -> Ok(ParserLimits(max_bytes, max_depth, number_limits))
+  case parser_limits.new(max_bytes, max_depth, number_limits) {
+    Error(parser_limits.MaxBytesMustBePositive) -> Error(MaxBytesMustBePositive)
+    Error(parser_limits.MaxDepthMustBePositive) -> Error(MaxDepthMustBePositive)
+    Ok(limits) -> Ok(limits)
   }
 }
 
 pub fn default_limits() -> ParserLimits {
-  let assert Ok(num_limits) = number.number_limits(1024, 100, 1000)
-  let assert Ok(limits) = parser_limits(10_485_760, 128, num_limits)
-  limits
+  parser_limits.default()
 }
 
 pub type Location {
@@ -62,7 +60,7 @@ pub fn parse_value(
   limits: ParserLimits,
   bytes: BitArray,
 ) -> Result(Value, ParseError) {
-  case parser_core.parse_value(to_core_limits(limits), bytes) {
+  case parser_core.parse_value(limits, bytes) {
     Ok(parsed) -> Ok(parsed)
     Error(error) -> Error(translate_parse_error(error))
   }
@@ -72,7 +70,7 @@ pub fn parse_value_from_string(
   limits: ParserLimits,
   source: String,
 ) -> Result(Value, ParseError) {
-  case parser_core.parse_value_from_string(to_core_limits(limits), source) {
+  case parser_core.parse_value_from_string(limits, source) {
     Ok(parsed) -> Ok(parsed)
     Error(error) -> Error(translate_parse_error(error))
   }
@@ -104,13 +102,6 @@ pub fn parse_schema_document_from_string(
         Ok(contract) -> Ok(contract)
       }
   }
-}
-
-fn to_core_limits(limits: ParserLimits) -> parser_core.ParserLimits {
-  let ParserLimits(max_bytes, max_depth, number_limits) = limits
-  let assert Ok(core_limits) =
-    parser_core.parser_limits(max_bytes, max_depth, number_limits)
-  core_limits
 }
 
 fn translate_parse_error(error: parser_core.ParseError) -> ParseError {

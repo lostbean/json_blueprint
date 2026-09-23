@@ -325,7 +325,12 @@ fn validate_at(
     codec.IntegerRangeSchema(minimum, maximum), value.Number(num) ->
       case number.is_integer(num) {
         True -> {
-          let assert Ok(limit) = number.integer_projection_limit(24)
+          let limit =
+            number.integer_projection_limit_for_range_value(
+              num,
+              minimum,
+              maximum,
+            )
           case number.to_int_exact(num, limit) {
             Ok(actual) if actual >= minimum && actual <= maximum -> Ok(Nil)
             Ok(actual) ->

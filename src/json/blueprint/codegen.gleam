@@ -671,6 +671,80 @@ pub fn optional(
   )
 }
 
+/// A generated optional property using the standard `Option` representation.
+pub fn optional_option(
+  name: String,
+  inner: Definition(a),
+) -> Properties(Option(a)) {
+  let Properties(_, _, names, lower_optional) = optional(name, inner)
+  let Definition(_, inner_type, _) = inner
+  let option_type = "option.Option(" <> inner_type <> ")"
+  Properties(
+    codec.optional_option(name, runtime(inner)),
+    option_type,
+    names,
+    fn(prefix) {
+      let lowered = lower_optional(prefix <> "_optional")
+      let encode = lower_property_encoder(lowered)
+      let decode = lower_property_decoder(lowered)
+      let native_encode = lower_property_native_encoder(lowered)
+      let native_decode = lower_property_native_decoder(lowered)
+      LoweredProperties(
+        encoder: prefix <> "_encode",
+        decoder: prefix <> "_decode",
+        native_encoder: prefix <> "_native_encode",
+        native_decoder: prefix <> "_native_decode",
+        native_supported: lowered.native_supported,
+        declarations: list.append(lower_property_declarations(lowered), [
+          "fn "
+            <> prefix
+            <> "_encode(item: "
+            <> option_type
+            <> ") -> Result(List(#(String, value.Value)), codec.EncodeError) {\n"
+            <> "  case item {\n    option.None -> "
+            <> encode
+            <> "(codec.Missing)\n    option.Some(value) -> "
+            <> encode
+            <> "(codec.Present(value))\n  }\n}",
+          "fn "
+            <> prefix
+            <> "_decode(fields: List(#(String, value.Value))) -> Result("
+            <> option_type
+            <> ", codec.DecodeError) {\n"
+            <> "  case "
+            <> decode
+            <> "(fields) {\n"
+            <> "    Ok(codec.Missing) -> Ok(option.None)\n"
+            <> "    Ok(codec.Present(value)) -> Ok(option.Some(value))\n"
+            <> "    Error(error) -> Error(error)\n  }\n}",
+          "fn "
+            <> prefix
+            <> "_native_encode(item: "
+            <> option_type
+            <> ") -> Result(List(#(String, json.Json)), codec.EncodeError) {\n"
+            <> "  case item {\n    option.None -> "
+            <> native_encode
+            <> "(codec.Missing)\n    option.Some(value) -> "
+            <> native_encode
+            <> "(codec.Present(value))\n  }\n}",
+          "fn "
+            <> prefix
+            <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
+            <> option_type
+            <> ", codec.DecodeError) {\n"
+            <> "  case "
+            <> native_decode
+            <> "(fields) {\n"
+            <> "    Ok(codec.Missing) -> Ok(option.None)\n"
+            <> "    Ok(codec.Present(value)) -> Ok(option.Some(value))\n"
+            <> "    Error(error) -> Error(error)\n  }\n}",
+        ]),
+        imports: ["gleam/option", ..lower_property_imports(lowered)],
+      )
+    },
+  )
+}
+
 pub fn combine(
   left: Properties(a),
   right: Properties(b),
@@ -898,8 +972,8 @@ pub fn runtime(definition: Definition(a)) -> codec.Codec(a) {
 
 /// Compile one canonical typed definition into Blueprint Value operations,
 /// gleam/json-native text operations, a schema, and an interchangeable Codec.
-/// Native text parsing follows gleam/json's parser normalization and duplicate
-/// object-key behavior rather than the stricter runtime Blueprint parser.
+/// Ordinary text decoding uses Blueprint's strict parser. An explicitly named
+/// native decoder remains available for callers needing `gleam/json` parsing.
 pub fn compile(
   module_path: String,
   name: String,
@@ -984,6 +1058,7 @@ fn compile_supported(
           let decoder_name = "decode_" <> name
           let json_encoder_name = "encode_" <> name <> "_json"
           let json_decoder_name = "decode_" <> name <> "_json"
+          let native_json_decoder_name = json_decoder_name <> "_native"
           let schema_name = name <> "_schema"
           let codec_name = name <> "_codec"
           let body =
@@ -1027,6 +1102,18 @@ fn compile_supported(
             <> "(source: String) -> Result("
             <> type_reference.expression
             <> ", codec.JsonDecodeError) {\n"
+            <> "  codec.decode_json(codec.from_parts("
+            <> encoder_name
+            <> ", "
+            <> decoder_name
+            <> ", "
+            <> schema_name
+            <> "()), source)\n}\n\n"
+            <> "pub fn "
+            <> native_json_decoder_name
+            <> "(source: String) -> Result("
+            <> type_reference.expression
+            <> ", codec.JsonDecodeError) {\n"
             <> "  case json.parse(from: source, using: decode.dynamic) {\n"
             <> "    Error(error) -> Error(codec.NativeJsonFailure(error))\n"
             <> "    Ok(raw) -> case "
@@ -1048,7 +1135,7 @@ fn compile_supported(
             <> ", "
             <> json_encoder_name
             <> ", "
-            <> json_decoder_name
+            <> native_json_decoder_name
             <> ", "
             <> schema_name
             <> "())\n}\n"

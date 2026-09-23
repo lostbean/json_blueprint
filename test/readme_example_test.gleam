@@ -27,7 +27,7 @@ pub fn runtime_and_generated_order_example(
   let _ = codec.encode_json(generated_codec, order)
   let _ = codec.decode_json(generated_codec, json_text)
 
-  // Direct generated operations avoid constructing the wrapper Codec.
+  // Direct generated operations expose the same strict text admission.
   let _ = generated_order_codec.encode_order_json(order)
   let _ = generated_order_codec.decode_order_json(json_text)
   let _ = generated_order_codec.order_schema()
