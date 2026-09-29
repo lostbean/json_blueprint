@@ -5,6 +5,7 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/string
 import gleeunit/should
 import json/blueprint/codec
 import json/blueprint/codegen
@@ -82,6 +83,22 @@ pub fn fallible_mapping_preserves_schema_and_errors_test() {
       codec.CannotEncode(codec.CustomEncodeReason("false forbidden")),
     )),
   )
+}
+
+pub fn codegen_description_preserves_runtime_and_generated_schema_test() {
+  let definition = codegen.describe(codegen.string(), "A quoted \"name\"")
+  codec.schema(codegen.runtime(definition))
+  |> should.equal(
+    Ok(codec.DescribedSchema("A quoted \"name\"", codec.StringSchema)),
+  )
+  let assert Ok(compiled) =
+    codegen.compile("generated/described_name", "described_name", definition)
+  let codegen.GeneratedModule(_, content, _) = compiled
+  string.contains(
+    content,
+    "codec.DescribedSchema(\"A quoted \\\"name\\\"\", codec.StringSchema)",
+  )
+  |> should.be_true
 }
 
 pub fn option_property_keeps_missing_null_and_value_test() {

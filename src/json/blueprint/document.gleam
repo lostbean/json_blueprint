@@ -89,6 +89,28 @@ fn parse_schema(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   use fields <- bind(object_fields(document, path))
+  let description = lookup(fields, "description")
+  let schema_fields = without_field(fields, "description")
+  use parsed <- bind(parse_schema_fields(schema_fields, path))
+  case description {
+    Nothing -> Ok(parsed)
+    Something(value.String(text)) ->
+      Ok(ParsedSchema(
+        codec.DescribedSchema(text, parsed.schema),
+        parsed.invariants,
+      ))
+    Something(_) ->
+      Error(MalformedDocument(
+        append_path(path, Property("description")),
+        ExpectedText,
+      ))
+  }
+}
+
+fn parse_schema_fields(
+  fields: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(ParsedSchema, DocumentError) {
   use _ <- bind(known_schema_keywords(fields, path))
   case lookup(fields, "anyOf") {
     Something(alternatives) -> {

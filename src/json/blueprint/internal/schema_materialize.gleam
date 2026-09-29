@@ -1,5 +1,6 @@
 import gleam/int
 import gleam/list
+import gleam/result
 import gleam/string
 import json/blueprint/codec
 
@@ -191,6 +192,16 @@ pub fn emit_schema_expression(
   path: List(String),
 ) -> Result(String, MaterializationError) {
   case schema {
+    codec.DescribedSchema(description, inner) -> {
+      use expression <- result.try(emit_schema_expression(inner, path))
+      Ok(
+        "codec.DescribedSchema("
+        <> escape_string_literal(description)
+        <> ", "
+        <> expression
+        <> ")",
+      )
+    }
     codec.StringSchema -> Ok("codec.StringSchema")
     codec.StringEnumSchema(labels) -> {
       let escaped_labels = list.map(labels, escape_string_literal)

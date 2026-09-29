@@ -970,6 +970,15 @@ pub fn runtime(definition: Definition(a)) -> codec.Codec(a) {
   runtime_codec
 }
 
+/// Add the same schema description to runtime and generated codecs.
+pub fn describe(
+  definition: Definition(a),
+  description: String,
+) -> Definition(a) {
+  let Definition(runtime_codec, gleam_type, lower) = definition
+  Definition(codec.describe(runtime_codec, description), gleam_type, lower)
+}
+
 /// Compile one canonical typed definition into Blueprint Value operations,
 /// gleam/json-native text operations, a schema, and an interchangeable Codec.
 /// Ordinary text decoding uses Blueprint's strict parser. An explicitly named

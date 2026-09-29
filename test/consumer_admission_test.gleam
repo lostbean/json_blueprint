@@ -38,6 +38,7 @@ pub fn extract_requirements(schema: Schema) -> List(Requirement) {
 
 fn at(schema: Schema, path: List(Segment)) -> List(Requirement) {
   case schema {
+    codec.DescribedSchema(_, inner) -> at(inner, path)
     codec.StringSchema -> [Requirement(path, TextValues)]
     codec.StringEnumSchema(labels) -> [
       Requirement(path, StringEnumValues(labels)),

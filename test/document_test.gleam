@@ -91,6 +91,22 @@ pub fn document_unsupported_keywords_test() {
   )
 }
 
+pub fn document_description_must_be_text_test() {
+  document.load(
+    value.Object([
+      #("$schema", value.String(draft_2020_12)),
+      #("description", value.Bool(True)),
+      #("type", value.String("string")),
+    ]),
+  )
+  |> should.equal(
+    Error(document.MalformedDocument(
+      [document.Property("description")],
+      document.ExpectedText,
+    )),
+  )
+}
+
 pub fn document_schema_invariants_test() {
   // Reversed integer range in document
   document.load(

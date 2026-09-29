@@ -1,6 +1,7 @@
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -92,6 +93,7 @@ pub type SchemaError {
 }
 
 pub type Schema {
+  DescribedSchema(description: String, inner: Schema)
   StringSchema
   StringEnumSchema(List(String))
   IntSchema
@@ -268,6 +270,104 @@ pub fn decode(codec: Codec(a), item: Value) -> Result(a, DecodeError) {
 
 pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
   codec.schema
+}
+
+/// Add a JSON Schema description without changing encoding or decoding.
+/// A description applied twice at the same node uses the latest text.
+pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
+  let described = case codec.schema {
+    Ok(DescribedSchema(_, inner)) -> Ok(DescribedSchema(description, inner))
+    Ok(schema) -> Ok(DescribedSchema(description, schema))
+    Error(error) -> Error(error)
+  }
+  Codec(..codec, schema: described)
+}
+
+/// Render a JSON decoding error for human-readable feedback.
+///
+/// Input values and custom reason text are omitted. Paths can still contain
+/// names supplied by a custom decoder, so callers decide whether to expose the
+/// result to an external audience.
+pub fn render_json_decode_error(error: JsonDecodeError) -> String {
+  case error {
+    BlueprintParserFailure(BlueprintJsonParseFailure(location, reason)) ->
+      "invalid JSON at line "
+      <> int.to_string(location.line)
+      <> ", column "
+      <> int.to_string(location.column)
+      <> ": "
+      <> render_parse_reason(reason)
+    NativeJsonFailure(_) -> "invalid JSON"
+    TypedCodecFailure(error) -> render_decode_error_at(error, "$")
+  }
+}
+
+fn render_decode_error_at(error: DecodeError, path: String) -> String {
+  case error {
+    DecodeAtField(_, CannotDecode(DecodeUnknownProperty(_))) ->
+      path <> ": unknown property"
+    DecodeAtField(_, CannotDecode(DecodeDuplicateProperty(_))) ->
+      path <> ": duplicate property"
+    DecodeAtField(field, inner) ->
+      render_decode_error_at(
+        inner,
+        path <> "[" <> json_text.render_value(value.String(field)) <> "]",
+      )
+    DecodeAtIndex(index, inner) ->
+      render_decode_error_at(inner, path <> "[" <> int.to_string(index) <> "]")
+    CannotDecode(reason) -> path <> ": " <> render_decode_reason(reason)
+  }
+}
+
+fn render_decode_reason(reason: DecodeReason) -> String {
+  case reason {
+    DecodeExpectedString -> "expected a string"
+    DecodeExpectedInt -> "expected an integer"
+    DecodeExpectedNumber -> "expected a number"
+    DecodeExpectedBool -> "expected a boolean"
+    DecodeExpectedArray -> "expected an array"
+    DecodeExpectedObject -> "expected an object"
+    DecodeUnknownEnumLabel(_) -> "unknown enum label"
+    DecodeUnknownTag(_) -> "unknown tag"
+    DecodeMissingTag -> "missing tag"
+    DecodeMissingTagPayload(_) -> "missing tag payload"
+    DecodeExpectedTaggedObject -> "expected a tagged object"
+    DecodeMissingProperty(_) -> "missing required property"
+    DecodeUnknownProperty(_) -> "unknown property"
+    DecodeDuplicateProperty(_) -> "duplicate property"
+    DecodeWrongTupleLength(expected, _) ->
+      "expected exactly " <> int.to_string(expected) <> " items"
+    DecodeInvalidWireValue(_) -> "invalid wire value"
+    DecodeIntegerOutsideRange(minimum, maximum, _) ->
+      "integer outside range "
+      <> int.to_string(minimum)
+      <> " to "
+      <> int.to_string(maximum)
+    DecodeNumberOutsideRange(minimum, maximum, _) ->
+      "number outside range "
+      <> number.number_text(minimum)
+      <> " to "
+      <> number.number_text(maximum)
+    CustomDecodeReason(_) -> "custom validation failed"
+  }
+}
+
+fn render_parse_reason(reason: BlueprintJsonParseReason) -> String {
+  case reason {
+    BlueprintUnexpectedByte(_) -> "unexpected byte"
+    BlueprintUnexpectedEndOfInput -> "unexpected end of input"
+    BlueprintInvalidUtf8 -> "invalid UTF-8"
+    BlueprintByteLimitExceeded(max) ->
+      "byte limit exceeded (" <> int.to_string(max) <> ")"
+    BlueprintDepthLimitExceeded(max) ->
+      "depth limit exceeded (" <> int.to_string(max) <> ")"
+    BlueprintInvalidNumberToken(_) -> "invalid number token"
+    BlueprintDuplicateObjectKey(_) -> "duplicate object key"
+    BlueprintUnterminatedString -> "unterminated string"
+    BlueprintInvalidEscapeSequence -> "invalid escape sequence"
+    BlueprintInvalidUnicodeEscape -> "invalid Unicode escape"
+    BlueprintTrailingContent -> "trailing content"
+  }
 }
 
 /// Render the codec's complete Draft 2020-12 schema document as exact JSON.
@@ -1558,6 +1658,12 @@ pub fn number_between(
 
 pub fn schema_value(schema: Schema) -> Value {
   case schema {
+    DescribedSchema(description, DescribedSchema(_, inner)) ->
+      schema_value(DescribedSchema(description, inner))
+    DescribedSchema(description, inner) -> {
+      let assert value.Object(fields) = schema_value(inner)
+      value.Object([#("description", value.String(description)), ..fields])
+    }
     StringSchema -> value.Object([#("type", value.String("string"))])
     StringEnumSchema(labels) ->
       value.Object([

@@ -2,6 +2,8 @@
 
 ## Unreleased — intended 2.0
 
+- Add `codec.describe` and `codegen.describe` for Draft 2020-12 descriptions at any codec schema node. Descriptions survive document loading and runtime contracts but do not affect validation or schema matching. The new public `DescribedSchema` variant requires exhaustive `Schema` matches to be updated.
+- Add `codec.render_json_decode_error` for readable, located JSON decode feedback. It omits input values and application-supplied custom reason text; callers still decide whether to expose a diagnostic.
 - Add an exact JSON value and decimal number model, bounded strict JSON parser, bidirectional `Codec(a)` definitions, finite Draft 2020-12 schema documents, and runtime contract validation.
 - Add typed `codegen.Definition(a)` for runtime and generated codecs. Ordinary generated JSON decoding uses the strict parser; native `gleam/json` admission remains an explicit option.
 - Retain the published `json/blueprint.Decoder(a)` and legacy schema module for recursive decoding and existing `$ref`/`$defs` output. The legacy renderer labels output Draft-07; strict dialect interoperability is not promised.

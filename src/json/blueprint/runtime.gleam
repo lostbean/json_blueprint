@@ -87,11 +87,48 @@ pub fn encoded(value: ValidatedValue) -> Value {
 }
 
 pub fn matches(contract: RuntimeContract, value: ValidatedValue) -> Bool {
-  contract.schema == value.schema
+  validation_shape(contract.schema) == validation_shape(value.schema)
 }
 
 pub fn same_schema(left: RuntimeContract, right: RuntimeContract) -> Bool {
-  left.schema == right.schema
+  validation_shape(left.schema) == validation_shape(right.schema)
+}
+
+fn validation_shape(schema: Schema) -> Schema {
+  case schema {
+    codec.DescribedSchema(_, inner) -> validation_shape(inner)
+    codec.PairSchema(left, right) ->
+      codec.PairSchema(validation_shape(left), validation_shape(right))
+    codec.FieldSchema(name, inner) ->
+      codec.FieldSchema(name, validation_shape(inner))
+    codec.ListSchema(inner) -> codec.ListSchema(validation_shape(inner))
+    codec.NullableSchema(inner) -> codec.NullableSchema(validation_shape(inner))
+    codec.ObjectSchema(properties) ->
+      codec.ObjectSchema(
+        list.map(properties, fn(property) {
+          codec.PropertySchema(
+            ..property,
+            schema: validation_shape(property.schema),
+          )
+        }),
+      )
+    codec.TaggedSchema(left_tag, left, right_tag, right) ->
+      codec.TaggedSchema(
+        left_tag,
+        validation_shape(left),
+        right_tag,
+        validation_shape(right),
+      )
+    codec.StringSchema -> codec.StringSchema
+    codec.StringEnumSchema(labels) -> codec.StringEnumSchema(labels)
+    codec.IntSchema -> codec.IntSchema
+    codec.NumberSchema -> codec.NumberSchema
+    codec.BoolSchema -> codec.BoolSchema
+    codec.IntegerRangeSchema(minimum, maximum) ->
+      codec.IntegerRangeSchema(minimum, maximum)
+    codec.NumberRangeSchema(minimum, maximum) ->
+      codec.NumberRangeSchema(minimum, maximum)
+  }
 }
 
 pub fn decode(
@@ -117,6 +154,12 @@ type Maybe(a) {
 
 fn normalize(schema: Schema) -> Result(Schema, ContractError) {
   case schema {
+    codec.DescribedSchema(description, codec.DescribedSchema(_, inner)) ->
+      normalize(codec.DescribedSchema(description, inner))
+    codec.DescribedSchema(description, inner) -> {
+      use normalized <- bind(normalize(inner))
+      Ok(codec.DescribedSchema(description, normalized))
+    }
     codec.StringSchema -> Ok(codec.StringSchema)
     codec.StringEnumSchema(labels) -> normalize_string_enum(labels)
     codec.IntSchema -> Ok(codec.IntSchema)
@@ -271,6 +314,7 @@ fn validate_at(
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
   case schema, val {
+    codec.DescribedSchema(_, inner), _ -> validate_at(inner, val, path)
     codec.StringSchema, value.String(_) -> Ok(Nil)
     codec.StringSchema, _ -> invalid(path, ExpectedString)
 

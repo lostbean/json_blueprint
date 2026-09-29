@@ -179,6 +179,16 @@ pub fn unknown_schema_from_codec_test() {
   |> should.equal(Error(UnknownSchema("custom_unknown")))
 }
 
+pub fn described_schema_expression_preserves_escaped_text_test() {
+  schema_materialize.emit_schema_expression(
+    codec.DescribedSchema("owner's \"name\"", codec.StringSchema),
+    ["name"],
+  )
+  |> should.equal(Ok(
+    "codec.DescribedSchema(\"owner's \\\"name\\\"\", codec.StringSchema)",
+  ))
+}
+
 pub fn unsupported_number_range_schema_located_test() {
   let range_c = materialize_fixtures.build_number_range_codec()
   let assert Ok(export) = schema_materialize.from_codec("range_schema", range_c)

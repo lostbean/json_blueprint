@@ -95,6 +95,8 @@ pub fn run_task_pipeline() -> Result(Task, String) {
 
 `codec.schema_json` renders the full Draft 2020-12 document from a known codec schema. A custom codec built without a schema returns `Error(codec.UnknownSchema)`. `codec.decode_json` always uses Blueprint's strict parser, including for generated and mapped codecs. It rejects duplicate keys and retains exact number tokens. `codec.decode_json_with_limits(codec, limits, source)` accepts a `parser.ParserLimits` value when the application needs a smaller byte, depth, or number bound. Start with `parser.default_limits()` and use `parser_limits.with_max_bytes`, `with_max_depth`, or `with_number_limits` to adjust one policy. The ordinary default allows exact finite-float decimal expansions, including subnormal values, while retaining finite resource limits.
 
+Use `codec.describe(codec.string(), "City to look up")` as the inner codec of `codec.required("city", ...)` to describe that property in the exported schema. Describe the completed object codec to annotate its root. `codegen.describe` does the same for a generated definition. Descriptions do not change value admission. `codec.render_json_decode_error(error)` turns a `JsonDecodeError` into readable feedback such as `$["city"]: expected a string`; it omits actual input values and custom reason text. The error remains structured for callers that need to classify it, and callers decide whether to expose the rendered text externally.
+
 For schema validation or runtime contract inspection, use the advanced `json/blueprint/parser` and `json/blueprint/runtime` modules with the same `Codec(a)`. The ordinary typed text path is `codec.decode_json` and `codec.encode_json`.
 
 ### Runtime and Build-Time Codecs
