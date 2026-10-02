@@ -62,25 +62,23 @@ pub fn decorative_codec() -> codec.Codec(DecorativeLabel) {
 }
 
 pub fn priority_request_codec() -> codec.Codec(PriorityRequest) {
-  use priority <- codec.field(
-    "priority",
-    priority_codec(),
-    fn(r: PriorityRequest) { r.priority },
-  )
+  use priority <- codec.field("priority", priority_codec(), get: fn(r) {
+    r.priority
+  })
   use note <- codec.optional_field(
     "note",
     codec.nullable(codec.string()),
-    fn(r: PriorityRequest) { r.note },
+    get: fn(r) { r.note },
   )
   codec.success(PriorityRequest(priority:, note:))
 }
 
 pub fn update_record_codec() -> codec.Codec(UpdateRecord) {
-  use name <- codec.field("name", codec.string(), fn(r: UpdateRecord) { r.name })
+  use name <- codec.field("name", codec.string(), get: fn(r) { r.name })
   use note <- codec.optional_field(
     "note",
     codec.nullable(codec.string()),
-    fn(r: UpdateRecord) { r.note },
+    get: fn(r) { r.note },
   )
   codec.success(UpdateRecord(name:, note:))
 }
@@ -90,12 +88,12 @@ pub fn decision_codec() -> codec.Codec(Decision) {
     use quantity <- codec.field(
       "quantity",
       codec.integer_between(1, 100),
-      fn(q: Int) { q },
+      get: fn(q) { q },
     )
     codec.success(quantity)
   }
   let decline = {
-    use reason <- codec.field("reason", codec.string(), fn(r: String) { r })
+    use reason <- codec.field("reason", codec.string(), get: fn(r) { r })
     codec.success(reason)
   }
   codec.union({

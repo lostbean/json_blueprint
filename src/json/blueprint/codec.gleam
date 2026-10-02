@@ -19,14 +19,14 @@
 ////
 //// pub fn user_codec() -> Codec(User) {
 ////   let role = codec.string_enum([#("admin", Admin), #("member", Member)])
-////   use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
-////   use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+////   use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
+////   use age <- codec.field("age", codec.integer_between(0, 150), get: fn(u) {
 ////     u.age
 ////   })
-////   use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+////   use email <- codec.optional_field("email", codec.string(), get: fn(u) {
 ////     u.email
 ////   })
-////   use role <- codec.field("role", role, fn(u: User) { u.role })
+////   use role <- codec.field("role", role, get: fn(u) { u.role })
 ////   codec.success(User(name:, age:, email:, role:))
 //// }
 ////
@@ -42,8 +42,9 @@
 //// }
 //// ```
 ////
-//// Each getter needs its record type annotated (`fn(u: User)`), because the
-//// record type is fixed only by `success`. The body after each `use` runs
+//// Each getter is passed with its `get:` label and needs no type
+//// annotation: the rest of the `use` block, which ends in `success`, is
+//// checked first and fixes the record type. The body after each `use` runs
 //// with placeholder values when the codec describes itself, so keep it a
 //// plain constructor call.
 ////
@@ -820,16 +821,22 @@ fn at_decode(
 /// A required field of a record, followed by the rest of the record:
 ///
 /// ```gleam
-/// use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
+/// use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
 /// ```
 ///
 /// `get` reads the field when encoding. The rest of the record is the codec
 /// that `next` returns: another `field` or `optional_field`, or `success`.
+///
+/// Pass the getter with its `get:` label. Gleam checks arguments in
+/// parameter order, and `next` (the rest of the `use` block) comes before
+/// `get`, so the record type is known from `success` by the time the getter
+/// is checked and the getter needs no annotation. Without the label the
+/// getter fills the `then` slot and the call fails to type-check.
 pub fn field(
   named name: String,
   of codec: Codec(a),
-  get get: fn(r) -> a,
   then next: fn(a) -> Codec(r),
+  get get: fn(r) -> a,
 ) -> Codec(r) {
   let rest = fn(item) { record_fields(name, next(item)) }
   let fields =
@@ -863,12 +870,19 @@ pub fn field(
 /// An optional field of a record: absent decodes as `None`, and `None`
 /// encodes as an absent field. JSON `null` fails to decode unless the inner
 /// codec is `nullable`; with `nullable(c)`, absent, `null` and a value decode
-/// as `None`, `Some(None)` and `Some(Some(x))`.
+/// as `None`, `Some(None)` and `Some(Some(x))`. Pass the getter with its
+/// `get:` label, as for `field`:
+///
+/// ```gleam
+/// use email <- codec.optional_field("email", codec.string(), get: fn(u) {
+///   u.email
+/// })
+/// ```
 pub fn optional_field(
   named name: String,
   of codec: Codec(a),
-  get get: fn(r) -> Option(a),
   then next: fn(Option(a)) -> Codec(r),
+  get get: fn(r) -> Option(a),
 ) -> Codec(r) {
   let rest = fn(item) { record_fields(name, next(item)) }
   let fields =
@@ -1233,10 +1247,10 @@ pub fn map(
 /// that field's codec inside the record from the fields decoded before it:
 ///
 /// ```gleam
-/// use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+/// use items <- codec.field("items", codec.list(codec.int()), get: fn(o) {
 ///   o.items
 /// })
-/// use total <- codec.field("total", total_of(items), fn(o: Order) { o.total })
+/// use total <- codec.field("total", total_of(items), get: fn(o) { o.total })
 /// codec.success(Order(items:, total:))
 /// ```
 ///

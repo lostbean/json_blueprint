@@ -133,7 +133,7 @@ pub fn gleam_json_bridges_use_the_value_functions_test() {
 
   // A codec nested in a record keeps its failures at the field's path.
   let nested = {
-    use name <- codec.field("name", custom, fn(name: String) { name })
+    use name <- codec.field("name", custom, get: fn(name) { name })
     codec.success(name)
   }
   let assert Error(json.UnableToDecode([decode.DecodeError(expected:, ..)])) =
@@ -191,7 +191,7 @@ pub fn custom_codec_failure_helpers_build_custom_reasons_test() {
       placeholder: "",
     )
   let wrapped = {
-    use text <- codec.field("text", refusing, fn(text: String) { text })
+    use text <- codec.field("text", refusing, get: fn(text) { text })
     codec.success(text)
   }
 

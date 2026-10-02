@@ -47,8 +47,8 @@ pub fn person_decoder() -> blueprint.Decoder(Person) {
 
 // 2.0
 pub fn person_codec() -> Codec(Person) {
-  use name <- codec.field("name", codec.string(), fn(p: Person) { p.name })
-  use age <- codec.field("age", codec.int(), fn(p: Person) { p.age })
+  use name <- codec.field("name", codec.string(), get: fn(p) { p.name })
+  use age <- codec.field("age", codec.int(), get: fn(p) { p.age })
   codec.success(Person(name:, age:))
 }
 ```
@@ -56,7 +56,7 @@ pub fn person_codec() -> Codec(Person) {
 | 1.x                                               | 2.0                                                         |
 | ------------------------------------------------- | ----------------------------------------------------------- |
 | `decode1` … `decode9` with `field`                | `codec.field` for each field, then `codec.success`          |
-| `optional_field(name, inner)`                     | `codec.optional_field(name, inner, getter)`                 |
+| `optional_field(name, inner)`                     | `codec.optional_field(name, inner, get: getter)`            |
 | `optional(inner)` (a present `null`)              | `codec.nullable(inner)`                                     |
 | `union_type_decoder` with `union_type_encoder`    | `codec.union` with `variant` and `unit_variant`             |
 | `enum_type_decoder` with `enum_type_encoder`      | `codec.string_enum`                                         |

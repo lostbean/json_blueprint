@@ -14,6 +14,11 @@ until a release decision.
 - Describe records with a `use`-based builder: `codec.field`,
   `codec.optional_field` (an `Option`) and `codec.success`. Objects are
   closed; unknown fields, duplicate keys and wrong types fail with a path.
+- Record getters need no type annotation: `field` and `optional_field`
+  take the rest of the block before the getter, which is passed as `get:`
+  (`use sku <- codec.field("sku", codec.string(), get: fn(q) { q.sku })`).
+  Code written against the earlier order fails to compile; see
+  [the follow-up](docs/migration-wave-2.md#follow-up-record-getters-without-annotations).
 - Describe sum types with `codec.union`, `variant`, `unit_variant` and
   `match`, on the `{"tag": ..., "value": ...}` envelope; a unit variant has
   no `"value"`. Gleam checks the `match` for exhaustiveness.

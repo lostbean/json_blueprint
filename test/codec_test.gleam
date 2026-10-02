@@ -1,5 +1,6 @@
 import gleam/dynamic/decode
 import gleam/json
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
@@ -46,11 +47,9 @@ fn fail(
 }
 
 fn note_codec() -> Codec(Note) {
-  use title <- codec.field("title", codec.string(), fn(n: Note) { n.title })
-  use count <- codec.field("count", codec.int(), fn(n: Note) { n.count })
-  use note <- codec.optional_field("note", codec.string(), fn(n: Note) {
-    n.note
-  })
+  use title <- codec.field("title", codec.string(), get: fn(n) { n.title })
+  use count <- codec.field("count", codec.int(), get: fn(n) { n.count })
+  use note <- codec.optional_field("note", codec.string(), get: fn(n) { n.note })
   codec.success(Note(title:, count:, note:))
 }
 
@@ -244,7 +243,7 @@ pub fn optional_nullable_field_keeps_three_states_test() {
     use name <- codec.optional_field(
       "name",
       codec.nullable(codec.string()),
-      fn(p: Patch) { p.name },
+      get: fn(p) { p.name },
     )
     codec.success(Patch(name:))
   }
@@ -289,6 +288,80 @@ pub fn success_alone_is_the_empty_object_test() {
   codec.schema(empty) |> should.equal(Ok(codec.ObjectSchema([])))
 }
 
+// The getters below carry no type annotation: `field` checks the rest of
+// the block, which ends in `success`, before the getter, so the record type
+// is known. This test fails to compile if that inference stops working.
+pub type Invoice {
+  Invoice(
+    vendor: String,
+    priority: Priority,
+    lines: List(Line),
+    memo: Option(String),
+    total: Int,
+  )
+}
+
+fn invoice_codec() -> Codec(Invoice) {
+  let priority =
+    codec.string_enum([#("low", Low), #("normal", Normal), #("urgent", Urgent)])
+  let line = {
+    use sku <- codec.field("sku", codec.string(), get: fn(l) { l.sku })
+    use quantity <- codec.field("quantity", codec.int(), get: fn(l) {
+      l.quantity
+    })
+    codec.success(Line(sku:, quantity:))
+  }
+  use vendor <- codec.field("vendor", codec.string(), get: fn(i) { i.vendor })
+  use priority <- codec.field("priority", priority, get: fn(i) { i.priority })
+  use lines <- codec.field("lines", codec.list(line), get: fn(i) { i.lines })
+  use memo <- codec.optional_field("memo", codec.string(), get: fn(i) { i.memo })
+  let sum = list.fold(lines, 0, fn(acc, l) { acc + l.quantity })
+  let check = fn(total) {
+    case total == sum {
+      True -> Ok(total)
+      False -> Error("total differs from the line sum")
+    }
+  }
+  let total =
+    codec.try_map(codec.int(), decode: check, encode: check, placeholder: 0)
+  use total <- codec.field("total", total, get: fn(i) { i.total })
+  codec.success(Invoice(vendor:, priority:, lines:, memo:, total:))
+}
+
+pub fn record_getters_need_no_annotation_test() {
+  let invoice =
+    Invoice("Acme", Urgent, [Line("a", 2), Line("b", 3)], Some("net 30"), 5)
+  let text =
+    "{\"vendor\":\"Acme\",\"priority\":\"urgent\",\"lines\":[{\"sku\":\"a\",\"quantity\":2},{\"sku\":\"b\",\"quantity\":3}],\"memo\":\"net 30\",\"total\":5}"
+  codec.encode_json(invoice_codec(), invoice) |> should.equal(Ok(text))
+  codec.decode_json(invoice_codec(), text) |> should.equal(Ok(invoice))
+  // The check across fields still reports the dependent field's path.
+  codec.encode(invoice_codec(), Invoice(..invoice, total: 4))
+  |> should.equal(
+    Error(EncodeError(
+      [Field("total")],
+      codec.Custom("total differs from the line sum"),
+    )),
+  )
+  let assert Ok(schema) = codec.schema_json(invoice_codec())
+  schema
+  |> should.equal(
+    "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"vendor\":{\"type\":\"string\"},\"priority\":{\"type\":\"string\",\"enum\":[\"low\",\"normal\",\"urgent\"]},\"lines\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"sku\":{\"type\":\"string\"},\"quantity\":{\"type\":\"integer\"}},\"required\":[\"sku\",\"quantity\"],\"additionalProperties\":false}},\"memo\":{\"type\":\"string\"},\"total\":{\"type\":\"integer\"}},\"required\":[\"vendor\",\"priority\",\"lines\",\"total\"],\"additionalProperties\":false}",
+  )
+}
+
+pub fn record_getter_may_still_be_annotated_test() {
+  let annotated = {
+    use sku <- codec.field("sku", codec.string(), get: fn(l: Line) { l.sku })
+    use quantity <- codec.field("quantity", codec.int(), get: fn(l: Line) {
+      l.quantity
+    })
+    codec.success(Line(sku:, quantity:))
+  }
+  codec.encode_json(annotated, Line("a", 1))
+  |> should.equal(Ok("{\"sku\":\"a\",\"quantity\":1}"))
+}
+
 pub type Order {
   Order(id: Int, lines: List(Line))
 }
@@ -299,16 +372,16 @@ pub type Line {
 
 fn order_codec() -> Codec(Order) {
   let line = {
-    use sku <- codec.field("sku", codec.string(), fn(l: Line) { l.sku })
+    use sku <- codec.field("sku", codec.string(), get: fn(l) { l.sku })
     use quantity <- codec.field(
       "quantity",
       codec.integer_between(1, 99),
-      fn(l: Line) { l.quantity },
+      get: fn(l) { l.quantity },
     )
     codec.success(Line(sku:, quantity:))
   }
-  use id <- codec.field("id", codec.int(), fn(o: Order) { o.id })
-  use lines <- codec.field("lines", codec.list(line), fn(o: Order) { o.lines })
+  use id <- codec.field("id", codec.int(), get: fn(o) { o.id })
+  use lines <- codec.field("lines", codec.list(line), get: fn(o) { o.lines })
   codec.success(Order(id:, lines:))
 }
 
@@ -496,8 +569,8 @@ type Span {
 }
 
 fn span_fields() -> Codec(Span) {
-  use start <- codec.field("start", codec.int(), fn(s: Span) { s.start })
-  use end <- codec.field("end", codec.int(), fn(s: Span) { s.end })
+  use start <- codec.field("start", codec.int(), get: fn(s) { s.start })
+  use end <- codec.field("end", codec.int(), get: fn(s) { s.end })
   codec.success(Span(start:, end:))
 }
 
@@ -517,7 +590,7 @@ pub fn record_level_try_map_fails_at_the_record_path_test() {
       placeholder: Span(0, 0),
     )
   let nested = {
-    use span <- codec.field("span", span, fn(s: Span) { s })
+    use span <- codec.field("span", span, get: fn(s) { s })
     codec.success(span)
   }
   codec.decode_json(span, "{\"start\":2,\"end\":1}")
@@ -532,7 +605,7 @@ pub fn record_level_try_map_fails_at_the_record_path_test() {
 
 pub fn cross_field_check_fails_at_the_dependent_field_test() {
   let span = {
-    use start <- codec.field("start", codec.int(), fn(s: Span) { s.start })
+    use start <- codec.field("start", codec.int(), get: fn(s) { s.start })
     let end =
       codec.try_map(
         codec.int(),
@@ -540,7 +613,7 @@ pub fn cross_field_check_fails_at_the_dependent_field_test() {
         encode: fn(end) { ordered(Span(start, end)) |> result.replace(end) },
         placeholder: start,
       )
-    use end <- codec.field("end", end, fn(s: Span) { s.end })
+    use end <- codec.field("end", end, get: fn(s) { s.end })
     codec.success(Span(start:, end:))
   }
   codec.decode_json(span, "{\"start\":1,\"end\":2}")
@@ -602,13 +675,13 @@ pub fn check_reports_definition_mistakes_test() {
   codec.check(codec.number_between(int_num(1), int_num(0)))
   |> should.equal(Error(codec.ReversedNumberBounds(int_num(1), int_num(0))))
   let repeated = {
-    use a <- codec.field("a", codec.int(), fn(p: #(Int, Int)) { p.0 })
-    use b <- codec.field("a", codec.int(), fn(p: #(Int, Int)) { p.1 })
+    use a <- codec.field("a", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.field("a", codec.int(), get: fn(p) { p.1 })
     codec.success(#(a, b))
   }
   codec.check(repeated) |> should.equal(Error(codec.DuplicateFieldName("a")))
   let not_record = {
-    use a <- codec.field("a", codec.string(), fn(s: String) { s })
+    use a <- codec.field("a", codec.string(), get: fn(s) { s })
     codec.string() |> codec.map(fn(_) { a }, fn(s) { s })
   }
   codec.check(not_record) |> should.equal(Error(codec.NotARecord("a")))
@@ -647,7 +720,7 @@ pub fn check_finds_mistakes_inside_composites_test() {
   codec.check(codec.pair(codec.string(), codec.nullable(bad)))
   |> should.equal(Error(codec.DuplicateEnumLabel("a")))
   let record = {
-    use x <- codec.field("x", bad, fn(r: Int) { r })
+    use x <- codec.field("x", bad, get: fn(r) { r })
     codec.success(x)
   }
   codec.check(record) |> should.equal(Error(codec.DuplicateEnumLabel("a")))
@@ -666,8 +739,8 @@ pub fn a_mistaken_definition_panics_with_the_key_at_first_use_test() {
     "json_blueprint: invalid codec definition: enum label \"draft\" appears twice",
   ))
   let repeated = {
-    use a <- codec.field("id", codec.int(), fn(p: #(Int, Int)) { p.0 })
-    use b <- codec.field("id", codec.int(), fn(p: #(Int, Int)) { p.1 })
+    use a <- codec.field("id", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.field("id", codec.int(), get: fn(p) { p.1 })
     codec.success(#(a, b))
   }
   panic_message(fn() { codec.encode(repeated, #(1, 2)) })

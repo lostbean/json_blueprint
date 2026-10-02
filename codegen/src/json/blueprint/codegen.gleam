@@ -592,7 +592,7 @@ pub fn string_enum(
 pub fn required(name: String, inner: Definition(a)) -> Properties(r, a) {
   let Definition(inner_codec, inner_type, lower_inner) = inner
   Properties(
-    build: fn(get, next) { codec.field(name, inner_codec, get, next) },
+    build: fn(get, next) { codec.field(name, inner_codec, then: next, get:) },
     gleam_type: inner_type,
     names: [name],
     lower: fn(prefix) {
@@ -663,7 +663,9 @@ pub fn optional(
   let Definition(inner_codec, inner_type, lower_inner) = inner
   let optional_type = "option.Option(" <> inner_type <> ")"
   Properties(
-    build: fn(get, next) { codec.optional_field(name, inner_codec, get, next) },
+    build: fn(get, next) {
+      codec.optional_field(name, inner_codec, then: next, get:)
+    },
     gleam_type: optional_type,
     names: [name],
     lower: fn(prefix) {

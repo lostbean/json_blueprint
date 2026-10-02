@@ -314,12 +314,8 @@ fn shape_codec() -> Codec(Shape) {
 }
 
 fn record_codec() -> Codec(#(Int, Option(String))) {
-  use id <- codec.field("id", codec.int(), fn(r: #(Int, Option(String))) { r.0 })
-  use name <- codec.optional_field(
-    "name",
-    codec.string(),
-    fn(r: #(Int, Option(String))) { r.1 },
-  )
+  use id <- codec.field("id", codec.int(), get: fn(r) { r.0 })
+  use name <- codec.optional_field("name", codec.string(), get: fn(r) { r.1 })
   codec.success(#(id, name))
 }
 

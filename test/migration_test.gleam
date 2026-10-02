@@ -13,8 +13,8 @@ pub type Person {
 }
 
 pub fn person_codec() -> Codec(Person) {
-  use name <- codec.field("name", codec.string(), fn(p: Person) { p.name })
-  use age <- codec.field("age", codec.int(), fn(p: Person) { p.age })
+  use name <- codec.field("name", codec.string(), get: fn(p) { p.name })
+  use age <- codec.field("age", codec.int(), get: fn(p) { p.age })
   codec.success(Person(name:, age:))
 }
 
@@ -55,7 +55,7 @@ pub fn optional_fields_distinguish_null_test() {
   legacy.decode(using: legacy_contact, from: "{\"email\":null}")
   |> should.equal(Ok(Contact(None)))
   let contact = {
-    use email <- codec.optional_field("email", codec.string(), fn(c: Contact) {
+    use email <- codec.optional_field("email", codec.string(), get: fn(c) {
       c.email
     })
     codec.success(Contact(email:))

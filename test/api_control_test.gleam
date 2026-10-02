@@ -54,7 +54,7 @@ pub fn fallible_mapping_preserves_schema_and_errors_test() {
   codec.encode(mapped, False)
   |> should.equal(Error(EncodeError([], codec.Custom("false forbidden"))))
   let nested = {
-    use flag <- codec.field("flag", mapped, fn(flag: Bool) { flag })
+    use flag <- codec.field("flag", mapped, get: fn(flag) { flag })
     codec.success(flag)
   }
   codec.decode(nested, value.Object([#("flag", value.String("no"))]))

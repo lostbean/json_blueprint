@@ -107,16 +107,16 @@ fn build_order_codec() -> codec.Codec(Order) {
   use order_id <- codec.field(
     \"order_id\",
     codec.integer_between(1, 999_999),
-    fn(o: Order) { o.order_id },
+    get: fn(o) { o.order_id },
   )
-  use items <- codec.field(\"items_\\\"list\\\"\", items_c, fn(o: Order) { o.items })
+  use items <- codec.field(\"items_\\\"list\\\"\", items_c, get: fn(o) { o.items })
   use note <- codec.optional_field(
     \"customer\\n\\r\\f\\t\\\\note\",
     codec.nullable(codec.string()),
-    fn(o: Order) { o.note },
+    get: fn(o) { o.note },
   )
-  use active <- codec.field(\"type\", codec.bool(), fn(o: Order) { o.active })
-  use status <- codec.field(\"status\", status_c, fn(o: Order) { o.status })
+  use active <- codec.field(\"type\", codec.bool(), get: fn(o) { o.active })
+  use status <- codec.field(\"status\", status_c, get: fn(o) { o.status })
   codec.success(Order(order_id:, items:, note:, active:, status:))
 }
 
@@ -139,18 +139,18 @@ fn build_decision_codec() -> codec.Codec(Decision) {
     use quantity <- codec.field(
       \"quantity\",
       codec.integer_between(1, 100),
-      fn(a: ApprovePayload) { a.quantity },
+      get: fn(a) { a.quantity },
     )
-    use ratio <- codec.field(\"ratio\", codec.number(), fn(a: ApprovePayload) {
+    use ratio <- codec.field(\"ratio\", codec.number(), get: fn(a) {
       a.ratio
     })
     codec.success(ApprovePayload(quantity:, ratio:))
   }
   let decline = {
-    use reason <- codec.field(\"reason\", codec.string(), fn(d: DeclinePayload) {
+    use reason <- codec.field(\"reason\", codec.string(), get: fn(d) {
       d.reason
     })
-    use code <- codec.field(\"code\", codec.int(), fn(d: DeclinePayload) {
+    use code <- codec.field(\"code\", codec.int(), get: fn(d) {
       d.code
     })
     codec.success(DeclinePayload(reason:, code:))

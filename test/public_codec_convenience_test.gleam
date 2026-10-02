@@ -16,40 +16,38 @@ fn described_person_codec() -> codec.Codec(DescribedPerson) {
   use name <- codec.field(
     "name",
     codec.describe(codec.string(), "Full name"),
-    fn(p: DescribedPerson) { p.0 },
+    get: fn(p) { p.0 },
   )
   use age <- codec.field(
     "age",
     codec.describe(codec.int(), "Age in years"),
-    fn(p: DescribedPerson) { p.1 },
+    get: fn(p) { p.1 },
   )
   use nickname <- codec.optional_field(
     "nickname",
     codec.describe(codec.nullable(codec.string()), "Optional nickname"),
-    fn(p: DescribedPerson) { p.2 },
+    get: fn(p) { p.2 },
   )
   codec.success(#(name, age, nickname))
 }
 
 fn bare_person_codec() -> codec.Codec(DescribedPerson) {
-  use name <- codec.field("name", codec.string(), fn(p: DescribedPerson) { p.0 })
-  use age <- codec.field("age", codec.int(), fn(p: DescribedPerson) { p.1 })
+  use name <- codec.field("name", codec.string(), get: fn(p) { p.0 })
+  use age <- codec.field("age", codec.int(), get: fn(p) { p.1 })
   use nickname <- codec.optional_field(
     "nickname",
     codec.nullable(codec.string()),
-    fn(p: DescribedPerson) { p.2 },
+    get: fn(p) { p.2 },
   )
   codec.success(#(name, age, nickname))
 }
 
 fn person_codec() -> codec.Codec(Person) {
-  use name <- codec.field("name", codec.string(), fn(p: Person) { p.name })
-  use age <- codec.field("age", codec.int(), fn(p: Person) { p.age })
-  use nickname <- codec.optional_field(
-    "nickname",
-    codec.string(),
-    fn(p: Person) { p.nickname },
-  )
+  use name <- codec.field("name", codec.string(), get: fn(p) { p.name })
+  use age <- codec.field("age", codec.int(), get: fn(p) { p.age })
+  use nickname <- codec.optional_field("nickname", codec.string(), get: fn(p) {
+    p.nickname
+  })
   codec.success(Person(name:, age:, nickname:))
 }
 
@@ -293,8 +291,8 @@ pub fn record_duplicate_field_definition_test() {
   // Repeated field names are definition mistakes: `check` reports them, and
   // every other use panics
   let same = {
-    use name <- codec.field("same", codec.string(), fn(p: Person) { p.name })
-    use age <- codec.field("same", codec.int(), fn(p: Person) { p.age })
+    use name <- codec.field("same", codec.string(), get: fn(p) { p.name })
+    use age <- codec.field("same", codec.int(), get: fn(p) { p.age })
     codec.success(Person(name, age, None))
   }
   codec.check(same)
@@ -303,9 +301,9 @@ pub fn record_duplicate_field_definition_test() {
 
 pub fn record_duplicate_later_field_definition_test() {
   let later = {
-    use name <- codec.field("name", codec.string(), fn(p: Person) { p.name })
-    use age <- codec.field("age", codec.int(), fn(p: Person) { p.age })
-    use nickname <- codec.optional_field("age", codec.string(), fn(p: Person) {
+    use name <- codec.field("name", codec.string(), get: fn(p) { p.name })
+    use age <- codec.field("age", codec.int(), get: fn(p) { p.age })
+    use nickname <- codec.optional_field("age", codec.string(), get: fn(p) {
       p.nickname
     })
     codec.success(Person(name, age, nickname))

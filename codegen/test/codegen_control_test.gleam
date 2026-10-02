@@ -5,7 +5,7 @@ import generated/option_codec
 import generated/order_codec
 import generated_source_normalize
 import gleam/list
-import gleam/option.{type Option, None, Some}
+import gleam/option.{None, Some}
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{DecodeError, Field}
@@ -44,7 +44,7 @@ pub fn option_property_keeps_missing_null_and_value_test() {
     use note <- codec.optional_field(
       "note",
       codec.nullable(codec.string()),
-      fn(note: Option(Option(String))) { note },
+      get: fn(note) { note },
     )
     codec.success(note)
   }
@@ -74,11 +74,9 @@ pub fn option_property_keeps_missing_null_and_value_test() {
 
   // Without `nullable`, `null` is not a value of the optional field.
   let plain = {
-    use note <- codec.optional_field(
-      "note",
-      codec.string(),
-      fn(note: Option(String)) { note },
-    )
+    use note <- codec.optional_field("note", codec.string(), get: fn(note) {
+      note
+    })
     codec.success(note)
   }
   codec.decode(plain, value.Object([#("note", value.Null)]))

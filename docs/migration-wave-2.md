@@ -47,9 +47,9 @@ The sections:
 
 All of these are replaced by one `use`-based builder: `field` (required),
 `optional_field` (optional, as `Option`), and `success` (the end of the
-record). Each getter needs its record type annotated: Gleam infers a call's
-arguments in order and does not use the expected result type, so `get` is
-checked before anything fixes the record type. `Properties`,
+record). Pass each getter with its `get:` label; it needs no type
+annotation (see [Follow-up: record getters without
+annotations](#follow-up-record-getters-without-annotations)). `Properties`,
 `PropertyError`, `Optional`, `Missing` and `Present` are removed.
 
 ```gleam
@@ -65,10 +65,10 @@ let assert Ok(task) =
 
 // after
 pub fn task_codec() -> codec.Codec(Task) {
-  use id <- codec.field("id", codec.integer_between(1, 100_000), fn(t: Task) {
+  use id <- codec.field("id", codec.integer_between(1, 100_000), get: fn(t) {
     t.id
   })
-  use title <- codec.field("title", codec.string(), fn(t: Task) { t.title })
+  use title <- codec.field("title", codec.string(), get: fn(t) { t.title })
   codec.success(Task(id:, title:))
 }
 ```
@@ -92,9 +92,9 @@ codec.object(props)
 )
 
 // after
-use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
-use age <- codec.field("age", age, fn(u: User) { u.age })
-use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
+use age <- codec.field("age", age, get: fn(u) { u.age })
+use email <- codec.optional_field("email", codec.string(), get: fn(u) {
   u.email
 })
 codec.success(User(name:, age:, email:))
@@ -114,14 +114,14 @@ codec.field("query", codec.string() |> codec.describe("Search terms"))
 
 // after
 {
-  use sku <- codec.field("sku", codec.string(), fn(q: StockQuery) { q.sku })
+  use sku <- codec.field("sku", codec.string(), get: fn(q) { q.sku })
   codec.success(StockQuery(sku))
 }
 {
   use query <- codec.field(
     "query",
     codec.string() |> codec.describe("Search terms"),
-    fn(query: String) { query },
+    get: fn(query) { query },
   )
   codec.success(query)
 }
@@ -305,12 +305,12 @@ codec.try_map(
 use line_items <- codec.field(
   "line_items",
   codec.list(line_item_codec()),
-  fn(i: Invoice) { i.line_items },
+  get: fn(i) { i.line_items },
 )
 use total_cents <- codec.field(
   "total_cents",
   total_matching(line_items),
-  fn(i: Invoice) { i.total_cents },
+  get: fn(i) { i.total_cents },
 )
 ```
 
@@ -798,3 +798,48 @@ replacement. Unchanged symbols are listed as such.
 | `runtime.encoded`              | tool_hub                  | `contract.value`                         |
 | `runtime.ValidationError`, `ValidationReason` and its variants, `Property`, `Index`, `TaggedBranch` | tool_hub | `contract.ValidationError` with `codec.Reason` and `codec.PathSegment`; `contract.value_codec` removes the map |
 | `document.load`                | tool_hub, fabric          | `contract.load`                          |
+
+## Follow-up: record getters without annotations
+
+`codec.field` and `codec.optional_field` take the rest of the `use` block
+before the getter, and the getter is passed with its `get:` label. Gleam
+checks a call's arguments in parameter order, so the block, which ends in
+`success`, fixes the record type before the getter is checked: getters need
+no type annotation. Schemas, wire output and error paths are unchanged.
+
+| Item                   | Before                                 | After                                  |
+| ---------------------- | -------------------------------------- | -------------------------------------- |
+| `codec.field`          | `field(named, of, get, then)`          | `field(named, of, then, get)`          |
+| `codec.optional_field` | `optional_field(named, of, get, then)` | `optional_field(named, of, then, get)` |
+
+```gleam
+// before
+use sku <- codec.field("sku", codec.string(), fn(q: StockQuery) { q.sku })
+use note <- codec.optional_field("note", codec.string(), fn(t: Ticket) {
+  t.note
+})
+
+// after
+use sku <- codec.field("sku", codec.string(), get: fn(q) { q.sku })
+use note <- codec.optional_field("note", codec.string(), get: fn(t) {
+  t.note
+})
+```
+
+The rule is mechanical: put `get: ` before the third argument of every
+`use x <- codec.field(...)` and `use x <- codec.optional_field(...)`, and
+drop the `fn(x: Type)` annotation if you like (it is still accepted). A call
+that passes the callback explicitly names it: `codec.field(name, inner,
+then: next, get:)`. A getter left without its label fills the `then` slot,
+and the call fails to compile with a type mismatch at the getter, so no
+call site changes meaning silently. Building a field's codec from the fields
+decoded before it works as before.
+
+Dependents (every site fails to compile until migrated):
+
+| Package        | Sites | Files                                                                                                                                                                                                                                                                                                             |
+| -------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| fabric         | 62    | `src/fabric/graph/llm.gleam`; `test/fabric/` (oracle, approved_context, observation, cancellation, readme_example, delegation, support/apps, support/codecs); `integrations/` fabric_postgres, fabric_mcp (2), fabric_saga (2); `consumers/` app, decision, jobs, writing; `experiments/graph_authoring/consumer` |
+| relay          | 6     | `src/relay/tool.gleam` (module doc), `src/relay_conformance_server.gleam`, `test/relay/client_test.gleam`, `test/relay/test_codec.gleam`, `fixtures/negative/wrong_handler_codec.gleam`                                                                                                                           |
+| llm_wire       | 2     | `test/llm_wire_api_test.gleam`, `test/tool_fixtures.gleam`                                                                                                                                                                                                                                                        |
+| oversight apps | 88    | extractor (`invoice`, `jobs`, test), research_agent (`domain`, `publish`), secure_mcp (`reports`), support_desk (`domain`), tool_hub (`inventory`, `assistant`)                                                                                                                                                   |

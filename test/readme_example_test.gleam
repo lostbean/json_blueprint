@@ -16,14 +16,14 @@ pub type User {
 
 pub fn user_codec() -> Codec(User) {
   let role = codec.string_enum([#("admin", Admin), #("member", Member)])
-  use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
-  use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+  use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
+  use age <- codec.field("age", codec.integer_between(0, 150), get: fn(u) {
     u.age
   })
-  use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+  use email <- codec.optional_field("email", codec.string(), get: fn(u) {
     u.email
   })
-  use role <- codec.field("role", role, fn(u: User) { u.role })
+  use role <- codec.field("role", role, get: fn(u) { u.role })
   codec.success(User(name:, age:, email:, role:))
 }
 
@@ -90,10 +90,10 @@ pub type Order {
 }
 
 pub fn order_codec() -> Codec(Order) {
-  use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+  use items <- codec.field("items", codec.list(codec.int()), get: fn(o) {
     o.items
   })
-  use total <- codec.field("total", total_of(items), fn(o: Order) { o.total })
+  use total <- codec.field("total", total_of(items), get: fn(o) { o.total })
   codec.success(Order(items:, total:))
 }
 
@@ -237,10 +237,10 @@ pub fn order_codec_test() {
   let assert Ok(schema) = codec.schema_json(order_codec())
   let assert Ok(expected) =
     {
-      use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+      use items <- codec.field("items", codec.list(codec.int()), get: fn(o) {
         o.items
       })
-      use total <- codec.field("total", codec.int(), fn(o: Order) { o.total })
+      use total <- codec.field("total", codec.int(), get: fn(o) { o.total })
       codec.success(Order(items:, total:))
     }
     |> codec.schema_json

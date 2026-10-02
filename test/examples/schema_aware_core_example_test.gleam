@@ -11,11 +11,11 @@ pub type Task {
 }
 
 fn task_codec() -> Codec(Task) {
-  use id <- codec.field("id", codec.integer_between(1, 100_000), fn(t: Task) {
+  use id <- codec.field("id", codec.integer_between(1, 100_000), get: fn(t) {
     t.id
   })
-  use title <- codec.field("title", codec.string(), fn(t: Task) { t.title })
-  use priority <- codec.optional_field("priority", codec.string(), fn(t: Task) {
+  use title <- codec.field("title", codec.string(), get: fn(t) { t.title })
+  use priority <- codec.optional_field("priority", codec.string(), get: fn(t) {
     t.priority
   })
   codec.success(Task(id:, title:, priority:))
