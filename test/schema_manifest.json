@@ -1461,5 +1461,897 @@
         }
       ]
     }
+  },
+  "union-unit-variants/valid-unit-on": {
+    "family": "union-unit-variants",
+    "accepted": true,
+    "instance": {
+      "tag": "on"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/valid-unit-off": {
+    "family": "union-unit-variants",
+    "accepted": true,
+    "instance": {
+      "tag": "off"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/valid-payload-dim": {
+    "family": "union-unit-variants",
+    "accepted": true,
+    "instance": {
+      "tag": "dim",
+      "value": 10
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/valid-payload-blink": {
+    "family": "union-unit-variants",
+    "accepted": true,
+    "instance": {
+      "tag": "blink",
+      "value": [
+        true,
+        false
+      ]
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-unit-with-value": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {
+      "tag": "on",
+      "value": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-payload-missing-value": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {
+      "tag": "dim"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-payload-out-of-range": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {
+      "tag": "dim",
+      "value": 11
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-unknown-tag": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {
+      "tag": "strobe"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-missing-tag": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {},
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-non-string-tag": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {
+      "tag": true
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-extra-member": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": {
+      "tag": "off",
+      "note": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "union-unit-variants/rejected-type-string": {
+    "family": "union-unit-variants",
+    "accepted": false,
+    "instance": "on",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "dim"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "blink"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "on"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "off"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
   }
 }

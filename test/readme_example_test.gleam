@@ -1,152 +1,221 @@
-import generated/order_codec as generated_order_codec
-import gleam/list
+//// Every Gleam snippet of the README, verbatim, compiled and run. The
+//// README test below fails when a snippet drifts from this file.
+
+import gleam/option.{type Option}
 import gleam/result
+import json/blueprint/codec.{type Codec}
+
+pub type Role {
+  Admin
+  Member
+}
+
+pub type User {
+  User(name: String, age: Int, email: Option(String), role: Role)
+}
+
+pub fn user_codec() -> Codec(User) {
+  let role = codec.string_enum([#("admin", Admin), #("member", Member)])
+  use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
+  use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+    u.age
+  })
+  use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+    u.email
+  })
+  use role <- codec.field("role", role, fn(u: User) { u.role })
+  codec.success(User(name:, age:, email:, role:))
+}
+
+pub fn round_trip() -> Result(User, String) {
+  let text = "{\"name\":\"Ada\",\"age\":36,\"role\":\"admin\"}"
+  use user <- result.try(
+    codec.decode_json(user_codec(), text)
+    |> result.map_error(codec.describe_decode_error),
+  )
+  let assert Ok(_text) = codec.encode_json(user_codec(), user)
+  let assert Ok(_schema) = codec.schema_json(user_codec())
+  Ok(user)
+}
+
+import gleam/json
+import gleam/list
 import gleam/string
+import json/blueprint/contract
+import json/blueprint/value
+
+pub type Shape {
+  Circle(radius: Int)
+  Label(text: String)
+  Empty
+}
+
+pub fn shape_codec() -> Codec(Shape) {
+  codec.union({
+    use circle <- codec.variant("circle", codec.int(), Circle)
+    use label <- codec.variant("label", codec.string(), Label)
+    use empty <- codec.unit_variant("empty", Empty)
+    codec.match(fn(shape) {
+      case shape {
+        Circle(radius) -> circle(radius)
+        Label(text) -> label(text)
+        Empty -> empty
+      }
+    })
+  })
+}
+
+pub type Email {
+  Email(address: String)
+}
+
+pub fn email_codec() -> Codec(Email) {
+  codec.try_map(
+    codec.string(),
+    decode: fn(text) {
+      case string.contains(text, "@") {
+        True -> Ok(Email(text))
+        False -> Error("an email address needs an @")
+      }
+    },
+    encode: fn(email: Email) { Ok(email.address) },
+    placeholder: Email(""),
+  )
+}
+
+pub fn explain(text: String) -> String {
+  case codec.decode_json(user_codec(), text) {
+    Ok(_) -> "ok"
+    Error(error) ->
+      case codec.is_limit_exceeded(error) {
+        True -> "the request is too large"
+        False -> codec.describe_decode_error(error)
+      }
+  }
+}
+
+pub fn status_codec(
+  labels: List(String),
+) -> Result(Codec(String), codec.DefinitionError) {
+  codec.string_enum(list.map(labels, fn(label) { #(label, label) }))
+  |> codec.check
+}
+
+pub fn with_gleam_json(user: User) -> Result(User, json.DecodeError) {
+  let assert Ok(encoded) = codec.to_json(user_codec(), user)
+  json.parse(json.to_string(encoded), codec.decoder(user_codec()))
+}
+
+pub fn decode_many(text: String) -> Result(List(User), codec.DecodeError) {
+  let limits =
+    value.default_limits()
+    |> value.with_max_bytes(8 * 1024 * 1024)
+    |> value.with_max_elements(2_000_000)
+  codec.decode_json_with_limits(codec.list(user_codec()), text, limits)
+}
+
+pub fn check_arguments(
+  schema_text: String,
+  arguments: String,
+) -> Result(value.Value, String) {
+  let limits = value.default_limits()
+  use remote <- result.try(
+    contract.parse(schema_text, limits)
+    |> result.map_error(contract.describe_load_error),
+  )
+  use parsed <- result.try(
+    value.parse(arguments, limits)
+    |> result.map_error(value.describe_parse_error),
+  )
+  contract.validate(remote, parsed)
+  |> result.map(contract.value)
+  |> result.map_error(contract.describe_validation_error)
+}
+
+// --- checks ------------------------------------------------------------------
+
 import gleeunit/should
-import json/blueprint/codec
-import json/blueprint/codegen
-import materialize_fixtures
 
 @external(erlang, "readme_test_ffi", "read_file_to_string")
 @external(javascript, "./readme_test_ffi.mjs", "read_file_to_string")
 fn read_file_to_string(path: String) -> Result(String, String)
 
-// --- Snippet 3: Runtime and Build-Time Codecs ---
-
-pub fn runtime_and_generated_order_example(
-  order: materialize_fixtures.Order,
-  json_text: String,
-) {
-  let definition = materialize_fixtures.order_definition()
-
-  // Runtime construction: use when the application wants a dynamic codec.
-  let runtime_codec = codegen.runtime(definition)
-
-  // Generated module: construct once and use interchangeably as a Codec(Order).
-  let generated_codec = generated_order_codec.order_codec()
-  let _ = codec.encode_json(generated_codec, order)
-  let _ = codec.decode_json(generated_codec, json_text)
-
-  // Direct generated operations expose the same strict text admission.
-  let _ = generated_order_codec.encode_order_json(order)
-  let _ = generated_order_codec.decode_order_json(json_text)
-  let _ = generated_order_codec.order_schema()
-  let _ = codec.encode_json(runtime_codec, order)
-  Nil
+pub fn readme_snippets_are_in_this_file_verbatim_test() {
+  let assert Ok(readme) = read_file_to_string("README.md")
+  let assert Ok(source) = read_file_to_string("test/readme_example_test.gleam")
+  let snippets = gleam_snippets(string.replace(readme, "\r\n", "\n"), [])
+  list.length(snippets) |> should.equal(8)
+  snippets
+  |> list.filter(fn(snippet) { !string.contains(source, snippet) })
+  |> should.equal([])
 }
 
-// --- Snippet 1: Schema-Aware Core Pipeline ---
-
-pub type Task {
-  Task(id: Int, title: String)
-}
-
-pub fn run_task_pipeline() -> Result(Task, String) {
-  // One bidirectional codec defines the record's JSON and schema.
-  use id_codec <- result.try(
-    codec.integer_between(1, 100_000)
-    |> result.map_error(fn(_) { "Invalid id range" }),
-  )
-  use task_codec <- result.try(
-    codec.record2(
-      codec.required("id", id_codec),
-      codec.required("title", codec.string()),
-      Task,
-      fn(task) { task.id },
-      fn(task) { task.title },
-    )
-    |> result.map_error(fn(_) { "Invalid record properties" }),
-  )
-
-  use task <- result.try(
-    codec.decode_json(task_codec, "{\"id\":42,\"title\":\"Verify Blueprint\"}")
-    |> result.map_error(fn(_) { "Invalid task JSON" }),
-  )
-  use _encoded <- result.try(
-    codec.encode_json(task_codec, task)
-    |> result.map_error(fn(_) { "Cannot encode task" }),
-  )
-  use _schema_json <- result.try(
-    codec.schema_json(task_codec)
-    |> result.map_error(fn(_) { "Unknown schema" }),
-  )
-  Ok(task)
-}
-
-// --- Snippet 2: Migration to a schema-bearing Codec ---
-
-pub type MyRecord {
-  MyRecord(name: String, count: Int)
-}
-
-pub fn example() -> codec.Codec(MyRecord) {
-  let assert Ok(record_codec) =
-    codec.record2(
-      codec.required("name", codec.string()),
-      codec.required("count", codec.int()),
-      MyRecord,
-      fn(record) { record.name },
-      fn(record) { record.count },
-    )
-  record_codec
-}
-
-// --- Runnable Tests ---
-
-pub fn readme_pipeline_execution_test() {
-  run_task_pipeline()
-  |> should.equal(Ok(Task(42, "Verify Blueprint")))
-}
-
-pub fn readme_migration_execution_test() {
-  let modern_codec = example()
-  codec.schema(modern_codec) |> should.be_ok
-
-  let record = MyRecord("test", 100)
-  let assert Ok(encoded) = codec.encode(modern_codec, record)
-  let assert Ok(decoded) = codec.decode(modern_codec, encoded)
-  decoded |> should.equal(record)
-}
-
-pub fn readme_snippets_exact_match_test() {
-  let assert Ok(readme_str) = read_file_to_string("README.md")
-  let assert Ok(test_source_str) =
-    read_file_to_string("test/readme_example_test.gleam")
-
-  let normalized_source = string.replace(test_source_str, "\r\n", "\n")
-  let snippets = extract_gleam_snippets(readme_str)
-
-  // Keep the schema, migration, and generated-code examples executable.
-  let modern_snippets = list.take(snippets, 3)
-  list.length(modern_snippets) |> should.equal(3)
-
-  list.each(modern_snippets, fn(snippet) {
-    let normalized_snippet = string.replace(snippet, "\r\n", "\n")
-    case string.contains(normalized_source, normalized_snippet) {
-      True -> Nil
-      False ->
-        panic as {
-          "README snippet not found verbatim in test/readme_example_test.gleam:\n"
-          <> normalized_snippet
-        }
-    }
-  })
-}
-
-fn extract_gleam_snippets(markdown: String) -> List(String) {
-  let normalized = string.replace(markdown, "\r\n", "\n")
-  extract_snippets_loop(normalized, [])
-}
-
-fn extract_snippets_loop(remaining: String, acc: List(String)) -> List(String) {
-  case string.split_once(remaining, "```gleam\n") {
-    Error(Nil) -> list.reverse(acc)
-    Ok(#(_before, rest)) -> {
+fn gleam_snippets(text: String, found: List(String)) -> List(String) {
+  case string.split_once(text, "```gleam\n") {
+    Error(Nil) -> list.reverse(found)
+    Ok(#(_, rest)) ->
       case string.split_once(rest, "\n```") {
-        Error(Nil) -> list.reverse(acc)
-        Ok(#(snippet, after)) ->
-          extract_snippets_loop(after, [string.trim(snippet), ..acc])
+        Error(Nil) -> list.reverse(found)
+        Ok(#(snippet, after)) -> gleam_snippets(after, [snippet, ..found])
       }
-    }
   }
+}
+
+pub fn round_trip_test() {
+  round_trip() |> should.equal(Ok(User("Ada", 36, option.None, Admin)))
+}
+
+pub fn shape_codec_test() {
+  codec.encode_json(shape_codec(), Circle(2))
+  |> should.equal(Ok("{\"tag\":\"circle\",\"value\":2}"))
+  codec.decode_json(shape_codec(), "{\"tag\":\"empty\"}")
+  |> should.equal(Ok(Empty))
+}
+
+pub fn email_codec_test() {
+  codec.decode_json(email_codec(), "\"a@b\"") |> should.equal(Ok(Email("a@b")))
+  codec.decode_json(email_codec(), "\"ab\"")
+  |> should.equal(
+    Error(codec.DecodeError([], codec.Custom("an email address needs an @"))),
+  )
+}
+
+pub fn explain_test() {
+  explain("{\"name\":\"Ada\",\"age\":36,\"role\":\"admin\"}")
+  |> should.equal("ok")
+  explain("{\"name\":\"Ada\",\"age\":360,\"role\":\"admin\"}")
+  |> should.equal("$[\"age\"]: integer outside range 0 to 150")
+  explain("[" <> string.repeat(" ", 1_048_576) <> "]")
+  |> should.equal("the request is too large")
+}
+
+pub fn status_codec_test() {
+  let assert Ok(status) = status_codec(["open", "closed"])
+  codec.decode_json(status, "\"open\"") |> should.equal(Ok("open"))
+  status_codec(["open", "open"])
+  |> should.equal(Error(codec.DuplicateEnumLabel("open")))
+}
+
+pub fn with_gleam_json_test() {
+  let user = User("Ada", 36, option.Some("ada@example.com"), Member)
+  with_gleam_json(user) |> should.equal(Ok(user))
+}
+
+pub fn decode_many_test() {
+  let assert Ok(text) =
+    codec.encode_json(codec.list(user_codec()), [
+      User("Ada", 36, option.None, Admin),
+    ])
+  decode_many(text) |> should.equal(Ok([User("Ada", 36, option.None, Admin)]))
+}
+
+pub fn check_arguments_test() {
+  let schema =
+    "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\","
+    <> "\"type\":\"object\",\"properties\":{\"limit\":"
+    <> "{\"type\":\"integer\",\"minimum\":1,\"maximum\":10}},"
+    <> "\"required\":[\"limit\"],\"additionalProperties\":false}"
+  check_arguments(schema, "{\"limit\":3}") |> should.be_ok
+  check_arguments(schema, "{\"limit\":30}")
+  |> should.equal(Error("$[\"limit\"]: integer outside range 1 to 10"))
 }

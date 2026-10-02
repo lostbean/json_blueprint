@@ -8,29 +8,25 @@ import materialize_fixtures
 // Hand-written gleam/json baseline for the same wire shape as the canonical
 // Blueprint Order definition. This is intentionally separate from the single
 // maintained Blueprint definition and exists only for comparative benchmarks.
+// Its encode errors use the codec's `{path, reason}` shape so tests can compare
+// them with the Blueprint codecs' errors.
 pub fn encode(
   order: materialize_fixtures.Order,
 ) -> Result(json.Json, codec.EncodeError) {
   case order.order_id >= 1 && order.order_id <= 999_999 {
     False ->
-      Error(codec.EncodeAtField(
-        "order_id",
-        codec.CannotEncode(codec.EncodeIntegerOutsideRange(
-          1,
-          999_999,
-          order.order_id,
-        )),
+      Error(codec.EncodeError(
+        [codec.Field("order_id")],
+        codec.IntegerOutsideRange(1, 999_999),
       ))
     True ->
       case status_label(order.status) {
         Error(error) -> Error(error)
         Ok(status) -> {
           let note = case order.note {
-            codec.Missing -> []
-            codec.Present(codec.Null) -> [
-              #("customer\n\r\f\t\\note", json.null()),
-            ]
-            codec.Present(codec.NonNull(value)) -> [
+            None -> []
+            Some(None) -> [#("customer\n\r\f\t\\note", json.null())]
+            Some(Some(value)) -> [
               #("customer\n\r\f\t\\note", json.string(value)),
             ]
           }
@@ -62,8 +58,8 @@ pub fn decoder() -> decode.Decoder(materialize_fixtures.Order) {
     use items <- decode.field("items_\"list\"", decode.list(of: item_pair()))
     use note <- decode.optional_field(
       "customer\n\r\f\t\\note",
-      codec.Missing,
-      nullable_string_as_present(),
+      None,
+      decode.optional(decode.string) |> decode.map(Some),
     )
     use active <- decode.field("type", decode.bool)
     use status <- decode.field("status", order_status())
@@ -101,18 +97,6 @@ fn item_pair() -> decode.Decoder(#(String, Int)) {
   })
 }
 
-fn nullable_string_as_present() -> decode.Decoder(
-  codec.Optional(codec.Nullable(String)),
-) {
-  decode.optional(decode.string)
-  |> decode.map(fn(value) {
-    case value {
-      Some(string) -> codec.Present(codec.NonNull(string))
-      None -> codec.Present(codec.Null)
-    }
-  })
-}
-
 fn order_status() -> decode.Decoder(materialize_fixtures.OrderStatus) {
   decode.string
   |> decode.then(fn(label) {
@@ -136,10 +120,6 @@ fn status_label(
     materialize_fixtures.ShippedQuoted -> Ok("shipped\n\r\f\t\"quoted\"")
     materialize_fixtures.DeliveredUnicode -> Ok("delivered 🚀 fn")
     materialize_fixtures.Unmapped ->
-      Error(
-        codec.CannotEncode(codec.EncodeUnknownEnumValue(
-          "Value is not in the string enum",
-        )),
-      )
+      Error(codec.EncodeError([codec.Field("status")], codec.UnknownEnumValue))
   }
 }

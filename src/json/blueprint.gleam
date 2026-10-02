@@ -49,8 +49,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import json/blueprint/internal/dynamic
-import json/blueprint/internal/parser_core
-import json/blueprint/parser_limits
+import json/blueprint/internal/text
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
 type DynamicDecoder(t) =
@@ -211,7 +210,7 @@ pub fn decode(
   decode_with_max_bytes(
     using: decoder,
     from: json_string,
-    max_bytes: parser_limits.max_bytes(parser_limits.default()),
+    max_bytes: text.default_max_bytes,
   )
 }
 
@@ -223,7 +222,7 @@ pub fn decode_with_max_bytes(
   max_bytes max_bytes: Int,
 ) -> Result(t, json.DecodeError) {
   use <- bool.guard(
-    when: parser_core.exceeds_byte_limit(json_string, max_bytes),
+    when: text.exceeds_byte_limit(json_string, max_bytes),
     return: Error(
       json.UnableToDecode([
         decode.DecodeError(

@@ -1,15 +1,35 @@
 //// Exact JSON numbers and their checked conversions to `Int` and `Float`.
 ////
 //// A `Number` keeps the decimal value of a JSON number token exactly, with no
-//// rounding, so `1.10` equals `1.1` and `1e2` equals `100`. `parse_number`
-//// reads a token within `NumberLimits` on token bytes, significant digits and
-//// exponent size. `to_int_exact` and `to_float_exact` return a native value
-//// only when it is exactly equal, and `from_int` and `from_float_exact`
-//// convert back. On JavaScript, integers outside the safe range
-//// (±9,007,199,254,740,991) are refused instead of rounded.
+//// rounding, so `1.10` equals `1.1` and `1e2` equals `100`. `parse` reads a
+//// token within `Limits` on token bytes, significant digits and exponent
+//// size; `default_limits()` is 1,024 bytes, 800 digits and exponent 1,200,
+//// which admits the exact decimal expansion of every finite binary64 value.
 ////
-//// The strict parser in `json/blueprint/parser` and `value.Number` use this
-//// type; `codec.number()` decodes it, and `codec.int()` projects it to `Int`.
+//// `to_int` and `to_float_exact` return a native value only when it is
+//// exactly equal; `to_float` rounds to the nearest binary64. `from_int`,
+//// `from_float` (the shortest decimal that reads back as the same float) and
+//// `from_float_exact` (the float's exact binary expansion) convert back. On
+//// JavaScript, integers outside the safe range (±9,007,199,254,740,991) are
+//// refused instead of rounded.
+////
+//// `value.Number` holds this type, and `codec.number()` decodes it.
+////
+//// ```gleam
+//// import gleam/order
+//// import json/blueprint/number
+////
+//// pub fn example() {
+////   let assert Ok(price) = number.parse("19.90", number.default_limits())
+////   let assert Ok(same) = number.parse("1.99e1", number.default_limits())
+////   let assert order.Eq = number.compare(price, same)
+////   let assert Ok(19.9) = number.to_float(price)
+////   number.to_string(price)
+//// }
+//// ```
+
+import gleam/float
+import gleam/order.{type Order}
 
 /// An exact JSON number.
 ///
@@ -28,20 +48,18 @@ pub opaque type Number {
 /// JavaScript doubles.
 const small_integer_digits = 15
 
-pub opaque type NumberLimits {
-  NumberLimits(
+/// Bounds for `parse`: token bytes, significant digits and the magnitude of
+/// the decimal exponent.
+pub opaque type Limits {
+  Limits(
     max_token_bytes: Int,
     max_significand_digits: Int,
     max_abs_exponent: Int,
   )
 }
 
-pub type LimitsError {
-  TokenLimitMustBePositive
-  SignificandLimitMustBePositive
-  ExponentLimitMustBeNonnegative
-}
-
+/// Why `parse` refused a token. `InvalidSyntax` is not a JSON number; the other
+/// variants exceed a bound of `Limits`.
 pub type NumberError {
   InvalidSyntax
   TokenTooLong
@@ -49,20 +67,14 @@ pub type NumberError {
   ExponentOutOfRange
 }
 
-pub opaque type IntegerProjectionLimit {
-  IntegerProjectionLimit(max_digits: Int)
-}
-
-pub type IntegerProjectionLimitError {
-  IntegerDigitLimitMustBePositive
-}
-
+/// Why `to_int` refused a number.
 pub type IntegerProjectionError {
   FractionalInteger
   IntegerDigitLimitExceeded
   UnsupportedNativeInteger
 }
 
+/// Why `to_float` or `to_float_exact` refused a number.
 pub type FloatProjectionError {
   FloatOverflow
   FloatUnderflow
@@ -70,101 +82,41 @@ pub type FloatProjectionError {
   InvalidFloatCandidate
 }
 
+/// Why `from_int` refused an `Int`. Only JavaScript produces these: a
+/// non-finite or fractional number, or one outside the safe integer range.
 pub type IntegerConstructionError {
   NonFiniteInteger
   NonIntegerValue
   UnsafeNativeInteger
 }
 
+/// Why `from_float` or `from_float_exact` refused a `Float`: on JavaScript,
+/// an infinity or NaN.
 pub type FloatConstructionError {
   NonFiniteFloat
 }
 
-pub type NumberOrder {
-  LessThan
-  EqualTo
-  GreaterThan
+/// Build number limits. A token longer than `max_token_bytes`, with more than
+/// `max_significant_digits` digits as written, or whose normalized decimal
+/// exponent exceeds `max_exponent` in magnitude is refused. A token bound
+/// or digit bound below 1 refuses every token; a negative exponent bound
+/// refuses every number except zero.
+pub fn limits(
+  max_token_bytes max_token_bytes: Int,
+  max_significant_digits max_significant_digits: Int,
+  max_exponent max_exponent: Int,
+) -> Limits {
+  Limits(max_token_bytes, max_significant_digits, max_exponent)
 }
 
-pub fn number_limits(
-  max_token_bytes: Int,
-  max_significand_digits: Int,
-  max_abs_exponent: Int,
-) -> Result(NumberLimits, LimitsError) {
-  case max_token_bytes > 0, max_significand_digits > 0, max_abs_exponent >= 0 {
-    False, _, _ -> Error(TokenLimitMustBePositive)
-    _, False, _ -> Error(SignificandLimitMustBePositive)
-    _, _, False -> Error(ExponentLimitMustBeNonnegative)
-    True, True, True ->
-      Ok(NumberLimits(max_token_bytes, max_significand_digits, max_abs_exponent))
-  }
+/// 1,024 token bytes, 800 significant digits and exponent magnitude 1,200.
+/// These admit the exact decimal expansion of every finite binary64 value,
+/// including the smallest subnormal.
+pub fn default_limits() -> Limits {
+  Limits(1024, 800, 1200)
 }
 
-pub fn integer_projection_limit(
-  max_digits: Int,
-) -> Result(IntegerProjectionLimit, IntegerProjectionLimitError) {
-  case max_digits > 0 {
-    True -> Ok(IntegerProjectionLimit(max_digits))
-    False -> Error(IntegerDigitLimitMustBePositive)
-  }
-}
-
-/// Size an integer projection from the admitted native bounds.
-pub fn integer_projection_limit_for_bounds(
-  minimum: Int,
-  maximum: Int,
-) -> IntegerProjectionLimit {
-  let minimum_digits = native_integer_digits(minimum)
-  let maximum_digits = native_integer_digits(maximum)
-  case minimum_digits >= maximum_digits {
-    True -> IntegerProjectionLimit(minimum_digits)
-    False -> IntegerProjectionLimit(maximum_digits)
-  }
-}
-
-/// Use admitted bounds for valid values. For an out-of-range value, allow
-/// native projection so a caller can report the actual integer in its error.
-pub fn integer_projection_limit_for_range_value(
-  value: Number,
-  minimum: Int,
-  maximum: Int,
-) -> IntegerProjectionLimit {
-  let bounded = integer_projection_limit_for_bounds(minimum, maximum)
-  case from_int(minimum), from_int(maximum) {
-    Ok(lower), Ok(upper) ->
-      case
-        compare(value, lower) == LessThan
-        || compare(value, upper) == GreaterThan
-      {
-        True -> integer_projection_limit_for_number(value)
-        False -> bounded
-      }
-    _, _ -> bounded
-  }
-}
-
-/// Size a projection for a parsed schema bound. The native projection still
-/// rejects values unsupported by the host runtime.
-pub fn integer_projection_limit_for_number(
-  number: Number,
-) -> IntegerProjectionLimit {
-  let #(_, coefficient, exponent10) = parts(number)
-  let digits = list_length(coefficient) + exponent10
-  case digits > 0 {
-    True -> IntegerProjectionLimit(digits)
-    False -> IntegerProjectionLimit(1)
-  }
-}
-
-fn native_integer_digits(value: Int) -> Int {
-  let length = list_length(native_byte_codes(native_integer_to_string(value)))
-  case value < 0 {
-    True -> length - 1
-    False -> length
-  }
-}
-
-pub type FloatCandidate {
+type FloatCandidate {
   CandidateValue(Float)
   CandidateOverflow
   CandidateInvalid
@@ -242,48 +194,15 @@ type DecimalPart {
   FractionalPart(List(Int), List(Int))
 }
 
-pub fn parse_number(
-  limits: NumberLimits,
-  token: String,
-) -> Result(Number, NumberError) {
-  let NumberLimits(max_token_bytes, max_significand_digits, max_abs_exponent) =
-    limits
+/// Parse a JSON number token, such as `-12.5e3`, exactly. Leading or trailing
+/// whitespace, a leading `+`, leading zeros and a bare `.` are invalid, as in
+/// JSON.
+pub fn parse(token: String, limits: Limits) -> Result(Number, NumberError) {
+  let Limits(max_token_bytes, max_significand_digits, max_abs_exponent) = limits
   case native_byte_length(token) > max_token_bytes {
     True -> Error(TokenTooLong)
     False ->
       parse_within_token_limit(max_significand_digits, max_abs_exponent, token)
-  }
-}
-
-/// Build a parsed integer token of at most 15 digits without leading zeros,
-/// when it satisfies `limits`. The strict parser uses this to skip the
-/// general decimal path for ordinary integers; `Error(Nil)` sends the token
-/// down that path, which reports the precise error.
-@internal
-pub fn small_integer_token(
-  limits: NumberLimits,
-  negative: Bool,
-  magnitude: Int,
-  digits: Int,
-) -> Result(Number, Nil) {
-  let NumberLimits(max_token_bytes, max_significand_digits, max_abs_exponent) =
-    limits
-  let token_bytes = case negative {
-    True -> digits + 1
-    False -> digits
-  }
-  case
-    digits <= small_integer_digits
-    && token_bytes <= max_token_bytes
-    && digits <= max_significand_digits
-    && digits - 1 <= max_abs_exponent
-  {
-    False -> Error(Nil)
-    True ->
-      case negative {
-        True -> Ok(SmallInteger(0 - magnitude))
-        False -> Ok(SmallInteger(magnitude))
-      }
   }
 }
 
@@ -360,7 +279,10 @@ fn normalize_parsed_number(
   }
 }
 
-pub fn number_text(number: Number) -> String {
+/// The number as JSON number text: a plain integer when its normalized
+/// exponent is zero, otherwise one leading digit and an exponent, such as
+/// `1.25e1` for 12.5 or `1e3` for 1000.
+pub fn to_string(number: Number) -> String {
   let #(negative, coefficient, exponent10) = parts(number)
   case coefficient {
     [48] -> "0"
@@ -388,7 +310,8 @@ fn match_coefficient_digits(digits: List(Int)) -> String {
   }
 }
 
-pub fn compare(left: Number, right: Number) -> NumberOrder {
+/// Compare two numbers by mathematical value.
+pub fn compare(left: Number, right: Number) -> Order {
   case left, right {
     SmallInteger(left), SmallInteger(right) -> compare_ints(left, right)
     _, _ -> compare_parts(parts(left), parts(right))
@@ -398,25 +321,25 @@ pub fn compare(left: Number, right: Number) -> NumberOrder {
 fn compare_parts(
   left: #(Bool, List(Int), Int),
   right: #(Bool, List(Int), Int),
-) -> NumberOrder {
+) -> Order {
   let #(left_negative, left_digits, left_exponent) = left
   let #(right_negative, right_digits, right_exponent) = right
   case left_digits == [48], right_digits == [48] {
-    True, True -> EqualTo
+    True, True -> order.Eq
     True, False ->
       case right_negative {
-        True -> GreaterThan
-        False -> LessThan
+        True -> order.Gt
+        False -> order.Lt
       }
     False, True ->
       case left_negative {
-        True -> LessThan
-        False -> GreaterThan
+        True -> order.Lt
+        False -> order.Gt
       }
     False, False ->
       case left_negative, right_negative {
-        True, False -> LessThan
-        False, True -> GreaterThan
+        True, False -> order.Lt
+        False, True -> order.Gt
         True, True ->
           reverse_order(compare_magnitudes(
             left_digits,
@@ -440,57 +363,59 @@ fn compare_magnitudes(
   left_exponent: Int,
   right_digits: List(Int),
   right_exponent: Int,
-) -> NumberOrder {
+) -> Order {
   let left_scale = left_exponent + list_length(left_digits)
   let right_scale = right_exponent + list_length(right_digits)
   case compare_ints(left_scale, right_scale) {
-    EqualTo -> compare_padded_digits(left_digits, right_digits)
+    order.Eq -> compare_padded_digits(left_digits, right_digits)
     order -> order
   }
 }
 
-fn compare_padded_digits(left: List(Int), right: List(Int)) -> NumberOrder {
+fn compare_padded_digits(left: List(Int), right: List(Int)) -> Order {
   case left, right {
-    [], [] -> EqualTo
+    [], [] -> order.Eq
     [left_digit, ..left_rest], [right_digit, ..right_rest] ->
       case compare_ints(left_digit, right_digit) {
-        EqualTo -> compare_padded_digits(left_rest, right_rest)
+        order.Eq -> compare_padded_digits(left_rest, right_rest)
         order -> order
       }
     [], [right_digit, ..right_rest] ->
       case compare_ints(48, right_digit) {
-        EqualTo -> compare_padded_digits([], right_rest)
+        order.Eq -> compare_padded_digits([], right_rest)
         order -> order
       }
     [left_digit, ..left_rest], [] ->
       case compare_ints(left_digit, 48) {
-        EqualTo -> compare_padded_digits(left_rest, [])
+        order.Eq -> compare_padded_digits(left_rest, [])
         order -> order
       }
   }
 }
 
-fn compare_ints(left: Int, right: Int) -> NumberOrder {
+fn compare_ints(left: Int, right: Int) -> Order {
   case left {
-    _ if left < right -> LessThan
-    _ if left > right -> GreaterThan
-    _ -> EqualTo
+    _ if left < right -> order.Lt
+    _ if left > right -> order.Gt
+    _ -> order.Eq
   }
 }
 
-fn reverse_order(order: NumberOrder) -> NumberOrder {
+fn reverse_order(order: Order) -> Order {
   case order {
-    LessThan -> GreaterThan
-    EqualTo -> EqualTo
-    GreaterThan -> LessThan
+    order.Lt -> order.Gt
+    order.Eq -> order.Eq
+    order.Gt -> order.Lt
   }
 }
 
-pub fn to_int_exact(
+/// The number as an `Int` when it is an integer of at most `max_digits`
+/// decimal digits. `max_digits` bounds the work and memory of the conversion;
+/// on JavaScript the integer must also be within the safe range.
+pub fn to_int(
   number: Number,
-  limit: IntegerProjectionLimit,
+  max_digits: Int,
 ) -> Result(Int, IntegerProjectionError) {
-  let IntegerProjectionLimit(max_digits) = limit
   case number {
     SmallInteger(value) ->
       case decimal_digit_count(absolute(value), 1) > max_digits {
@@ -528,6 +453,7 @@ fn decimal_to_int_exact(
   }
 }
 
+/// Whether the number has no fractional part.
 pub fn is_integer(number: Number) -> Bool {
   case number {
     SmallInteger(_) -> True
@@ -535,7 +461,20 @@ pub fn is_integer(number: Number) -> Bool {
   }
 }
 
+/// The exact number of an `Int`. Fails only on JavaScript, for a value that is
+/// not a safe integer.
 pub fn from_int(value: Int) -> Result(Number, IntegerConstructionError) {
+  case value > -small_integer_bound && value < small_integer_bound {
+    // Fewer than 16 digits: exact on every target. On JavaScript, a fraction
+    // fails the remainder test and takes the checked path below.
+    True if value % 1 == 0 -> Ok(SmallInteger(value))
+    _ -> from_checked_int(value)
+  }
+}
+
+const small_integer_bound = 1_000_000_000_000_000
+
+fn from_checked_int(value: Int) -> Result(Number, IntegerConstructionError) {
   case
     native_validate_native_int(
       value,
@@ -561,6 +500,24 @@ pub fn from_int(value: Int) -> Result(Number, IntegerConstructionError) {
   }
 }
 
+/// The shortest decimal that reads back as the same float, such as `0.1` for
+/// `0.1`. This is the number a JSON reader sees in the float's usual printed
+/// form.
+pub fn from_float(value: Float) -> Result(Number, FloatConstructionError) {
+  case native_float_parts(value) {
+    Error(Nil) -> Error(NonFiniteFloat)
+    Ok(_) -> {
+      let assert Ok(parsed) = parse(float.to_string(value), float_text_limits)
+      Ok(parsed)
+    }
+  }
+}
+
+/// Enough for the shortest form of any finite binary64 value.
+const float_text_limits = Limits(64, 64, 400)
+
+/// The exact decimal value of the float's binary representation, such as
+/// `0.1000000000000000055511151231257827021181583404541015625` for `0.1`.
 pub fn from_float_exact(
   value: Float,
 ) -> Result(Number, FloatConstructionError) {
@@ -577,6 +534,37 @@ pub fn from_float_exact(
   }
 }
 
+/// The nearest binary64 float. Fails with `FloatOverflow` when the magnitude
+/// is beyond the largest finite float; a magnitude below the smallest
+/// subnormal rounds to zero.
+pub fn to_float(number: Number) -> Result(Float, FloatProjectionError) {
+  case is_zero(number) {
+    True -> Ok(0.0)
+    False ->
+      case
+        native_parse_float_candidate(
+          to_string(number),
+          CandidateValue,
+          CandidateOverflow,
+          CandidateInvalid,
+        )
+      {
+        CandidateValue(candidate) -> Ok(candidate)
+        CandidateOverflow -> Error(FloatOverflow)
+        CandidateInvalid -> Error(InvalidFloatCandidate)
+      }
+  }
+}
+
+fn is_zero(number: Number) -> Bool {
+  case number {
+    SmallInteger(0) -> True
+    _ -> False
+  }
+}
+
+/// The float exactly equal to the number. Fails when the nearest float
+/// differs (`FloatInexact`), or the number is beyond the float range.
 pub fn to_float_exact(number: Number) -> Result(Float, FloatProjectionError) {
   let #(negative, coefficient, exponent10) = parts(number)
   case coefficient == [48] {
@@ -584,7 +572,7 @@ pub fn to_float_exact(number: Number) -> Result(Float, FloatProjectionError) {
     False ->
       case
         native_parse_float_candidate(
-          number_text(number),
+          to_string(number),
           CandidateValue,
           CandidateOverflow,
           CandidateInvalid,

@@ -1,6 +1,11 @@
+//// A consumer package's view of `codec.Schema`: Relay, the standalone LLM
+//// client and Fabric walk a tool schema to decide whether they can admit it.
+
 import gleam/list
+import gleam/option.{None, Some}
 import gleeunit/should
 import json/blueprint/codec.{type Schema}
+import json/blueprint/contract
 import json/blueprint/number
 import json/blueprint/value
 
@@ -24,6 +29,7 @@ pub type Feature {
   FixedTuple
   NullableValues
   TaggedAlternatives
+  UnitAlternative
   IntegerBounds(min: Int, max: Int)
   DecimalBounds(min: number.Number, max: number.Number)
 }
@@ -54,10 +60,6 @@ fn at(schema: Schema, path: List(Segment)) -> List(Requirement) {
       Requirement(path, ExactDecimalValues),
       Requirement(path, DecimalBounds(min, max)),
     ]
-    codec.FieldSchema(name, inner) -> [
-      Requirement(path, ClosedObject),
-      ..at(inner, list.append(path, [Property(name)]))
-    ]
     codec.ObjectSchema(properties) -> [
       Requirement(path, ClosedObject),
       ..properties_at(properties, path)
@@ -78,13 +80,17 @@ fn at(schema: Schema, path: List(Segment)) -> List(Requirement) {
       Requirement(path, NullableValues),
       ..at(inner, list.append(path, [NonNullCase]))
     ]
-    codec.TaggedSchema(left_tag, left, right_tag, right) -> [
+    codec.UnionSchema(variants) -> [
       Requirement(path, ClosedObject),
       Requirement(path, TaggedAlternatives),
-      ..list.append(
-        at(left, list.append(path, [TaggedCase(left_tag), Property("value")])),
-        at(right, list.append(path, [TaggedCase(right_tag), Property("value")])),
-      )
+      ..list.flat_map(variants, fn(variant) {
+        let case_path = list.append(path, [TaggedCase(variant.tag)])
+        case variant.payload {
+          None -> [Requirement(case_path, UnitAlternative)]
+          Some(payload) ->
+            at(payload, list.append(case_path, [Property("value")]))
+        }
+      })
     ]
   }
 }
@@ -117,12 +123,29 @@ pub type ToolEntry {
   ToolEntry(name: String, description: String, schema: Schema)
 }
 
+pub fn tool_entry(
+  name: String,
+  description: String,
+  input: codec.Codec(a),
+) -> Result(ToolEntry, AdmissionIssue) {
+  case codec.schema(input) {
+    Ok(schema) -> Ok(ToolEntry(name, description, schema))
+    Error(codec.UnknownSchema) -> Error(UnknownToolSchema)
+  }
+}
+
 pub fn admit_object_root(entry: ToolEntry) -> List(AdmissionIssue) {
-  case entry.schema {
-    codec.FieldSchema(_, _)
-    | codec.ObjectSchema(_)
-    | codec.TaggedSchema(_, _, _, _) -> []
-    _ -> [RootMustBeObject]
+  case object_root(entry.schema) {
+    True -> []
+    False -> [RootMustBeObject]
+  }
+}
+
+fn object_root(schema: Schema) -> Bool {
+  case schema {
+    codec.DescribedSchema(_, inner) -> object_root(inner)
+    codec.ObjectSchema(_) | codec.UnionSchema(_) -> True
+    _ -> False
   }
 }
 
@@ -140,6 +163,27 @@ pub fn reject_feature(
   }
 }
 
+pub type Command {
+  Start(delay: Int)
+  Stop
+  Restart
+}
+
+fn command_codec() -> codec.Codec(Command) {
+  codec.union({
+    use start <- codec.variant("start", codec.integer_between(0, 60), Start)
+    use stop <- codec.unit_variant("stop", Stop)
+    use restart <- codec.unit_variant("restart", Restart)
+    codec.match(fn(command) {
+      case command {
+        Start(delay) -> start(delay)
+        Stop -> stop
+        Restart -> restart
+      }
+    })
+  })
+}
+
 pub fn relay_and_standalone_llm_admission_test() {
   // 1. Tool with object root schema is admitted
   let user_schema =
@@ -151,38 +195,59 @@ pub fn relay_and_standalone_llm_admission_test() {
   admit_object_root(user_tool)
   |> should.equal([])
 
+  // A described object root and a union root are objects too
+  admit_object_root(ToolEntry(
+    "described",
+    "",
+    codec.DescribedSchema("A user", user_schema),
+  ))
+  |> should.equal([])
+  let assert Ok(command_tool) =
+    tool_entry("control", "Control the job", command_codec())
+  admit_object_root(command_tool)
+  |> should.equal([])
+
   // 2. Tool with scalar root schema is rejected by Relay/LLM profile
   let scalar_tool = ToolEntry("ping", "Ping", codec.StringSchema)
   admit_object_root(scalar_tool)
   |> should.equal([RootMustBeObject])
 
-  // 3. Custom codec with UnknownSchema returns error on entry construction
+  // 3. Custom codec with UnknownSchema fails entry construction
   let custom_codec =
-    codec.new(
-      fn(i: Int) {
+    codec.custom(
+      encode: fn(i: Int) {
         let assert Ok(num) = number.from_int(i)
         Ok(value.Number(num))
       },
-      fn(_) { Ok(1) },
+      decode: fn(_) { Ok(1) },
+      schema: None,
+      placeholder: 0,
     )
   codec.schema(custom_codec)
+  |> should.equal(Error(codec.UnknownSchema))
+  tool_entry("custom", "", custom_codec)
+  |> should.equal(Error(UnknownToolSchema))
+  contract.from_codec(custom_codec)
   |> should.equal(Error(codec.UnknownSchema))
 }
 
 pub fn fabric_schema_admission_policies_test() {
-  // Tool schema with an optional property
+  // Tool schema with an optional property, under a single required field
   let request_schema =
-    codec.FieldSchema(
-      "request",
-      codec.ObjectSchema([
-        codec.PropertySchema("id", True, codec.IntegerRangeSchema(1, 10)),
-        codec.PropertySchema(
-          "labels",
-          False,
-          codec.ListSchema(codec.NullableSchema(codec.StringSchema)),
-        ),
-      ]),
-    )
+    codec.ObjectSchema([
+      codec.PropertySchema(
+        "request",
+        True,
+        codec.ObjectSchema([
+          codec.PropertySchema("id", True, codec.IntegerRangeSchema(1, 10)),
+          codec.PropertySchema(
+            "labels",
+            False,
+            codec.ListSchema(codec.NullableSchema(codec.StringSchema)),
+          ),
+        ]),
+      ),
+    ])
 
   let reqs = extract_requirements(request_schema)
 
@@ -198,13 +263,23 @@ pub fn fabric_schema_admission_policies_test() {
 
   // Tool schema with TaggedAlternatives
   let choice_schema =
-    codec.TaggedSchema("number", codec.IntSchema, "text", codec.StringSchema)
+    codec.UnionSchema([
+      codec.VariantSchema("number", Some(codec.IntSchema)),
+      codec.VariantSchema("text", Some(codec.StringSchema)),
+      codec.VariantSchema("nothing", None),
+    ])
   let choice_reqs = extract_requirements(choice_schema)
 
   let choice_issues = reject_feature(choice_reqs, TaggedAlternatives)
   choice_issues
+  |> should.equal([UnsupportedFeature(Requirement([], TaggedAlternatives))])
+
+  // A policy without unit variants finds each one by its tag
+  let assert Ok(command_schema) = codec.schema(command_codec())
+  reject_feature(extract_requirements(command_schema), UnitAlternative)
   |> should.equal([
-    UnsupportedFeature(Requirement([], TaggedAlternatives)),
+    UnsupportedFeature(Requirement([TaggedCase("stop")], UnitAlternative)),
+    UnsupportedFeature(Requirement([TaggedCase("restart")], UnitAlternative)),
   ])
 }
 
@@ -226,13 +301,14 @@ pub fn structural_requirements_extraction_test() {
     Requirement([NonNullCase], IntegerBounds(1, 10)),
   ])
 
-  // TaggedSchema
-  extract_requirements(codec.TaggedSchema(
-    "small",
-    codec.IntegerRangeSchema(1, 2),
-    "many",
-    codec.ListSchema(codec.StringSchema),
-  ))
+  // UnionSchema with payload variants and a unit variant
+  extract_requirements(
+    codec.UnionSchema([
+      codec.VariantSchema("small", Some(codec.IntegerRangeSchema(1, 2))),
+      codec.VariantSchema("many", Some(codec.ListSchema(codec.StringSchema))),
+      codec.VariantSchema("none", None),
+    ]),
+  )
   |> should.equal([
     Requirement([], ClosedObject),
     Requirement([], TaggedAlternatives),
@@ -240,7 +316,27 @@ pub fn structural_requirements_extraction_test() {
     Requirement([TaggedCase("small"), Property("value")], IntegerBounds(1, 2)),
     Requirement([TaggedCase("many"), Property("value")], ArrayValues),
     Requirement([TaggedCase("many"), Property("value"), Element], TextValues),
+    Requirement([TaggedCase("none")], UnitAlternative),
   ])
+
+  // The schema of a union codec
+  let assert Ok(command_schema) = codec.schema(command_codec())
+  extract_requirements(command_schema)
+  |> should.equal([
+    Requirement([], ClosedObject),
+    Requirement([], TaggedAlternatives),
+    Requirement([TaggedCase("start"), Property("value")], IntegerValues),
+    Requirement([TaggedCase("start"), Property("value")], IntegerBounds(0, 60)),
+    Requirement([TaggedCase("stop")], UnitAlternative),
+    Requirement([TaggedCase("restart")], UnitAlternative),
+  ])
+
+  // A described enum
+  extract_requirements(codec.DescribedSchema(
+    "Level",
+    codec.StringEnumSchema(["low", "high"]),
+  ))
+  |> should.equal([Requirement([], StringEnumValues(["low", "high"]))])
 
   // NumberSchema and NumberRangeSchema
   let assert Ok(num0) = number.from_int(0)
@@ -286,4 +382,11 @@ pub fn exact_decimal_admission_distinction_test() {
 
   reject_feature(int_reqs, IntegerValues)
   |> should.equal([UnsupportedFeature(Requirement([], IntegerValues))])
+
+  // The codecs that produce these schemas
+  codec.schema(codec.int()) |> should.equal(Ok(int_schema))
+  codec.schema(codec.float()) |> should.equal(Ok(number_schema))
+  codec.schema(codec.number()) |> should.equal(Ok(number_schema))
+  codec.schema(codec.number_between(num_min, num_max))
+  |> should.equal(Ok(number_range_schema))
 }

@@ -1,1877 +1,1551 @@
 //// Bidirectional JSON codecs: one `Codec(a)` encodes a Gleam value, decodes
-//// JSON text or a parsed `Value` strictly, and describes the JSON as a
-//// Draft 2020-12 schema.
+//// JSON text strictly, and describes the JSON as a Draft 2020-12 schema.
 ////
-//// This is the module for ordinary application data. Build codecs from
-//// `string`, `int`, `number`, `bool`, `list`, `pair`, `nullable`,
-//// `string_enum`, `tagged`, the bounded `integer_between` and
-//// `number_between`, and objects of `required` and `optional` properties
-//// (`record2`, `record3`, or `combine` with `object` and `imap`).
-////
-//// `decode_json` uses the strict parser with `parser_limits.default()`
-//// (1 MiB, depth 64): it rejects duplicate keys and keeps numbers exact.
-//// `decode_json_with_limits` takes other limits and `render_json_decode_error`
-//// turns an error into readable text without input values. `schema_json`
-//// renders the schema document.
-////
-//// `json/blueprint/codegen` builds the same codecs from definitions that can
-//// also be compiled to Gleam source. `json/blueprint/runtime` validates parsed
-//// values against a codec's schema. The functions named `encode_*_value`,
-//// `decode_*_value`, `*_with`, `encode_native_*` and `decode_native_*` are
-//// called by generated modules; application code uses the combinators.
+//// Describe a record once with `field`, `optional_field` and `success`, then
+//// use it in both directions:
 ////
 //// ```gleam
-//// import json/blueprint/codec
+//// import gleam/option.{type Option}
+//// import json/blueprint/codec.{type Codec}
 ////
-//// pub type Task {
-////   Task(id: Int, title: String)
+//// pub type Role {
+////   Admin
+////   Member
 //// }
 ////
-//// pub fn task_codec() -> codec.Codec(Task) {
-////   let assert Ok(id) = codec.integer_between(1, 100_000)
-////   let assert Ok(task) =
-////     codec.record2(
-////       codec.required("id", id),
-////       codec.required("title", codec.string()),
-////       Task,
-////       fn(task) { task.id },
-////       fn(task) { task.title },
-////     )
-////   task
+//// pub type User {
+////   User(name: String, age: Int, email: Option(String), role: Role)
+//// }
+////
+//// pub fn user_codec() -> Codec(User) {
+////   let role = codec.string_enum([#("admin", Admin), #("member", Member)])
+////   use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
+////   use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+////     u.age
+////   })
+////   use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+////     u.email
+////   })
+////   use role <- codec.field("role", role, fn(u: User) { u.role })
+////   codec.success(User(name:, age:, email:, role:))
 //// }
 ////
 //// pub fn example() -> Result(String, String) {
-////   case codec.decode_json(task_codec(), "{\"id\":42,\"title\":\"Ship\"}") {
-////     Error(error) -> Error(codec.render_json_decode_error(error))
-////     Ok(task) ->
-////       case codec.encode_json(task_codec(), task) {
-////         Ok(text) -> Ok(text)
-////         Error(_) -> Error("cannot encode")
-////       }
+////   let text = "{\"name\":\"Ada\",\"age\":36,\"role\":\"admin\"}"
+////   case codec.decode_json(user_codec(), text) {
+////     Error(error) -> Error(codec.describe_decode_error(error))
+////     Ok(user) -> {
+////       let assert Ok(text) = codec.encode_json(user_codec(), user)
+////       Ok(text)
+////     }
 ////   }
 //// }
 //// ```
+////
+//// Each getter needs its record type annotated (`fn(u: User)`), because the
+//// record type is fixed only by `success`. The body after each `use` runs
+//// with placeholder values when the codec describes itself, so keep it a
+//// plain constructor call.
+////
+//// Objects are closed: an unknown field fails to decode. `optional_field`
+//// omits the field for `None`; wrap the inner codec in `nullable` to also
+//// accept `null`. `union` with `variant` and `unit_variant` describes a sum
+//// type as `{"tag": ..., "value": ...}`. `map` and `try_map` convert to your
+//// own types, and `custom` builds a codec from functions.
+////
+//// `decode_json` parses with `value.default_limits()`: 1 MiB of text, depth
+//// 64 and 262,144 values; `decode_json_with_limits` takes other limits.
+//// `to_json` and `decoder` bridge to `gleam/json` and
+//// `gleam/dynamic/decode`.
+////
+//// A definition written wrongly, such as a field named twice or an enum label
+//// repeated, panics with a message naming the field or label when the
+//// mistaken part is first used: when it encodes or decodes a value, or when
+//// `schema` describes the codec. `check` returns the same problem as a
+//// `DefinitionError` instead, for codecs built from runtime data such as enum
+//// labels loaded from a database; call it at startup.
+////
+//// `DecodeError` and `EncodeError` are `{path, reason}` records. `Reason`
+//// and `Schema` may gain variants in minor releases; match them with a `_`
+//// branch, and build errors with `decode_failure` and `encode_failure`.
 
-import gleam/dict
-import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import json/blueprint/internal/parser_core
-import json/blueprint/json_text
-import json/blueprint/number.{type Number, type NumberError}
-import json/blueprint/parser_limits
+import gleam/order
+import gleam/result
+import gleam/set.{type Set}
+import gleam/string
+import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
-pub type EncodeReason {
-  EncodeUnknownEnumLabel(String)
-  EncodeUnknownEnumValue(String)
-  EncodeUnknownTag(String)
-  EncodeUnknownProperty(String)
-  EncodeWrongTupleLength(expected: Int, actual: Int)
-  EncodeInvalidNativeValue(String)
-  EncodeIntegerOutsideRange(minimum: Int, maximum: Int, actual: Int)
-  EncodeNumberOutsideRange(minimum: Number, maximum: Number, actual: Number)
-  CustomEncodeReason(String)
-}
+// --- schema ------------------------------------------------------------------
 
-pub type EncodeError {
-  CannotEncode(reason: EncodeReason)
-  EncodeAtField(field: String, inner: EncodeError)
-  EncodeAtIndex(index: Int, inner: EncodeError)
-}
-
-pub type DecodeReason {
-  DecodeExpectedString
-  DecodeExpectedInt
-  DecodeExpectedNumber
-  DecodeExpectedBool
-  DecodeExpectedArray
-  DecodeExpectedObject
-  DecodeUnknownEnumLabel(String)
-  DecodeUnknownTag(String)
-  DecodeMissingTag
-  DecodeMissingTagPayload(String)
-  DecodeExpectedTaggedObject
-  DecodeMissingProperty(String)
-  DecodeUnknownProperty(String)
-  DecodeDuplicateProperty(String)
-  DecodeWrongTupleLength(expected: Int, actual: Int)
-  DecodeInvalidWireValue(String)
-  DecodeIntegerOutsideRange(minimum: Int, maximum: Int, actual: Int)
-  DecodeNumberOutsideRange(minimum: Number, maximum: Number, actual: Number)
-  CustomDecodeReason(String)
-}
-
-pub type DecodeError {
-  CannotDecode(reason: DecodeReason)
-  DecodeAtField(field: String, inner: DecodeError)
-  DecodeAtIndex(index: Int, inner: DecodeError)
-}
-
-pub type JsonDecodeError {
-  BlueprintParserFailure(BlueprintJsonParseFailure)
-  NativeJsonFailure(json.DecodeError)
-  TypedCodecFailure(DecodeError)
-}
-
-pub type BlueprintJsonParseFailure {
-  BlueprintJsonParseFailure(
-    location: BlueprintJsonLocation,
-    reason: BlueprintJsonParseReason,
-  )
-}
-
-pub type BlueprintJsonLocation {
-  BlueprintJsonLocation(byte_offset: Int, line: Int, column: Int)
-}
-
-pub type BlueprintJsonParseReason {
-  BlueprintUnexpectedByte(String)
-  BlueprintUnexpectedEndOfInput
-  BlueprintInvalidUtf8
-  BlueprintByteLimitExceeded(max: Int)
-  BlueprintDepthLimitExceeded(max: Int)
-  BlueprintInvalidNumberToken(NumberError)
-  BlueprintDuplicateObjectKey(key: String)
-  BlueprintUnterminatedString
-  BlueprintInvalidEscapeSequence
-  BlueprintInvalidUnicodeEscape
-  BlueprintTrailingContent
-}
-
-pub type SchemaError {
-  UnknownSchema
-}
-
+/// The JSON Schema of a codec, within the finite Draft 2020-12 profile that
+/// codecs describe. Render it with `schema_document`.
+///
+/// May gain variants in a minor release; match with a `_` branch.
+/// Generated modules build it in constants, so it is not opaque.
 pub type Schema {
   DescribedSchema(description: String, inner: Schema)
   StringSchema
-  StringEnumSchema(List(String))
+  StringEnumSchema(labels: List(String))
   IntSchema
   NumberSchema
   BoolSchema
-  PairSchema(Schema, Schema)
-  FieldSchema(String, Schema)
-  ListSchema(Schema)
-  NullableSchema(Schema)
-  ObjectSchema(List(PropertySchema))
-  TaggedSchema(String, Schema, String, Schema)
-  IntegerRangeSchema(Int, Int)
-  NumberRangeSchema(Number, Number)
+  PairSchema(left: Schema, right: Schema)
+  ListSchema(items: Schema)
+  NullableSchema(inner: Schema)
+  ObjectSchema(properties: List(PropertySchema))
+  UnionSchema(variants: List(VariantSchema))
+  IntegerRangeSchema(minimum: Int, maximum: Int)
+  NumberRangeSchema(minimum: Number, maximum: Number)
 }
 
+/// One property of an `ObjectSchema`.
 pub type PropertySchema {
   PropertySchema(name: String, required: Bool, schema: Schema)
 }
 
+/// One variant of a `UnionSchema`. A unit variant has no payload.
+pub type VariantSchema {
+  VariantSchema(tag: String, payload: Option(Schema))
+}
+
+/// A codec built by `custom` without a schema has none to describe.
+pub type SchemaError {
+  UnknownSchema
+}
+
+// --- errors ------------------------------------------------------------------
+
+/// A mistake in a codec definition. The strings name the offending field,
+/// tag or label from the definition, never input data.
+pub type DefinitionError {
+  DuplicateFieldName(name: String)
+  /// The codec after a `field` or `optional_field` is not another field or
+  /// `success`.
+  NotARecord(after_field: String)
+  DuplicateTag(tag: String)
+  EmptyUnion
+  EmptyEnum
+  DuplicateEnumLabel(label: String)
+  /// Two labels map to the same value; `label` is the second.
+  DuplicateEnumValue(label: String)
+  ReversedIntegerBounds(minimum: Int, maximum: Int)
+  ReversedNumberBounds(minimum: Number, maximum: Number)
+  /// On JavaScript, a bound of `integer_between` outside the safe range.
+  UnsafeIntegerBound(bound: Int)
+}
+
+/// A step of the path from the root of a value to a failure.
+pub type PathSegment {
+  Field(name: String)
+  Index(index: Int)
+}
+
+/// Why a value failed to decode or encode. Decoding produces the reasons
+/// from `InvalidJson` to `ContractMismatch`, encoding those from
+/// `UnknownEnumValue` on; both produce `IntegerOutsideRange`,
+/// `NumberOutsideRange` and `Custom`.
+///
+/// May gain variants in a minor release; match with a `_` branch.
+pub type Reason {
+  /// `decode_json` could not parse the text; the path is empty.
+  InvalidJson(value.ParseError)
+  ExpectedString
+  ExpectedInt
+  ExpectedNumber
+  ExpectedBool
+  ExpectedArray
+  ExpectedObject
+  WrongLength(expected: Int, actual: Int)
+  MissingField
+  UnknownField
+  DuplicateField
+  UnknownEnumLabel
+  UnknownTag
+  /// The number is beyond the largest finite float.
+  FloatOutOfRange
+  /// `contract.decode`: the codec's schema differs from the contract's.
+  ContractMismatch
+  UnknownEnumValue
+  /// On JavaScript, an `Int` outside the safe integer range.
+  UnsafeInteger
+  /// On JavaScript, an infinite or NaN `Float`.
+  NonFiniteFloat
+  /// `nullable` was given `Some(x)` whose inner codec encodes `x` as `null`.
+  NullInsideNullable
+  /// `to_json`: the number has no exact `gleam/json` form.
+  UnrepresentableNumber(Number)
+  IntegerOutsideRange(minimum: Int, maximum: Int)
+  NumberOutsideRange(minimum: Number, maximum: Number)
+  /// A message from `try_map`, `decode_failure` or `encode_failure`.
+  Custom(message: String)
+}
+
+/// A decoding failure at `path`. Read fields by label.
+pub type DecodeError {
+  DecodeError(path: List(PathSegment), reason: Reason)
+}
+
+/// An encoding failure at `path`. Read fields by label.
+pub type EncodeError {
+  EncodeError(path: List(PathSegment), reason: Reason)
+}
+
+/// A decoding failure with `Custom(message)` at the current path, for
+/// `custom` decoders.
+pub fn decode_failure(message: String) -> DecodeError {
+  DecodeError([], Custom(message))
+}
+
+/// An encoding failure with `Custom(message)` at the current path, for
+/// `custom` encoders.
+pub fn encode_failure(message: String) -> EncodeError {
+  EncodeError([], Custom(message))
+}
+
+// --- codec -------------------------------------------------------------------
+
+/// Encodes `a` to JSON, decodes JSON to `a`, and describes the JSON.
 pub opaque type Codec(a) {
   Codec(
-    encoder: fn(a) -> Result(Value, EncodeError),
-    decoder: fn(Value) -> Result(a, DecodeError),
-    json_encoder: fn(a) -> Result(String, EncodeError),
-    json_decoder: fn(String) -> Result(a, JsonDecodeError),
-    schema: Result(Schema, SchemaError),
+    encode: fn(a) -> Result(Value, EncodeError),
+    decode: fn(Value) -> Result(a, DecodeError),
+    // The schema, `None` when unknown, or the first definition mistake.
+    // Computed on demand, so record codecs built inside a decode stay cheap.
+    definition: fn() -> Result(Option(Schema), DefinitionError),
+    // A value of `a` for describing records and for failed `decoder` runs.
+    placeholder: fn() -> a,
+    fields: Option(Fields(a)),
   )
 }
 
-pub fn new(
-  encode: fn(a) -> Result(Value, EncodeError),
-  decode: fn(Value) -> Result(a, DecodeError),
-) -> Codec(a) {
-  runtime_codec(encode, decode, Error(UnknownSchema))
-}
-
-pub fn from_parts(
-  encode: fn(a) -> Result(Value, EncodeError),
-  decode: fn(Value) -> Result(a, DecodeError),
-  schema: Schema,
-) -> Codec(a) {
-  runtime_codec(encode, decode, Ok(schema))
-}
-
-/// Construct a codec with native JSON text operations. Ordinary decoding uses
-/// Blueprint's strict parser; the supplied decoder is available through
-/// `decode_json_native` when its native parsing behavior is desired.
-pub fn from_json_parts(
-  value_encode: fn(a) -> Result(Value, EncodeError),
-  value_decode: fn(Value) -> Result(a, DecodeError),
-  json_encode: fn(a) -> Result(String, EncodeError),
-  json_decode: fn(String) -> Result(a, JsonDecodeError),
-  schema: Schema,
-) -> Codec(a) {
-  Codec(value_encode, value_decode, json_encode, json_decode, Ok(schema))
-}
-
-fn runtime_codec(
-  value_encode: fn(a) -> Result(Value, EncodeError),
-  value_decode: fn(Value) -> Result(a, DecodeError),
-  schema: Result(Schema, SchemaError),
-) -> Codec(a) {
-  Codec(
-    value_encode,
-    value_decode,
-    fn(item) { encode_json_with(value_encode, item) },
-    fn(source) {
-      decode_json_with(value_decode, parser_limits.default(), source)
-    },
-    schema,
+/// The fields of a record codec built by `field`, `optional_field` and
+/// `success`.
+type Fields(a) {
+  Fields(
+    encode: fn(a) -> Result(List(#(String, Value)), EncodeError),
+    // Decode from the members, and count the members used.
+    decode: fn(List(#(String, Value))) -> Result(#(a, Int), DecodeError),
+    names: fn() -> List(String),
+    properties: fn() -> Result(List(Property), DefinitionError),
   )
 }
 
-/// Encode JSON text using this codec's backend.
-///
-/// Runtime codecs render Blueprint Values; native-backed codecs call their
-/// supplied JSON encoder directly.
-pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
-  codec.json_encoder(item)
+type Property {
+  Property(name: String, required: Bool, schema: Option(Schema))
 }
 
-/// Decode JSON text with Blueprint's strict parser.
-///
-/// All codecs use Blueprint's parser, including duplicate-key rejection and
-/// exact number admission.
-pub fn decode_json(
-  codec: Codec(a),
-  source: String,
-) -> Result(a, JsonDecodeError) {
-  decode_json_with_limits(codec, parser_limits.default(), source)
-}
-
-/// Decode using caller-supplied parser limits. `parser.ParserLimits` is an
-/// alias of the shared limit type accepted here.
-pub fn decode_json_with_limits(
-  codec: Codec(a),
-  limits: parser_limits.ParserLimits,
-  source: String,
-) -> Result(a, JsonDecodeError) {
-  decode_json_with(codec.decoder, limits, source)
-}
-
-/// Use a codec's native JSON parser when its distinct performance and parser
-/// semantics are explicitly required. Generated codecs use `gleam/json` here.
-///
-/// Text above the default byte limit of `parser_limits.default()` (1 MiB) is
-/// rejected before parsing with a `BlueprintByteLimitExceeded` reason. The
-/// native parser has no depth or number limits. Use
-/// `decode_json_native_with_max_bytes` to accept larger text.
-pub fn decode_json_native(
-  codec: Codec(a),
-  source: String,
-) -> Result(a, JsonDecodeError) {
-  decode_json_native_with_max_bytes(
-    codec,
-    parser_limits.max_bytes(parser_limits.default()),
-    source,
-  )
-}
-
-/// Like `decode_json_native`, but reject text above `max_bytes` bytes of
-/// UTF-8 instead of the default limit. A `max_bytes` below 1 rejects every
-/// non-empty text.
-pub fn decode_json_native_with_max_bytes(
-  codec: Codec(a),
-  max_bytes: Int,
-  source: String,
-) -> Result(a, JsonDecodeError) {
-  case parser_core.exceeds_byte_limit(source, max_bytes) {
-    True ->
-      Error(
-        BlueprintParserFailure(BlueprintJsonParseFailure(
-          BlueprintJsonLocation(0, 1, 1),
-          BlueprintByteLimitExceeded(max_bytes),
-        )),
-      )
-    False -> codec.json_decoder(source)
+/// The schema, after panicking on a definition mistake.
+fn defined(codec: Codec(a)) -> Option(Schema) {
+  case codec.definition() {
+    Ok(schema) -> schema
+    Error(error) -> definition_panic(error)
   }
 }
 
-fn encode_json_with(
-  value_encode: fn(a) -> Result(Value, EncodeError),
-  item: a,
-) -> Result(String, EncodeError) {
-  case value_encode(item) {
-    Ok(encoded) -> Ok(json_text.render_value(encoded))
+/// Panic on a definition mistake found where the codec is used.
+fn ensure(defect: Option(DefinitionError)) -> Nil {
+  case defect {
+    Some(error) -> definition_panic(error)
+    None -> Nil
+  }
+}
+
+fn definition_panic(error: DefinitionError) -> b {
+  panic as {
+    "json_blueprint: invalid codec definition: "
+    <> describe_definition_error(error)
+  }
+}
+
+/// Report a definition mistake without panicking. Use it for codecs built
+/// from runtime data, such as enum labels or bounds loaded at runtime; the
+/// other functions panic on the same mistake.
+pub fn check(codec: Codec(a)) -> Result(Codec(a), DefinitionError) {
+  case codec.definition() {
+    Ok(_) -> Ok(codec)
     Error(error) -> Error(error)
   }
 }
 
-fn decode_json_with(
-  value_decode: fn(Value) -> Result(a, DecodeError),
-  limits: parser_limits.ParserLimits,
-  source: String,
-) -> Result(a, JsonDecodeError) {
-  case parser_core.parse_value_from_string(limits, source) {
-    Error(error) ->
-      Error(BlueprintParserFailure(translate_json_parse_error(error)))
-    Ok(parsed) ->
-      case value_decode(parsed) {
-        Ok(item) -> Ok(item)
-        Error(error) -> Error(TypedCodecFailure(error))
+// --- use ---------------------------------------------------------------------
+
+/// Encode to a `Value`.
+pub fn encode(codec: Codec(a), item: a) -> Result(Value, EncodeError) {
+  codec.encode(item)
+}
+
+/// Decode a `Value`.
+pub fn decode(codec: Codec(a), raw: Value) -> Result(a, DecodeError) {
+  codec.decode(raw)
+}
+
+/// Encode to compact JSON text.
+pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
+  encode(codec, item) |> result.map(value.to_string)
+}
+
+/// Parse JSON text strictly within `value.default_limits()` and decode it.
+/// Duplicate keys are rejected and numbers stay exact. A parse failure is
+/// `DecodeError([], InvalidJson(error))`.
+pub fn decode_json(codec: Codec(a), text: String) -> Result(a, DecodeError) {
+  decode_json_with_limits(codec, text, value.default_limits())
+}
+
+/// Like `decode_json`, within other limits.
+pub fn decode_json_with_limits(
+  codec: Codec(a),
+  text: String,
+  limits: value.Limits,
+) -> Result(a, DecodeError) {
+  case value.parse(text, limits) {
+    Error(error) -> Error(DecodeError([], InvalidJson(error)))
+    Ok(raw) -> codec.decode(raw)
+  }
+}
+
+/// Encode to `gleam/json`, for libraries that take `json.Json`. Numbers are
+/// exact: a number with no exact `gleam/json` form, such as `1e400`, fails
+/// with `UnrepresentableNumber`. Codecs of `Int`, `Float` and `String`
+/// never produce one.
+pub fn to_json(codec: Codec(a), item: a) -> Result(json.Json, EncodeError) {
+  use encoded <- result.try(encode(codec, item))
+  value_to_json(encoded, [])
+}
+
+fn value_to_json(
+  raw: Value,
+  path: List(PathSegment),
+) -> Result(json.Json, EncodeError) {
+  case raw {
+    value.Number(item) ->
+      value.to_json(raw)
+      |> result.replace_error(EncodeError(
+        list.reverse(path),
+        UnrepresentableNumber(item),
+      ))
+    value.Array(items) ->
+      list.index_map(items, fn(item, index) { #(index, item) })
+      |> list.try_map(fn(pair) {
+        value_to_json(pair.1, [Index(pair.0), ..path])
+      })
+      |> result.map(json.preprocessed_array)
+    value.Object(members) ->
+      members
+      |> list.try_map(fn(member) {
+        value_to_json(member.1, [Field(member.0), ..path])
+        |> result.map(fn(converted) { #(member.0, converted) })
+      })
+      |> result.map(json.object)
+    _ -> {
+      let assert Ok(converted) = value.to_json(raw)
+      Ok(converted)
+    }
+  }
+}
+
+/// A `gleam/dynamic/decode` decoder, for libraries that take one, such as
+/// `json.parse(text, codec.decoder(user_codec()))`.
+///
+/// The parser that produced the data owns duplicate keys, number precision
+/// and size limits; see `value.decoder`. A failure is one `decode.DecodeError`
+/// whose `expected` is the `describe_decode_error` text.
+pub fn decoder(codec: Codec(a)) -> decode.Decoder(a) {
+  value.decoder()
+  |> decode.then(fn(raw) {
+    case codec.decode(raw) {
+      Ok(item) -> decode.success(item)
+      Error(error) ->
+        decode.failure(codec.placeholder(), describe_decode_error(error))
+    }
+  })
+}
+
+/// The codec's schema.
+pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
+  case defined(codec) {
+    Some(found) -> Ok(found)
+    None -> Error(UnknownSchema)
+  }
+}
+
+/// The complete Draft 2020-12 schema document as JSON text.
+pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
+  schema(codec)
+  |> result.map(fn(found) { found |> schema_document |> value.to_string })
+}
+
+// --- primitives --------------------------------------------------------------
+
+fn leaf(
+  encode: fn(a) -> Result(Value, EncodeError),
+  decode: fn(Value) -> Result(a, DecodeError),
+  schema: Schema,
+  placeholder: a,
+) -> Codec(a) {
+  Codec(encode, decode, fn() { Ok(Some(schema)) }, fn() { placeholder }, None)
+}
+
+fn fail(reason: Reason) -> Result(a, DecodeError) {
+  Error(DecodeError([], reason))
+}
+
+fn refuse(reason: Reason) -> Result(a, EncodeError) {
+  Error(EncodeError([], reason))
+}
+
+/// A JSON string.
+pub fn string() -> Codec(String) {
+  leaf(
+    fn(item) { Ok(value.String(item)) },
+    fn(raw) {
+      case raw {
+        value.String(item) -> Ok(item)
+        _ -> fail(ExpectedString)
+      }
+    },
+    StringSchema,
+    "",
+  )
+}
+
+/// A JSON integer as an `Int`, with the schema `{"type": "integer"}`.
+///
+/// Decoding accepts any exact integer spelling, such as `12`, `12.0` or
+/// `1.2e1`, of at most 24 digits. A longer integer, a fraction, or on
+/// JavaScript an integer outside ±9,007,199,254,740,991 fails with
+/// `ExpectedInt`; use `number()` for larger values.
+pub fn int() -> Codec(Int) {
+  leaf(encode_int, decode_int, IntSchema, 0)
+}
+
+fn encode_int(item: Int) -> Result(Value, EncodeError) {
+  case number.from_int(item) {
+    Ok(parsed) -> Ok(value.Number(parsed))
+    Error(_) -> refuse(UnsafeInteger)
+  }
+}
+
+fn decode_int(raw: Value) -> Result(Int, DecodeError) {
+  case raw {
+    value.Number(item) ->
+      case number.to_int(item, 24) {
+        Ok(integer) -> Ok(integer)
+        Error(_) -> fail(ExpectedInt)
+      }
+    _ -> fail(ExpectedInt)
+  }
+}
+
+/// A JSON number as a `Float`, with the schema `{"type": "number"}`.
+///
+/// Decoding rounds to the nearest float, so `0.1` decodes to `0.1` although
+/// that float is not exactly one tenth; a number beyond the float range
+/// fails with `FloatOutOfRange`. Encoding writes the shortest decimal that
+/// reads back as the same float. Use `number()` to keep numbers exact.
+pub fn float() -> Codec(Float) {
+  leaf(
+    fn(item) {
+      case number.from_float(item) {
+        Ok(parsed) -> Ok(value.Number(parsed))
+        Error(_) -> refuse(NonFiniteFloat)
+      }
+    },
+    fn(raw) {
+      case raw {
+        value.Number(item) ->
+          case number.to_float(item) {
+            Ok(float) -> Ok(float)
+            Error(_) -> fail(FloatOutOfRange)
+          }
+        _ -> fail(ExpectedNumber)
+      }
+    },
+    NumberSchema,
+    0.0,
+  )
+}
+
+/// A JSON number, exactly, as a `number.Number`.
+pub fn number() -> Codec(Number) {
+  leaf(
+    fn(item) { Ok(value.Number(item)) },
+    fn(raw) {
+      case raw {
+        value.Number(item) -> Ok(item)
+        _ -> fail(ExpectedNumber)
+      }
+    },
+    NumberSchema,
+    zero(),
+  )
+}
+
+fn zero() -> Number {
+  let assert Ok(found) = number.from_int(0)
+  found
+}
+
+/// A JSON boolean.
+pub fn bool() -> Codec(Bool) {
+  leaf(
+    fn(item) { Ok(value.Bool(item)) },
+    fn(raw) {
+      case raw {
+        value.Bool(item) -> Ok(item)
+        _ -> fail(ExpectedBool)
+      }
+    },
+    BoolSchema,
+    False,
+  )
+}
+
+// --- refinements -------------------------------------------------------------
+
+/// An integer from `minimum` to `maximum` inclusive, with those bounds in the
+/// schema. Reversed bounds are a definition mistake.
+pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
+  let defect = case minimum > maximum {
+    True -> Some(ReversedIntegerBounds(minimum, maximum))
+    False ->
+      case number.from_int(minimum), number.from_int(maximum) {
+        Ok(_), Ok(_) -> None
+        Error(_), _ -> Some(UnsafeIntegerBound(minimum))
+        _, Error(_) -> Some(UnsafeIntegerBound(maximum))
+      }
+  }
+  let lower = number.from_int(minimum) |> result.unwrap(zero())
+  let upper = number.from_int(maximum) |> result.unwrap(zero())
+  let digits = int.max(digit_count(minimum), digit_count(maximum))
+  Codec(
+    encode: fn(item) {
+      ensure(defect)
+      case item >= minimum && item <= maximum {
+        True -> encode_int(item)
+        False -> refuse(IntegerOutsideRange(minimum, maximum))
+      }
+    },
+    decode: fn(raw) {
+      ensure(defect)
+      case raw {
+        value.Number(item) ->
+          case number.is_integer(item) {
+            False -> fail(ExpectedInt)
+            True ->
+              case within(item, lower, upper) {
+                False -> fail(IntegerOutsideRange(minimum, maximum))
+                True ->
+                  number.to_int(item, digits)
+                  |> result.replace_error(DecodeError([], ExpectedInt))
+              }
+          }
+        _ -> fail(ExpectedInt)
+      }
+    },
+    definition: fn() {
+      case defect {
+        Some(error) -> Error(error)
+        None -> Ok(Some(IntegerRangeSchema(minimum, maximum)))
+      }
+    },
+    placeholder: fn() { minimum },
+    fields: None,
+  )
+}
+
+fn digit_count(item: Int) -> Int {
+  string.length(int.to_string(int.absolute_value(item)))
+}
+
+fn within(item: Number, lower: Number, upper: Number) -> Bool {
+  number.compare(item, lower) != order.Lt
+  && number.compare(item, upper) != order.Gt
+}
+
+/// A number from `minimum` to `maximum` inclusive, exactly, with those bounds
+/// in the schema. Reversed bounds are a definition mistake.
+pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
+  let defect = case number.compare(minimum, maximum) {
+    order.Gt -> Some(ReversedNumberBounds(minimum, maximum))
+    _ -> None
+  }
+  Codec(
+    encode: fn(item) {
+      ensure(defect)
+      case within(item, minimum, maximum) {
+        True -> Ok(value.Number(item))
+        False -> refuse(NumberOutsideRange(minimum, maximum))
+      }
+    },
+    decode: fn(raw) {
+      ensure(defect)
+      case raw {
+        value.Number(item) ->
+          case within(item, minimum, maximum) {
+            True -> Ok(item)
+            False -> fail(NumberOutsideRange(minimum, maximum))
+          }
+        _ -> fail(ExpectedNumber)
+      }
+    },
+    definition: fn() {
+      case defect {
+        Some(error) -> Error(error)
+        None -> Ok(Some(NumberRangeSchema(minimum, maximum)))
+      }
+    },
+    placeholder: fn() { minimum },
+    fields: None,
+  )
+}
+
+/// A string from a fixed set of labels, each mapped to a value, such as
+/// `string_enum([#("admin", Admin), #("member", Member)])`. The JSON is the
+/// bare label. An empty list, a repeated label or two labels with the same
+/// value are definition mistakes.
+pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
+  let defect = case variants {
+    [] -> Some(EmptyEnum)
+    _ -> enum_defect(variants, set.new(), set.new())
+  }
+  let labels = list.map(variants, fn(variant) { variant.0 })
+  Codec(
+    encode: fn(item) {
+      ensure(defect)
+      case list.find(variants, fn(variant) { variant.1 == item }) {
+        Ok(#(label, _)) -> Ok(value.String(label))
+        Error(Nil) -> refuse(UnknownEnumValue)
+      }
+    },
+    decode: fn(raw) {
+      ensure(defect)
+      case raw {
+        value.String(label) ->
+          case list.key_find(variants, label) {
+            Ok(item) -> Ok(item)
+            Error(Nil) -> fail(UnknownEnumLabel)
+          }
+        _ -> fail(ExpectedString)
+      }
+    },
+    definition: fn() {
+      case defect {
+        Some(error) -> Error(error)
+        None -> Ok(Some(StringEnumSchema(labels)))
+      }
+    },
+    placeholder: fn() {
+      case variants {
+        [#(_, first), ..] -> first
+        [] -> definition_panic(EmptyEnum)
+      }
+    },
+    fields: None,
+  )
+}
+
+/// Sets keep this linear in the number of labels, which may come from
+/// runtime data.
+fn enum_defect(
+  variants: List(#(String, a)),
+  labels: Set(String),
+  values: Set(a),
+) -> Option(DefinitionError) {
+  case variants {
+    [] -> None
+    [#(label, item), ..rest] ->
+      case set.contains(labels, label), set.contains(values, item) {
+        True, _ -> Some(DuplicateEnumLabel(label))
+        _, True -> Some(DuplicateEnumValue(label))
+        False, False ->
+          enum_defect(rest, set.insert(labels, label), set.insert(values, item))
       }
   }
 }
 
-fn translate_json_parse_error(
-  error: parser_core.ParseError,
-) -> BlueprintJsonParseFailure {
-  let parser_core.ParseError(location, reason) = error
-  let parser_core.Location(byte_offset, line, column) = location
-  BlueprintJsonParseFailure(
-    BlueprintJsonLocation(byte_offset, line, column),
-    translate_json_parse_reason(reason),
+/// Add a JSON Schema description without changing encoding or decoding. A
+/// later description at the same node replaces an earlier one.
+pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
+  Codec(
+    ..codec,
+    definition: fn() {
+      use found <- result.map(codec.definition())
+      option.map(found, fn(found) {
+        case found {
+          DescribedSchema(_, inner) -> DescribedSchema(description, inner)
+          other -> DescribedSchema(description, other)
+        }
+      })
+    },
+    fields: None,
   )
 }
 
-fn translate_json_parse_reason(
-  reason: parser_core.ParseErrorKind,
-) -> BlueprintJsonParseReason {
-  case reason {
-    parser_core.UnexpectedByte(byte) -> BlueprintUnexpectedByte(byte)
-    parser_core.UnexpectedEndOfInput -> BlueprintUnexpectedEndOfInput
-    parser_core.InvalidUtf8 -> BlueprintInvalidUtf8
-    parser_core.ByteLimitExceeded(max) -> BlueprintByteLimitExceeded(max)
-    parser_core.DepthLimitExceeded(max) -> BlueprintDepthLimitExceeded(max)
-    parser_core.InvalidNumberToken(error) -> BlueprintInvalidNumberToken(error)
-    parser_core.DuplicateObjectKey(key) -> BlueprintDuplicateObjectKey(key)
-    parser_core.UnterminatedString -> BlueprintUnterminatedString
-    parser_core.InvalidEscapeSequence -> BlueprintInvalidEscapeSequence
-    parser_core.InvalidUnicodeEscape -> BlueprintInvalidUnicodeEscape
-    parser_core.TrailingContent -> BlueprintTrailingContent
+// --- collections -------------------------------------------------------------
+
+/// A JSON array of items.
+pub fn list(of item: Codec(a)) -> Codec(List(a)) {
+  Codec(
+    encode: fn(items) {
+      list.index_map(items, fn(entry, index) { #(index, entry) })
+      |> list.try_map(fn(pair) {
+        item.encode(pair.1) |> at_encode(Index(pair.0))
+      })
+      |> result.map(value.Array)
+    },
+    decode: fn(raw) {
+      case raw {
+        value.Array(items) -> decode_items(item, items, 0, [])
+        _ -> fail(ExpectedArray)
+      }
+    },
+    definition: fn() { item.definition() |> map_schema(ListSchema) },
+    placeholder: fn() { [] },
+    fields: None,
+  )
+}
+
+fn decode_items(
+  item: Codec(a),
+  items: List(Value),
+  index: Int,
+  done: List(a),
+) -> Result(List(a), DecodeError) {
+  case items {
+    [] -> Ok(list.reverse(done))
+    [raw, ..rest] ->
+      case item.decode(raw) |> at_decode(Index(index)) {
+        Ok(decoded) -> decode_items(item, rest, index + 1, [decoded, ..done])
+        Error(error) -> Error(error)
+      }
   }
 }
 
-pub fn encode(codec: Codec(a), item: a) -> Result(Value, EncodeError) {
-  codec.encoder(item)
+/// A two-item JSON array.
+pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
+  Codec(
+    encode: fn(items: #(a, b)) {
+      use first <- result.try(left.encode(items.0) |> at_encode(Index(0)))
+      use second <- result.try(right.encode(items.1) |> at_encode(Index(1)))
+      Ok(value.Array([first, second]))
+    },
+    decode: fn(raw) {
+      case raw {
+        value.Array([first, second]) -> {
+          use first <- result.try(left.decode(first) |> at_decode(Index(0)))
+          use second <- result.try(right.decode(second) |> at_decode(Index(1)))
+          Ok(#(first, second))
+        }
+        value.Array(items) -> fail(WrongLength(2, list.length(items)))
+        _ -> fail(ExpectedArray)
+      }
+    },
+    definition: fn() {
+      use first <- result.try(left.definition())
+      use second <- result.map(right.definition())
+      case first, second {
+        Some(first), Some(second) -> Some(PairSchema(first, second))
+        _, _ -> None
+      }
+    },
+    placeholder: fn() { #(left.placeholder(), right.placeholder()) },
+    fields: None,
+  )
 }
 
-pub fn decode(codec: Codec(a), item: Value) -> Result(a, DecodeError) {
-  codec.decoder(item)
+/// `null` or the inner codec's JSON, as an `Option`. `Some(x)` whose inner
+/// encoding is itself `null` fails with `NullInsideNullable`, because it
+/// would decode as `None`.
+pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
+  Codec(
+    encode: fn(item) {
+      case item {
+        None -> Ok(value.Null)
+        Some(item) ->
+          case inner.encode(item) {
+            Ok(value.Null) -> refuse(NullInsideNullable)
+            other -> other
+          }
+      }
+    },
+    decode: fn(raw) {
+      case raw {
+        value.Null -> Ok(None)
+        _ -> inner.decode(raw) |> result.map(Some)
+      }
+    },
+    definition: fn() { inner.definition() |> map_schema(NullableSchema) },
+    placeholder: fn() { None },
+    fields: None,
+  )
 }
 
-pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
-  codec.schema
+fn map_schema(
+  found: Result(Option(Schema), DefinitionError),
+  wrap: fn(Schema) -> Schema,
+) -> Result(Option(Schema), DefinitionError) {
+  result.map(found, option.map(_, wrap))
 }
 
-/// Add a JSON Schema description without changing encoding or decoding.
-/// A description applied twice at the same node uses the latest text.
-pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
-  let described = case codec.schema {
-    Ok(DescribedSchema(_, inner)) -> Ok(DescribedSchema(description, inner))
-    Ok(schema) -> Ok(DescribedSchema(description, schema))
-    Error(error) -> Error(error)
-  }
-  Codec(..codec, schema: described)
+fn at_encode(
+  outcome: Result(a, EncodeError),
+  segment: PathSegment,
+) -> Result(a, EncodeError) {
+  result.map_error(outcome, fn(error) {
+    EncodeError([segment, ..error.path], error.reason)
+  })
 }
 
-/// Render a JSON decoding error for human-readable feedback.
+fn at_decode(
+  outcome: Result(a, DecodeError),
+  segment: PathSegment,
+) -> Result(a, DecodeError) {
+  result.map_error(outcome, fn(error) {
+    DecodeError([segment, ..error.path], error.reason)
+  })
+}
+
+// --- records -----------------------------------------------------------------
+
+/// A required field of a record, followed by the rest of the record:
 ///
-/// Input values and custom reason text are omitted. Paths can still contain
-/// names supplied by a custom decoder, so callers decide whether to expose the
-/// result to an external audience.
-pub fn render_json_decode_error(error: JsonDecodeError) -> String {
-  case error {
-    BlueprintParserFailure(BlueprintJsonParseFailure(location, reason)) ->
-      "invalid JSON at line "
-      <> int.to_string(location.line)
-      <> ", column "
-      <> int.to_string(location.column)
-      <> ": "
-      <> render_parse_reason(reason)
-    NativeJsonFailure(_) -> "invalid JSON"
-    TypedCodecFailure(error) -> render_decode_error_at(error, "$")
+/// ```gleam
+/// use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
+/// ```
+///
+/// `get` reads the field when encoding. The rest of the record is the codec
+/// that `next` returns: another `field` or `optional_field`, or `success`.
+pub fn field(
+  named name: String,
+  of codec: Codec(a),
+  get get: fn(r) -> a,
+  then next: fn(a) -> Codec(r),
+) -> Codec(r) {
+  let rest = fn(item) { record_fields(name, next(item)) }
+  let fields =
+    Fields(
+      encode: fn(record) {
+        let item = get(record)
+        use encoded <- result.try(codec.encode(item) |> at_encode(Field(name)))
+        use others <- result.map(rest(item).encode(record))
+        prepend_member(name, encoded, others)
+      },
+      decode: fn(members) {
+        case list.key_find(members, name) {
+          Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
+          Ok(raw) -> {
+            use item <- result.try(codec.decode(raw) |> at_decode(Field(name)))
+            use #(record, used) <- result.map(rest(item).decode(members))
+            #(record, used + 1)
+          }
+        }
+      },
+      names: fn() { prepend_name(name, rest(codec.placeholder()).names()) },
+      properties: fn() {
+        use found <- result.try(codec.definition())
+        let next_codec = next(codec.placeholder())
+        property(name, True, found, next_codec)
+      },
+    )
+  record(fields, fn() { next(codec.placeholder()).placeholder() })
+}
+
+/// An optional field of a record: absent decodes as `None`, and `None`
+/// encodes as an absent field. JSON `null` fails to decode unless the inner
+/// codec is `nullable`; with `nullable(c)`, absent, `null` and a value decode
+/// as `None`, `Some(None)` and `Some(Some(x))`.
+pub fn optional_field(
+  named name: String,
+  of codec: Codec(a),
+  get get: fn(r) -> Option(a),
+  then next: fn(Option(a)) -> Codec(r),
+) -> Codec(r) {
+  let rest = fn(item) { record_fields(name, next(item)) }
+  let fields =
+    Fields(
+      encode: fn(record) {
+        case get(record) {
+          None -> rest(None).encode(record)
+          Some(item) -> {
+            use encoded <- result.try(
+              codec.encode(item) |> at_encode(Field(name)),
+            )
+            use others <- result.map(rest(Some(item)).encode(record))
+            prepend_member(name, encoded, others)
+          }
+        }
+      },
+      decode: fn(members) {
+        case list.key_find(members, name) {
+          Error(Nil) -> rest(None).decode(members)
+          Ok(raw) -> {
+            use item <- result.try(codec.decode(raw) |> at_decode(Field(name)))
+            use #(record, used) <- result.map(rest(Some(item)).decode(members))
+            #(record, used + 1)
+          }
+        }
+      },
+      names: fn() { prepend_name(name, rest(None).names()) },
+      properties: fn() {
+        use found <- result.try(codec.definition())
+        property(name, False, found, next(None))
+      },
+    )
+  record(fields, fn() { next(None).placeholder() })
+}
+
+/// The end of a record: the value built from the decoded fields. Alone,
+/// `success(x)` is the empty object `{}`, which decodes as `x`.
+pub fn success(value: r) -> Codec(r) {
+  record(
+    Fields(
+      encode: fn(_) { Ok([]) },
+      decode: fn(_) { Ok(#(value, 0)) },
+      names: fn() { [] },
+      properties: fn() { Ok([]) },
+    ),
+    fn() { value },
+  )
+}
+
+fn property(
+  name: String,
+  required: Bool,
+  found: Option(Schema),
+  next_codec: Codec(r),
+) -> Result(List(Property), DefinitionError) {
+  case next_codec.fields {
+    None -> Error(NotARecord(name))
+    Some(fields) -> {
+      use others <- result.try(fields.properties())
+      case list.any(others, fn(other) { other.name == name }) {
+        True -> Error(DuplicateFieldName(name))
+        False -> Ok([Property(name, required, found), ..others])
+      }
+    }
   }
 }
 
-fn render_decode_error_at(error: DecodeError, path: String) -> String {
-  case error {
-    DecodeAtField(_, CannotDecode(DecodeUnknownProperty(_))) ->
-      path <> ": unknown property"
-    DecodeAtField(_, CannotDecode(DecodeDuplicateProperty(_))) ->
-      path <> ": duplicate property"
-    DecodeAtField(field, inner) ->
-      render_decode_error_at(
-        inner,
-        path <> "[" <> json_text.render_value(value.String(field)) <> "]",
-      )
-    DecodeAtIndex(index, inner) ->
-      render_decode_error_at(inner, path <> "[" <> int.to_string(index) <> "]")
-    CannotDecode(reason) -> path <> ": " <> render_decode_reason(reason)
+fn prepend_name(name: String, others: List(String)) -> List(String) {
+  case list.contains(others, name) {
+    True -> definition_panic(DuplicateFieldName(name))
+    False -> [name, ..others]
   }
 }
 
-fn render_decode_reason(reason: DecodeReason) -> String {
+fn prepend_member(
+  name: String,
+  encoded: Value,
+  others: List(#(String, Value)),
+) -> List(#(String, Value)) {
+  case list.key_find(others, name) {
+    Ok(_) -> definition_panic(DuplicateFieldName(name))
+    Error(Nil) -> [#(name, encoded), ..others]
+  }
+}
+
+fn record_fields(after: String, codec: Codec(r)) -> Fields(r) {
+  case codec.fields {
+    Some(fields) -> fields
+    None -> definition_panic(NotARecord(after))
+  }
+}
+
+fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
+  Codec(
+    encode: fn(item) { fields.encode(item) |> result.map(value.Object) },
+    decode: fn(raw) {
+      case raw {
+        value.Object(members) -> {
+          use #(record, used) <- result.try(fields.decode(members))
+          case used == list.length(members) {
+            True -> Ok(record)
+            // A member was not used: name it, as an unknown or repeated key.
+            False ->
+              check_members(members, fields.names(), [])
+              |> result.replace(record)
+          }
+        }
+        _ -> fail(ExpectedObject)
+      }
+    },
+    definition: fn() {
+      use properties <- result.map(fields.properties())
+      properties
+      |> list.try_map(fn(property) {
+        case property.schema {
+          Some(found) ->
+            Ok(PropertySchema(property.name, property.required, found))
+          None -> Error(Nil)
+        }
+      })
+      |> result.map(ObjectSchema)
+      |> option.from_result
+    },
+    placeholder:,
+    fields: Some(fields),
+  )
+}
+
+fn check_members(
+  members: List(#(String, Value)),
+  names: List(String),
+  seen: List(String),
+) -> Result(Nil, DecodeError) {
+  case members {
+    [] -> Ok(Nil)
+    [#(name, _), ..rest] ->
+      case list.contains(seen, name), list.contains(names, name) {
+        True, _ -> Error(DecodeError([Field(name)], DuplicateField))
+        _, False -> Error(DecodeError([Field(name)], UnknownField))
+        False, True -> check_members(rest, names, [name, ..seen])
+      }
+  }
+}
+
+// --- unions ------------------------------------------------------------------
+
+/// The variants of a union under construction; see `union`.
+pub opaque type Union(t) {
+  Union(
+    variants: List(Variant(t)),
+    encode: fn(t) -> Tagged(t),
+    defect: Option(DefinitionError),
+  )
+}
+
+type Variant(t) {
+  Variant(
+    tag: String,
+    has_payload: Bool,
+    decode: fn(Value) -> Result(t, DecodeError),
+    definition: fn() -> Result(Option(Schema), DefinitionError),
+    placeholder: fn() -> t,
+  )
+}
+
+/// A value of a union with its tag, made by the function that `variant` or
+/// `unit_variant` passes on.
+pub opaque type Tagged(t) {
+  Tagged(tag: String, payload: Option(Result(Value, EncodeError)))
+}
+
+/// A codec for a sum type. Each case is a `variant` with a payload or a
+/// `unit_variant` without one, and `match` maps each value to its case:
+///
+/// ```gleam
+/// codec.union({
+///   use circle <- codec.variant("circle", codec.int(), Circle)
+///   use square <- codec.variant("square", codec.int(), Square)
+///   use empty <- codec.unit_variant("empty", Empty)
+///   codec.match(fn(shape) {
+///     case shape {
+///       Circle(radius) -> circle(radius)
+///       Square(side) -> square(side)
+///       Empty -> empty
+///     }
+///   })
+/// })
+/// ```
+///
+/// The JSON is `{"tag": "circle", "value": 2}`; a unit variant has no
+/// `"value"`. Gleam checks the `case` for exhaustiveness. A repeated tag or a
+/// union with no variants is a definition mistake.
+pub fn union(variants: Union(t)) -> Codec(t) {
+  let defect = case variants.defect, variants.variants {
+    Some(_), _ -> variants.defect
+    None, [] -> Some(EmptyUnion)
+    None, _ -> None
+  }
+  Codec(
+    encode: fn(item) {
+      ensure(defect)
+      let Tagged(tag, payload) = variants.encode(item)
+      let tag_member = #("tag", value.String(tag))
+      case payload {
+        None -> Ok(value.Object([tag_member]))
+        Some(Ok(encoded)) -> Ok(value.Object([tag_member, #("value", encoded)]))
+        Some(Error(error)) -> Error(error) |> at_encode(Field("value"))
+      }
+    },
+    decode: fn(raw) {
+      ensure(defect)
+      decode_union(variants.variants, raw)
+    },
+    definition: fn() {
+      case defect {
+        Some(error) -> Error(error)
+        None -> union_schema(variants.variants, [])
+      }
+    },
+    placeholder: fn() {
+      case variants.variants {
+        [first, ..] -> first.placeholder()
+        [] -> definition_panic(EmptyUnion)
+      }
+    },
+    fields: None,
+  )
+}
+
+/// A case of a union whose JSON carries a payload. `next` receives the
+/// function that tags a payload as this case, for use in `match`.
+pub fn variant(
+  tag: String,
+  of payload: Codec(p),
+  construct construct: fn(p) -> t,
+  then next: fn(fn(p) -> Tagged(t)) -> Union(t),
+) -> Union(t) {
+  let rest = next(fn(item) { Tagged(tag, Some(payload.encode(item))) })
+  add_variant(
+    rest,
+    Variant(
+      tag:,
+      has_payload: True,
+      decode: fn(raw) { payload.decode(raw) |> result.map(construct) },
+      definition: payload.definition,
+      placeholder: fn() { construct(payload.placeholder()) },
+    ),
+  )
+}
+
+/// A case of a union without a payload, such as `Empty`. `next` receives the
+/// tagged value, for use in `match`.
+pub fn unit_variant(
+  tag: String,
+  value item: t,
+  then next: fn(Tagged(t)) -> Union(t),
+) -> Union(t) {
+  let rest = next(Tagged(tag, None))
+  add_variant(
+    rest,
+    Variant(
+      tag:,
+      has_payload: False,
+      decode: fn(_) { Ok(item) },
+      definition: fn() { Ok(None) },
+      placeholder: fn() { item },
+    ),
+  )
+}
+
+/// The end of a union: the function that maps each value to its case.
+pub fn match(encode: fn(t) -> Tagged(t)) -> Union(t) {
+  Union([], encode, None)
+}
+
+fn add_variant(rest: Union(t), this: Variant(t)) -> Union(t) {
+  let repeated = list.any(rest.variants, fn(other) { other.tag == this.tag })
+  let defect = case rest.defect, repeated {
+    Some(_), _ -> rest.defect
+    None, True -> Some(DuplicateTag(this.tag))
+    None, False -> None
+  }
+  Union(..rest, variants: [this, ..rest.variants], defect:)
+}
+
+fn union_schema(
+  variants: List(Variant(t)),
+  done: List(VariantSchema),
+) -> Result(Option(Schema), DefinitionError) {
+  case variants {
+    [] -> Ok(Some(UnionSchema(list.reverse(done))))
+    [variant, ..rest] -> {
+      use found <- result.try(variant.definition())
+      case variant.has_payload, found {
+        False, _ ->
+          union_schema(rest, [VariantSchema(variant.tag, None), ..done])
+        True, Some(payload) ->
+          union_schema(rest, [VariantSchema(variant.tag, Some(payload)), ..done])
+        // A payload without a schema leaves the union without one, but
+        // later variants may still hold a definition mistake.
+        True, None -> union_schema(rest, done) |> result.replace(None)
+      }
+    }
+  }
+}
+
+fn decode_union(
+  variants: List(Variant(t)),
+  raw: Value,
+) -> Result(t, DecodeError) {
+  case raw {
+    value.Object(members) -> {
+      use Nil <- result.try(check_members(members, ["tag", "value"], []))
+      case list.key_find(members, "tag") {
+        Error(Nil) -> Error(DecodeError([Field("tag")], MissingField))
+        Ok(value.String(tag)) ->
+          case list.find(variants, fn(variant) { variant.tag == tag }) {
+            Error(Nil) -> Error(DecodeError([Field("tag")], UnknownTag))
+            Ok(variant) ->
+              case variant.has_payload, list.key_find(members, "value") {
+                True, Ok(payload) ->
+                  variant.decode(payload) |> at_decode(Field("value"))
+                True, Error(Nil) ->
+                  Error(DecodeError([Field("value")], MissingField))
+                False, Ok(_) ->
+                  Error(DecodeError([Field("value")], UnknownField))
+                False, Error(Nil) -> variant.decode(value.Null)
+              }
+          }
+        Ok(_) -> Error(DecodeError([Field("tag")], ExpectedString))
+      }
+    }
+    _ -> fail(ExpectedObject)
+  }
+}
+
+// --- mapping -----------------------------------------------------------------
+
+/// Convert a codec to another type with total conversions in both
+/// directions, such as `map(codec.string(), decode: Email, encode: fn(e) {
+/// e.address })`. The schema is unchanged.
+pub fn map(
+  codec: Codec(a),
+  decode from: fn(a) -> b,
+  encode to: fn(b) -> a,
+) -> Codec(b) {
+  Codec(
+    encode: fn(item) { codec.encode(to(item)) },
+    decode: fn(raw) { codec.decode(raw) |> result.map(from) },
+    definition: codec.definition,
+    placeholder: fn() { from(codec.placeholder()) },
+    fields: None,
+  )
+}
+
+/// Like `map`, with conversions that may fail with a message. A failure is
+/// `Custom(message)` at the codec's path. `placeholder` is any value of `b`,
+/// used where a value is needed without input, as `decode.failure` does.
+pub fn try_map(
+  codec: Codec(a),
+  decode from: fn(a) -> Result(b, String),
+  encode to: fn(b) -> Result(a, String),
+  placeholder placeholder: b,
+) -> Codec(b) {
+  Codec(
+    encode: fn(item) {
+      case to(item) {
+        Ok(inner) -> codec.encode(inner)
+        Error(message) -> refuse(Custom(message))
+      }
+    },
+    decode: fn(raw) {
+      use inner <- result.try(codec.decode(raw))
+      from(inner)
+      |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
+    },
+    definition: codec.definition,
+    placeholder: fn() { placeholder },
+    fields: None,
+  )
+}
+
+/// A codec from your own functions over `Value`. `schema` is its schema, or
+/// `None` when it has none, in which case `schema` returns `UnknownSchema`
+/// and so does every codec built from this one. Build errors with
+/// `decode_failure` and `encode_failure`, or return those of other codecs.
+/// `placeholder` is any value of `a`.
+pub fn custom(
+  encode encode: fn(a) -> Result(Value, EncodeError),
+  decode decode: fn(Value) -> Result(a, DecodeError),
+  schema schema: Option(Schema),
+  placeholder placeholder: a,
+) -> Codec(a) {
+  Codec(
+    encode:,
+    decode:,
+    definition: fn() {
+      case schema {
+        None -> Ok(None)
+        Some(found) -> validate_schema(found) |> result.replace(schema)
+      }
+    },
+    placeholder: fn() { placeholder },
+    fields: None,
+  )
+}
+
+fn validate_schema(schema: Schema) -> Result(Nil, DefinitionError) {
+  case schema {
+    DescribedSchema(_, inner) | ListSchema(inner) | NullableSchema(inner) ->
+      validate_schema(inner)
+    StringSchema | IntSchema | NumberSchema | BoolSchema -> Ok(Nil)
+    StringEnumSchema([]) -> Error(EmptyEnum)
+    StringEnumSchema(labels) ->
+      case first_repeated(labels, set.new()) {
+        Some(label) -> Error(DuplicateEnumLabel(label))
+        None -> Ok(Nil)
+      }
+    PairSchema(left, right) -> {
+      use Nil <- result.try(validate_schema(left))
+      validate_schema(right)
+    }
+    ObjectSchema(properties) -> {
+      let names = list.map(properties, fn(property) { property.name })
+      case first_repeated(names, set.new()) {
+        Some(name) -> Error(DuplicateFieldName(name))
+        None ->
+          list.try_each(properties, fn(property) {
+            validate_schema(property.schema)
+          })
+      }
+    }
+    UnionSchema([]) -> Error(EmptyUnion)
+    UnionSchema(variants) -> {
+      let tags = list.map(variants, fn(variant) { variant.tag })
+      case first_repeated(tags, set.new()) {
+        Some(tag) -> Error(DuplicateTag(tag))
+        None ->
+          list.try_each(variants, fn(variant) {
+            case variant.payload {
+              Some(payload) -> validate_schema(payload)
+              None -> Ok(Nil)
+            }
+          })
+      }
+    }
+    IntegerRangeSchema(minimum, maximum) if minimum > maximum ->
+      Error(ReversedIntegerBounds(minimum, maximum))
+    IntegerRangeSchema(_, _) -> Ok(Nil)
+    NumberRangeSchema(minimum, maximum) ->
+      case number.compare(minimum, maximum) {
+        order.Gt -> Error(ReversedNumberBounds(minimum, maximum))
+        _ -> Ok(Nil)
+      }
+  }
+}
+
+fn first_repeated(items: List(String), seen: Set(String)) -> Option(String) {
+  case items {
+    [] -> None
+    [item, ..rest] ->
+      case set.contains(seen, item) {
+        True -> Some(item)
+        False -> first_repeated(rest, set.insert(seen, item))
+      }
+  }
+}
+
+// --- rendering ---------------------------------------------------------------
+
+/// Render a decode error as text such as
+/// `$["user"]["age"]: integer outside range 0 to 150`. The text contains no
+/// input values, no unknown or repeated keys from the input, and no `Custom`
+/// message; a path may still contain names from your own codecs.
+pub fn describe_decode_error(error: DecodeError) -> String {
+  describe_failure(error.path, error.reason)
+}
+
+/// Render an encode error as text such as
+/// `$["role"]: value is not in the enum`, with the same omissions as
+/// `describe_decode_error`.
+pub fn describe_encode_error(error: EncodeError) -> String {
+  describe_failure(error.path, error.reason)
+}
+
+fn describe_failure(path: List(PathSegment), reason: Reason) -> String {
   case reason {
-    DecodeExpectedString -> "expected a string"
-    DecodeExpectedInt -> "expected an integer"
-    DecodeExpectedNumber -> "expected a number"
-    DecodeExpectedBool -> "expected a boolean"
-    DecodeExpectedArray -> "expected an array"
-    DecodeExpectedObject -> "expected an object"
-    DecodeUnknownEnumLabel(_) -> "unknown enum label"
-    DecodeUnknownTag(_) -> "unknown tag"
-    DecodeMissingTag -> "missing tag"
-    DecodeMissingTagPayload(_) -> "missing tag payload"
-    DecodeExpectedTaggedObject -> "expected a tagged object"
-    DecodeMissingProperty(_) -> "missing required property"
-    DecodeUnknownProperty(_) -> "unknown property"
-    DecodeDuplicateProperty(_) -> "duplicate property"
-    DecodeWrongTupleLength(expected, _) ->
+    InvalidJson(error) -> value.describe_parse_error(error)
+    // The last segment of these is a key from the input.
+    UnknownField | DuplicateField ->
+      path_text(list.take(path, list.length(path) - 1))
+      <> ": "
+      <> describe_reason(reason)
+    _ -> path_text(path) <> ": " <> describe_reason(reason)
+  }
+}
+
+fn path_text(path: List(PathSegment)) -> String {
+  list.fold(path, "$", fn(text, segment) {
+    case segment {
+      Field(name) -> text <> "[" <> json.to_string(json.string(name)) <> "]"
+      Index(index) -> text <> "[" <> int.to_string(index) <> "]"
+    }
+  })
+}
+
+fn describe_reason(reason: Reason) -> String {
+  case reason {
+    InvalidJson(error) -> value.describe_parse_error(error)
+    ExpectedString -> "expected a string"
+    ExpectedInt -> "expected an integer"
+    ExpectedNumber -> "expected a number"
+    ExpectedBool -> "expected a boolean"
+    ExpectedArray -> "expected an array"
+    ExpectedObject -> "expected an object"
+    WrongLength(expected, _) ->
       "expected exactly " <> int.to_string(expected) <> " items"
-    DecodeInvalidWireValue(_) -> "invalid wire value"
-    DecodeIntegerOutsideRange(minimum, maximum, _) ->
+    MissingField -> "missing field"
+    UnknownField -> "unknown field"
+    DuplicateField -> "duplicate field"
+    UnknownEnumLabel -> "unknown enum label"
+    UnknownTag -> "unknown tag"
+    FloatOutOfRange -> "number outside the float range"
+    ContractMismatch -> "the codec's schema differs from the contract's"
+    UnknownEnumValue -> "value is not in the enum"
+    UnsafeInteger -> "integer outside the JavaScript safe range"
+    NonFiniteFloat -> "float is not finite"
+    NullInsideNullable -> "the inner value of a nullable encoded as null"
+    UnrepresentableNumber(_) -> "number has no exact gleam/json form"
+    IntegerOutsideRange(minimum, maximum) ->
       "integer outside range "
       <> int.to_string(minimum)
       <> " to "
       <> int.to_string(maximum)
-    DecodeNumberOutsideRange(minimum, maximum, _) ->
+    NumberOutsideRange(minimum, maximum) ->
       "number outside range "
-      <> number.number_text(minimum)
+      <> number.to_string(minimum)
       <> " to "
-      <> number.number_text(maximum)
-    CustomDecodeReason(_) -> "custom validation failed"
-  }
-}
-
-fn render_parse_reason(reason: BlueprintJsonParseReason) -> String {
-  case reason {
-    BlueprintUnexpectedByte(_) -> "unexpected byte"
-    BlueprintUnexpectedEndOfInput -> "unexpected end of input"
-    BlueprintInvalidUtf8 -> "invalid UTF-8"
-    BlueprintByteLimitExceeded(max) ->
-      "byte limit exceeded (" <> int.to_string(max) <> ")"
-    BlueprintDepthLimitExceeded(max) ->
-      "depth limit exceeded (" <> int.to_string(max) <> ")"
-    BlueprintInvalidNumberToken(_) -> "invalid number token"
-    BlueprintDuplicateObjectKey(_) -> "duplicate object key"
-    BlueprintUnterminatedString -> "unterminated string"
-    BlueprintInvalidEscapeSequence -> "invalid escape sequence"
-    BlueprintInvalidUnicodeEscape -> "invalid Unicode escape"
-    BlueprintTrailingContent -> "trailing content"
-  }
-}
-
-/// Render the codec's complete Draft 2020-12 schema document as exact JSON.
-///
-/// Codecs without a known schema return `UnknownSchema`.
-pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
-  case schema(codec) {
-    Ok(description) ->
-      Ok(description |> schema_document |> json_text.render_value)
-    Error(error) -> Error(error)
-  }
-}
-
-// These operations are the allocation-light targets used by generated codecs.
-// They mirror the corresponding runtime combinators but accept functions rather
-// than already-constructed Codec values.
-pub fn encode_string_value(item: String) -> Result(Value, EncodeError) {
-  Ok(value.String(item))
-}
-
-pub fn decode_string_value(raw: Value) -> Result(String, DecodeError) {
-  case raw {
-    value.String(item) -> Ok(item)
-    _ -> Error(CannotDecode(DecodeExpectedString))
-  }
-}
-
-pub fn encode_int_value(item: Int) -> Result(Value, EncodeError) {
-  case native_integer_number(item) {
-    Ok(num) -> Ok(value.Number(num))
-    Error(error) -> Error(error)
-  }
-}
-
-pub fn encode_native_int(item: Int) -> Result(json.Json, EncodeError) {
-  case native_integer_number(item) {
-    Ok(_) -> Ok(json.int(item))
-    Error(error) -> Error(error)
-  }
-}
-
-fn native_integer_number(item: Int) -> Result(Number, EncodeError) {
-  case number.from_int(item) {
-    Ok(num) -> Ok(num)
-    Error(number.NonFiniteInteger) ->
-      Error(CannotEncode(EncodeInvalidNativeValue("NonFiniteInteger")))
-    Error(number.NonIntegerValue) ->
-      Error(CannotEncode(EncodeInvalidNativeValue("NonIntegerValue")))
-    Error(number.UnsafeNativeInteger) ->
-      Error(CannotEncode(EncodeInvalidNativeValue("UnsafeNativeInteger")))
-  }
-}
-
-pub fn decode_int_value(raw: Value) -> Result(Int, DecodeError) {
-  case raw {
-    value.Number(num) -> {
-      let assert Ok(limit) = number.integer_projection_limit(24)
-      case number.to_int_exact(num, limit) {
-        Ok(item) -> Ok(item)
-        Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-      }
-    }
-    _ -> Error(CannotDecode(DecodeExpectedInt))
-  }
-}
-
-pub fn encode_number_value(item: Number) -> Result(Value, EncodeError) {
-  Ok(value.Number(item))
-}
-
-pub fn decode_number_value(raw: Value) -> Result(Number, DecodeError) {
-  case raw {
-    value.Number(item) -> Ok(item)
-    _ -> Error(CannotDecode(DecodeExpectedNumber))
-  }
-}
-
-pub fn encode_bool_value(item: Bool) -> Result(Value, EncodeError) {
-  Ok(value.Bool(item))
-}
-
-pub fn decode_bool_value(raw: Value) -> Result(Bool, DecodeError) {
-  case raw {
-    value.Bool(item) -> Ok(item)
-    _ -> Error(CannotDecode(DecodeExpectedBool))
-  }
-}
-
-pub fn encode_integer_between_value(
-  min: Int,
-  max: Int,
-  item: Int,
-) -> Result(Value, EncodeError) {
-  case item >= min && item <= max {
-    True ->
-      case number.from_int(item) {
-        Ok(num) -> Ok(value.Number(num))
-        Error(_) ->
-          Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
-      }
-    False -> Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
-  }
-}
-
-pub fn encode_native_integer_between(
-  min: Int,
-  max: Int,
-  item: Int,
-) -> Result(json.Json, EncodeError) {
-  case item >= min && item <= max {
-    True ->
-      case native_integer_number(item) {
-        Ok(_) -> Ok(json.int(item))
-        Error(_) ->
-          Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
-      }
-    False -> Error(CannotEncode(EncodeIntegerOutsideRange(min, max, item)))
-  }
-}
-
-pub fn decode_integer_between_value(
-  min: Int,
-  max: Int,
-  raw: Value,
-) -> Result(Int, DecodeError) {
-  case raw {
-    value.Number(num) -> {
-      let limit = number.integer_projection_limit_for_range_value(num, min, max)
-      case number.to_int_exact(num, limit) {
-        Ok(item) if item >= min && item <= max -> Ok(item)
-        Ok(item) ->
-          Error(CannotDecode(DecodeIntegerOutsideRange(min, max, item)))
-        Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-      }
-    }
-    _ -> Error(CannotDecode(DecodeExpectedInt))
-  }
-}
-
-pub fn encode_pair_with(
-  encode_left: fn(a) -> Result(Value, EncodeError),
-  encode_right: fn(b) -> Result(Value, EncodeError),
-  pair: #(a, b),
-) -> Result(Value, EncodeError) {
-  case encode_left(pair.0) {
-    Error(error) -> Error(EncodeAtIndex(0, error))
-    Ok(left) ->
-      case encode_right(pair.1) {
-        Error(error) -> Error(EncodeAtIndex(1, error))
-        Ok(right) -> Ok(value.Array([left, right]))
-      }
-  }
-}
-
-pub fn decode_pair_with(
-  decode_left: fn(Value) -> Result(a, DecodeError),
-  decode_right: fn(Value) -> Result(b, DecodeError),
-  raw: Value,
-) -> Result(#(a, b), DecodeError) {
-  case raw {
-    value.Array([left, right]) ->
-      case decode_left(left) {
-        Error(error) -> Error(DecodeAtIndex(0, error))
-        Ok(left) ->
-          case decode_right(right) {
-            Error(error) -> Error(DecodeAtIndex(1, error))
-            Ok(right) -> Ok(#(left, right))
-          }
-      }
-    value.Array(items) ->
-      Error(CannotDecode(DecodeWrongTupleLength(2, list.length(items))))
-    _ -> Error(CannotDecode(DecodeExpectedArray))
-  }
-}
-
-pub fn encode_list_with(
-  encode_item: fn(a) -> Result(Value, EncodeError),
-  items: List(a),
-) -> Result(Value, EncodeError) {
-  case encode_list_values(encode_item, items, 0) {
-    Ok(values) -> Ok(value.Array(values))
-    Error(error) -> Error(error)
-  }
-}
-
-fn encode_list_values(
-  encode_item: fn(a) -> Result(Value, EncodeError),
-  items: List(a),
-  index: Int,
-) -> Result(List(Value), EncodeError) {
-  case items {
-    [] -> Ok([])
-    [item, ..rest] ->
-      case encode_item(item) {
-        Error(error) -> Error(EncodeAtIndex(index, error))
-        Ok(raw) ->
-          case encode_list_values(encode_item, rest, index + 1) {
-            Ok(encoded_rest) -> Ok([raw, ..encoded_rest])
-            Error(error) -> Error(error)
-          }
-      }
-  }
-}
-
-pub fn decode_list_with(
-  decode_item: fn(Value) -> Result(a, DecodeError),
-  raw: Value,
-) -> Result(List(a), DecodeError) {
-  case raw {
-    value.Array(items) -> decode_list_values(decode_item, items, 0)
-    _ -> Error(CannotDecode(DecodeExpectedArray))
-  }
-}
-
-fn decode_list_values(
-  decode_item: fn(Value) -> Result(a, DecodeError),
-  items: List(Value),
-  index: Int,
-) -> Result(List(a), DecodeError) {
-  case items {
-    [] -> Ok([])
-    [item, ..rest] ->
-      case decode_item(item) {
-        Error(error) -> Error(DecodeAtIndex(index, error))
-        Ok(decoded) ->
-          case decode_list_values(decode_item, rest, index + 1) {
-            Ok(decoded_rest) -> Ok([decoded, ..decoded_rest])
-            Error(error) -> Error(error)
-          }
-      }
-  }
-}
-
-pub fn encode_nullable_with(
-  encode_inner: fn(a) -> Result(Value, EncodeError),
-  item: Nullable(a),
-) -> Result(Value, EncodeError) {
-  case item {
-    Null -> Ok(value.Null)
-    NonNull(item) ->
-      case encode_inner(item) {
-        Ok(value.Null) ->
-          Error(
-            CannotEncode(CustomEncodeReason(
-              "NonNull must encode a non-null value",
-            )),
-          )
-        other -> other
-      }
-  }
-}
-
-pub fn decode_nullable_with(
-  decode_inner: fn(Value) -> Result(a, DecodeError),
-  raw: Value,
-) -> Result(Nullable(a), DecodeError) {
-  case raw {
-    value.Null -> Ok(Null)
-    _ ->
-      case decode_inner(raw) {
-        Ok(item) -> Ok(NonNull(item))
-        Error(error) -> Error(error)
-      }
-  }
-}
-
-pub fn encode_required_property_with(
-  name: String,
-  encode_item: fn(a) -> Result(Value, EncodeError),
-  item: a,
-) -> Result(List(#(String, Value)), EncodeError) {
-  case encode_item(item) {
-    Ok(raw) -> Ok([#(name, raw)])
-    Error(error) -> Error(EncodeAtField(name, error))
-  }
-}
-
-pub fn encode_optional_property_with(
-  name: String,
-  encode_item: fn(a) -> Result(Value, EncodeError),
-  item: Optional(a),
-) -> Result(List(#(String, Value)), EncodeError) {
-  case item {
-    Missing -> Ok([])
-    Present(item) -> encode_required_property_with(name, encode_item, item)
-  }
-}
-
-pub fn decode_required_property_with(
-  name: String,
-  fields: List(#(String, Value)),
-  decode_item: fn(Value) -> Result(a, DecodeError),
-) -> Result(a, DecodeError) {
-  case lookup(fields, name) {
-    Missing ->
-      Error(DecodeAtField(name, CannotDecode(DecodeMissingProperty(name))))
-    Present(raw) ->
-      case decode_item(raw) {
-        Ok(item) -> Ok(item)
-        Error(error) -> Error(DecodeAtField(name, error))
-      }
-  }
-}
-
-pub fn decode_optional_property_with(
-  name: String,
-  fields: List(#(String, Value)),
-  decode_item: fn(Value) -> Result(a, DecodeError),
-) -> Result(Optional(a), DecodeError) {
-  case lookup(fields, name) {
-    Missing -> Ok(Missing)
-    Present(raw) ->
-      case decode_item(raw) {
-        Ok(item) -> Ok(Present(item))
-        Error(error) -> Error(DecodeAtField(name, error))
-      }
-  }
-}
-
-pub fn encode_properties_pair_with(
-  encode_left: fn(a) -> Result(List(#(String, Value)), EncodeError),
-  encode_right: fn(b) -> Result(List(#(String, Value)), EncodeError),
-  items: #(a, b),
-) -> Result(List(#(String, Value)), EncodeError) {
-  case encode_left(items.0) {
-    Error(error) -> Error(error)
-    Ok(left) ->
-      case encode_right(items.1) {
-        Error(error) -> Error(error)
-        Ok(right) -> Ok(list.append(left, right))
-      }
-  }
-}
-
-pub fn decode_properties_pair_with(
-  decode_left: fn(List(#(String, Value))) -> Result(a, DecodeError),
-  decode_right: fn(List(#(String, Value))) -> Result(b, DecodeError),
-  fields: List(#(String, Value)),
-) -> Result(#(a, b), DecodeError) {
-  case decode_left(fields) {
-    Error(error) -> Error(error)
-    Ok(left) ->
-      case decode_right(fields) {
-        Error(error) -> Error(error)
-        Ok(right) -> Ok(#(left, right))
-      }
-  }
-}
-
-pub fn encode_object_with(
-  encode_fields: fn(a) -> Result(List(#(String, Value)), EncodeError),
-  item: a,
-) -> Result(Value, EncodeError) {
-  case encode_fields(item) {
-    Ok(fields) -> Ok(value.Object(fields))
-    Error(error) -> Error(error)
-  }
-}
-
-pub fn decode_object_with(
-  names: List(String),
-  decode_fields: fn(List(#(String, Value))) -> Result(a, DecodeError),
-  raw: Value,
-) -> Result(a, DecodeError) {
-  case raw {
-    value.Object(fields) ->
-      case check_object_keys(fields, names, []) {
-        Ok(Nil) -> decode_fields(fields)
-        Error(error) -> Error(error)
-      }
-    _ -> Error(CannotDecode(DecodeExpectedObject))
-  }
-}
-
-pub fn encode_native_pair_with(
-  encode_left: fn(a) -> Result(json.Json, EncodeError),
-  encode_right: fn(b) -> Result(json.Json, EncodeError),
-  items: #(a, b),
-) -> Result(json.Json, EncodeError) {
-  case encode_left(items.0) {
-    Error(error) -> Error(EncodeAtIndex(0, error))
-    Ok(left) ->
-      case encode_right(items.1) {
-        Error(error) -> Error(EncodeAtIndex(1, error))
-        Ok(right) -> Ok(json.preprocessed_array([left, right]))
-      }
-  }
-}
-
-pub fn encode_native_list_with(
-  encode_item: fn(a) -> Result(json.Json, EncodeError),
-  items: List(a),
-) -> Result(json.Json, EncodeError) {
-  case encode_native_list_values(encode_item, items, 0, []) {
-    Ok(values) -> Ok(json.preprocessed_array(values))
-    Error(error) -> Error(error)
-  }
-}
-
-fn encode_native_list_values(
-  encode_item: fn(a) -> Result(json.Json, EncodeError),
-  items: List(a),
-  index: Int,
-  acc: List(json.Json),
-) -> Result(List(json.Json), EncodeError) {
-  case items {
-    [] -> Ok(list.reverse(acc))
-    [item, ..rest] ->
-      case encode_item(item) {
-        Error(error) -> Error(EncodeAtIndex(index, error))
-        Ok(encoded) ->
-          encode_native_list_values(encode_item, rest, index + 1, [
-            encoded,
-            ..acc
-          ])
-      }
-  }
-}
-
-pub fn encode_native_nullable_with(
-  encode_inner: fn(a) -> Result(json.Json, EncodeError),
-  item: Nullable(a),
-) -> Result(json.Json, EncodeError) {
-  case item {
-    Null -> Ok(json.null())
-    NonNull(item) ->
-      case encode_inner(item) {
-        Error(error) -> Error(error)
-        Ok(encoded) ->
-          case encoded == json.null() {
-            True ->
-              Error(
-                CannotEncode(CustomEncodeReason(
-                  "NonNull must encode a non-null value",
-                )),
-              )
-            False -> Ok(encoded)
-          }
-      }
-  }
-}
-
-pub fn encode_native_required_property_with(
-  name: String,
-  encode_item: fn(a) -> Result(json.Json, EncodeError),
-  item: a,
-) -> Result(List(#(String, json.Json)), EncodeError) {
-  case encode_item(item) {
-    Ok(raw) -> Ok([#(name, raw)])
-    Error(error) -> Error(EncodeAtField(name, error))
-  }
-}
-
-pub fn encode_native_optional_property_with(
-  name: String,
-  encode_item: fn(a) -> Result(json.Json, EncodeError),
-  item: Optional(a),
-) -> Result(List(#(String, json.Json)), EncodeError) {
-  case item {
-    Missing -> Ok([])
-    Present(item) ->
-      encode_native_required_property_with(name, encode_item, item)
-  }
-}
-
-pub fn encode_native_properties_pair_with(
-  encode_left: fn(a) -> Result(List(#(String, json.Json)), EncodeError),
-  encode_right: fn(b) -> Result(List(#(String, json.Json)), EncodeError),
-  items: #(a, b),
-) -> Result(List(#(String, json.Json)), EncodeError) {
-  case encode_left(items.0) {
-    Error(error) -> Error(error)
-    Ok(left) ->
-      case encode_right(items.1) {
-        Error(error) -> Error(error)
-        Ok(right) -> Ok(list.append(left, right))
-      }
-  }
-}
-
-pub fn encode_native_object_with(
-  encode_fields: fn(a) -> Result(List(#(String, json.Json)), EncodeError),
-  item: a,
-) -> Result(json.Json, EncodeError) {
-  case encode_fields(item) {
-    Ok(fields) -> Ok(json.object(fields))
-    Error(error) -> Error(error)
-  }
-}
-
-pub fn decode_native_string(raw: Dynamic) -> Result(String, DecodeError) {
-  case decode.run(raw, decode.string) {
-    Ok(item) -> Ok(item)
-    Error(_) -> Error(CannotDecode(DecodeExpectedString))
-  }
-}
-
-/// Decode a native JSON number using exact integer projection.
-///
-/// JSON parsers normalize numeric tokens before this function sees them. In
-/// particular, JavaScript may round a fractional token to an integer first, so
-/// the original lexical fraction cannot always be recovered here.
-pub fn decode_native_int(raw: Dynamic) -> Result(Int, DecodeError) {
-  case decode.run(raw, decode.int) {
-    Ok(item) -> exact_native_int(item)
-    Error(_) ->
-      case decode.run(raw, decode.float) {
-        Ok(item) ->
-          case number.from_float_exact(item) {
-            Ok(parsed) -> project_native_int(parsed)
-            Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-          }
-        Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-      }
-  }
-}
-
-fn exact_native_int(item: Int) -> Result(Int, DecodeError) {
-  case number.from_int(item) {
-    Ok(parsed) -> project_native_int(parsed)
-    Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-  }
-}
-
-fn project_native_int(item: Number) -> Result(Int, DecodeError) {
-  let assert Ok(limit) = number.integer_projection_limit(24)
-  case number.to_int_exact(item, limit) {
-    Ok(projected) -> Ok(projected)
-    Error(_) -> Error(CannotDecode(DecodeExpectedInt))
-  }
-}
-
-pub fn decode_native_bool(raw: Dynamic) -> Result(Bool, DecodeError) {
-  case decode.run(raw, decode.bool) {
-    Ok(item) -> Ok(item)
-    Error(_) -> Error(CannotDecode(DecodeExpectedBool))
-  }
-}
-
-pub fn decode_native_pair_with(
-  decode_left: fn(Dynamic) -> Result(a, DecodeError),
-  decode_right: fn(Dynamic) -> Result(b, DecodeError),
-  raw: Dynamic,
-) -> Result(#(a, b), DecodeError) {
-  case decode.run(raw, decode.list(of: decode.dynamic)) {
-    Error(_) -> Error(CannotDecode(DecodeExpectedArray))
-    Ok([left, right]) ->
-      case decode_left(left) {
-        Error(error) -> Error(DecodeAtIndex(0, error))
-        Ok(left) ->
-          case decode_right(right) {
-            Error(error) -> Error(DecodeAtIndex(1, error))
-            Ok(right) -> Ok(#(left, right))
-          }
-      }
-    Ok(items) ->
-      Error(CannotDecode(DecodeWrongTupleLength(2, list.length(items))))
-  }
-}
-
-pub fn decode_native_list_with(
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-  raw: Dynamic,
-) -> Result(List(a), DecodeError) {
-  case decode.run(raw, decode.list(of: decode.dynamic)) {
-    Error(_) -> Error(CannotDecode(DecodeExpectedArray))
-    Ok(items) -> decode_native_list_items(decode_item, items, 0, [])
-  }
-}
-
-fn decode_native_list_items(
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-  items: List(Dynamic),
-  index: Int,
-  acc: List(a),
-) -> Result(List(a), DecodeError) {
-  case items {
-    [] -> Ok(list.reverse(acc))
-    [item, ..rest] ->
-      case decode_item(item) {
-        Error(error) -> Error(DecodeAtIndex(index, error))
-        Ok(decoded) ->
-          decode_native_list_items(decode_item, rest, index + 1, [
-            decoded,
-            ..acc
-          ])
-      }
-  }
-}
-
-pub fn decode_native_nullable_with(
-  decode_inner: fn(Dynamic) -> Result(a, DecodeError),
-  raw: Dynamic,
-) -> Result(Nullable(a), DecodeError) {
-  case decode.run(raw, decode.optional(decode.dynamic)) {
-    Error(_) ->
-      Error(CannotDecode(DecodeInvalidWireValue("invalid nullable value")))
-    Ok(None) -> Ok(Null)
-    Ok(Some(inner)) ->
-      case decode_inner(inner) {
-        Ok(item) -> Ok(NonNull(item))
-        Error(error) -> Error(error)
-      }
-  }
-}
-
-pub fn decode_native_required_property_with(
-  name: String,
-  fields: dict.Dict(String, Dynamic),
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-) -> Result(a, DecodeError) {
-  case dict.get(fields, name) {
-    Error(_) ->
-      Error(DecodeAtField(name, CannotDecode(DecodeMissingProperty(name))))
-    Ok(raw) ->
-      case decode_item(raw) {
-        Ok(item) -> Ok(item)
-        Error(error) -> Error(DecodeAtField(name, error))
-      }
-  }
-}
-
-pub fn decode_native_optional_property_with(
-  name: String,
-  fields: dict.Dict(String, Dynamic),
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-) -> Result(Optional(a), DecodeError) {
-  case dict.get(fields, name) {
-    Error(_) -> Ok(Missing)
-    Ok(raw) ->
-      case decode_item(raw) {
-        Ok(item) -> Ok(Present(item))
-        Error(error) -> Error(DecodeAtField(name, error))
-      }
-  }
-}
-
-pub fn decode_native_properties_pair_with(
-  decode_left: fn(dict.Dict(String, Dynamic)) -> Result(a, DecodeError),
-  decode_right: fn(dict.Dict(String, Dynamic)) -> Result(b, DecodeError),
-  fields: dict.Dict(String, Dynamic),
-) -> Result(#(a, b), DecodeError) {
-  case decode_left(fields) {
-    Error(error) -> Error(error)
-    Ok(left) ->
-      case decode_right(fields) {
-        Error(error) -> Error(error)
-        Ok(right) -> Ok(#(left, right))
-      }
-  }
-}
-
-pub fn decode_native_object_with(
-  names: List(String),
-  decode_fields: fn(dict.Dict(String, Dynamic)) -> Result(a, DecodeError),
-  raw: Dynamic,
-) -> Result(a, DecodeError) {
-  case decode.run(raw, decode.dict(decode.string, decode.dynamic)) {
-    Error(_) -> Error(CannotDecode(DecodeExpectedObject))
-    Ok(fields) ->
-      case first_unknown_native_property(dict.keys(fields), names) {
-        Some(name) -> Error(CannotDecode(DecodeUnknownProperty(name)))
-        None -> decode_fields(fields)
-      }
-  }
-}
-
-fn first_unknown_native_property(
-  names: List(String),
-  allowed: List(String),
-) -> Option(String) {
-  case names {
-    [] -> None
-    [name, ..rest] ->
-      case list.contains(allowed, name) {
-        True -> first_unknown_native_property(rest, allowed)
-        False -> Some(name)
-      }
-  }
-}
-
-pub fn encode_mapped_with(
-  encode_inner: fn(a) -> Result(Value, EncodeError),
-  to_inner: fn(b) -> a,
-  item: b,
-) -> Result(Value, EncodeError) {
-  encode_inner(to_inner(item))
-}
-
-pub fn decode_mapped_with(
-  decode_inner: fn(Value) -> Result(a, DecodeError),
-  from_inner: fn(a) -> b,
-  raw: Value,
-) -> Result(b, DecodeError) {
-  case decode_inner(raw) {
-    Ok(item) -> Ok(from_inner(item))
-    Error(error) -> Error(error)
-  }
-}
-
-pub fn imap(codec: Codec(a), from: fn(a) -> b, to: fn(b) -> a) -> Codec(b) {
-  let mapped =
-    new(fn(value) { encode_mapped_with(codec.encoder, to, value) }, fn(raw) {
-      decode_mapped_with(codec.decoder, from, raw)
-    })
-  Codec(..mapped, schema: codec.schema)
-}
-
-/// Map a codec through fallible application conversions in both directions.
-/// Conversion failures use the same located errors as the base codec.
-pub fn try_imap(
-  codec: Codec(a),
-  from: fn(a) -> Result(b, DecodeError),
-  to: fn(b) -> Result(a, EncodeError),
-) -> Codec(b) {
-  let mapped =
-    new(
-      fn(item) {
-        case to(item) {
-          Ok(inner) -> codec.encoder(inner)
-          Error(error) -> Error(error)
-        }
-      },
-      fn(raw) {
-        case codec.decoder(raw) {
-          Ok(inner) -> from(inner)
-          Error(error) -> Error(error)
-        }
-      },
-    )
-  Codec(..mapped, schema: codec.schema)
-}
-
-pub fn string() -> Codec(String) {
-  let codec = new(encode_string_value, decode_string_value)
-  Codec(..codec, schema: Ok(StringSchema))
-}
-
-/// A JSON integer as a native `Int`, with the schema `{"type": "integer"}`.
-///
-/// Decoding accepts any exact integer spelling, such as `12`, `12.0` or
-/// `1.2e1`, of at most 24 digits. A longer integer, a fraction, or on
-/// JavaScript an integer outside -9007199254740991 to 9007199254740991, fails
-/// with `DecodeExpectedInt`. The 24-digit limit is fixed; use `number()` for
-/// larger values. Generated codecs apply the same limit.
-pub fn int() -> Codec(Int) {
-  let codec = new(encode_int_value, decode_int_value)
-  Codec(..codec, schema: Ok(IntSchema))
-}
-
-pub fn number() -> Codec(Number) {
-  let codec = new(encode_number_value, decode_number_value)
-  Codec(..codec, schema: Ok(NumberSchema))
-}
-
-pub fn bool() -> Codec(Bool) {
-  let codec = new(encode_bool_value, decode_bool_value)
-  Codec(..codec, schema: Ok(BoolSchema))
-}
-
-pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
-  let paired =
-    new(
-      fn(items) { encode_pair_with(left.encoder, right.encoder, items) },
-      fn(raw) { decode_pair_with(left.decoder, right.decoder, raw) },
-    )
-  let description = case left.schema, right.schema {
-    Ok(a), Ok(b) -> Ok(PairSchema(a, b))
-    Error(error), _ -> Error(error)
-    _, Error(error) -> Error(error)
-  }
-  Codec(..paired, schema: description)
-}
-
-pub fn list(inner: Codec(a)) -> Codec(List(a)) {
-  let codec =
-    new(fn(items) { encode_list_with(inner.encoder, items) }, fn(raw) {
-      decode_list_with(inner.decoder, raw)
-    })
-  let description = case inner.schema {
-    Ok(schema) -> Ok(ListSchema(schema))
-    Error(error) -> Error(error)
-  }
-  Codec(..codec, schema: description)
-}
-
-pub type Nullable(a) {
-  Null
-  NonNull(a)
-}
-
-pub fn nullable(inner: Codec(a)) -> Codec(Nullable(a)) {
-  let codec =
-    new(fn(item) { encode_nullable_with(inner.encoder, item) }, fn(raw) {
-      decode_nullable_with(inner.decoder, raw)
-    })
-  let description = case inner.schema {
-    Ok(schema) -> Ok(NullableSchema(schema))
-    Error(error) -> Error(error)
-  }
-  Codec(..codec, schema: description)
-}
-
-pub type Optional(a) {
-  Missing
-  Present(a)
-}
-
-pub type PropertyError {
-  DuplicateProperty(String)
-}
-
-pub opaque type Properties(a) {
-  Properties(
-    encode: fn(a) -> Result(List(#(String, Value)), EncodeError),
-    decode: fn(List(#(String, Value))) -> Result(a, DecodeError),
-    names: List(String),
-    schemas: Result(List(PropertySchema), SchemaError),
-  )
-}
-
-pub fn empty() -> Properties(Nil) {
-  Properties(fn(_) { Ok([]) }, fn(_) { Ok(Nil) }, [], Ok([]))
-}
-
-pub fn required(name: String, codec: Codec(a)) -> Properties(a) {
-  Properties(
-    fn(item) { encode_required_property_with(name, codec.encoder, item) },
-    fn(fields) { decode_required_property_with(name, fields, codec.decoder) },
-    [name],
-    property_description(name, True, codec),
-  )
-}
-
-pub fn optional(name: String, codec: Codec(a)) -> Properties(Optional(a)) {
-  Properties(
-    fn(item) { encode_optional_property_with(name, codec.encoder, item) },
-    fn(fields) { decode_optional_property_with(name, fields, codec.decoder) },
-    [name],
-    property_description(name, False, codec),
-  )
-}
-
-/// Represent an optional property with `gleam/option.Option`. Wrap the inner
-/// codec in `nullable` when explicit JSON null must be distinct from absence.
-pub fn optional_option(name: String, codec: Codec(a)) -> Properties(Option(a)) {
-  let Properties(encode, decode, names, schemas) = optional(name, codec)
-  Properties(
-    fn(item) {
-      case item {
-        None -> encode(Missing)
-        Some(value) -> encode(Present(value))
-      }
-    },
-    fn(fields) {
-      case decode(fields) {
-        Ok(Missing) -> Ok(None)
-        Ok(Present(value)) -> Ok(Some(value))
-        Error(error) -> Error(error)
-      }
-    },
-    names,
-    schemas,
-  )
-}
-
-pub fn combine(
-  left: Properties(a),
-  right: Properties(b),
-) -> Result(Properties(#(a, b)), PropertyError) {
-  case overlap(left.names, right.names) {
-    Present(name) -> Error(DuplicateProperty(name))
-    Missing ->
-      Ok(
-        Properties(
-          fn(items) {
-            encode_properties_pair_with(left.encode, right.encode, items)
-          },
-          fn(fields) {
-            decode_properties_pair_with(left.decode, right.decode, fields)
-          },
-          list.append(left.names, right.names),
-          case left.schemas, right.schemas {
-            Ok(a), Ok(b) -> Ok(list.append(a, b))
-            Error(error), _ -> Error(error)
-            _, Error(error) -> Error(error)
-          },
-        ),
-      )
-  }
-}
-
-pub fn object(properties: Properties(a)) -> Codec(a) {
-  runtime_codec(
-    fn(item) { encode_object_with(properties.encode, item) },
-    fn(raw) { decode_object_with(properties.names, properties.decode, raw) },
-    case properties.schemas {
-      Ok(props) -> Ok(ObjectSchema(props))
-      Error(error) -> Error(error)
-    },
-  )
-}
-
-/// Build a two-property native record codec without tuple mapping at the call site.
-///
-/// Each property may be `required` or `optional`. Property order is preserved,
-/// and duplicate names return `DuplicateProperty` before a codec is created.
-pub fn record2(
-  first: Properties(a),
-  second: Properties(b),
-  construct: fn(a, b) -> record,
-  first_value: fn(record) -> a,
-  second_value: fn(record) -> b,
-) -> Result(Codec(record), PropertyError) {
-  case combine(first, second) {
-    Ok(properties) ->
-      Ok(
-        imap(
-          object(properties),
-          fn(items) {
-            let #(a, b) = items
-            construct(a, b)
-          },
-          fn(item) { #(first_value(item), second_value(item)) },
-        ),
-      )
-    Error(error) -> Error(error)
-  }
-}
-
-/// Build a three-property native record codec without nested tuple mapping.
-///
-/// Each property may be `required` or `optional`. Property order is preserved,
-/// and duplicate names return `DuplicateProperty` before a codec is created.
-pub fn record3(
-  first: Properties(a),
-  second: Properties(b),
-  third: Properties(c),
-  construct: fn(a, b, c) -> record,
-  first_value: fn(record) -> a,
-  second_value: fn(record) -> b,
-  third_value: fn(record) -> c,
-) -> Result(Codec(record), PropertyError) {
-  case combine(first, second) {
-    Error(error) -> Error(error)
-    Ok(first_two) ->
-      case combine(first_two, third) {
-        Error(error) -> Error(error)
-        Ok(properties) ->
-          Ok(
-            imap(
-              object(properties),
-              fn(items) {
-                let #(#(a, b), c) = items
-                construct(a, b, c)
-              },
-              fn(item) {
-                #(#(first_value(item), second_value(item)), third_value(item))
-              },
-            ),
-          )
-      }
-  }
-}
-
-pub fn field(name: String, inner: Codec(a)) -> Codec(a) {
-  let codec = object(required(name, inner))
-  let description = case inner.schema {
-    Ok(schema) -> Ok(FieldSchema(name, schema))
-    Error(error) -> Error(error)
-  }
-  Codec(..codec, schema: description)
-}
-
-fn property_description(
-  name: String,
-  required: Bool,
-  codec: Codec(a),
-) -> Result(List(PropertySchema), SchemaError) {
-  case codec.schema {
-    Ok(schema) -> Ok([PropertySchema(name, required, schema)])
-    Error(error) -> Error(error)
-  }
-}
-
-fn decode_property(
-  name: String,
-  codec: Codec(a),
-  raw: Value,
-) -> Result(a, DecodeError) {
-  case decode(codec, raw) {
-    Ok(item) -> Ok(item)
-    Error(error) -> Error(DecodeAtField(name, error))
-  }
-}
-
-fn lookup(fields: List(#(String, Value)), name: String) -> Optional(Value) {
-  case fields {
-    [] -> Missing
-    [#(key, raw), ..] if key == name -> Present(raw)
-    [_, ..rest] -> lookup(rest, name)
-  }
-}
-
-fn overlap(left: List(String), right: List(String)) -> Optional(String) {
-  case left {
-    [] -> Missing
-    [head, ..rest] ->
-      case list.contains(right, head) {
-        True -> Present(head)
-        False -> overlap(rest, right)
-      }
-  }
-}
-
-fn check_object_keys(
-  fields: List(#(String, Value)),
-  names: List(String),
-  seen: List(String),
-) -> Result(Nil, DecodeError) {
-  case fields {
-    [] -> Ok(Nil)
-    [#(name, _), ..rest] ->
-      case list.contains(seen, name), list.contains(names, name) {
-        True, _ ->
-          Error(DecodeAtField(name, CannotDecode(DecodeDuplicateProperty(name))))
-        _, False ->
-          Error(DecodeAtField(name, CannotDecode(DecodeUnknownProperty(name))))
-        False, True -> check_object_keys(rest, names, [name, ..seen])
-      }
-  }
-}
-
-pub type EnumError {
-  EmptyEnum
-  DuplicateEnumLabel(String)
-  DuplicateEnumValue(first_index: Int, repeated_index: Int)
-}
-
-type EnumValueIndex {
-  NoEnumValue
-  EnumValueAt(Int)
-}
-
-pub fn string_enum(
-  variants: List(#(String, a)),
-) -> Result(Codec(a), EnumError) {
-  case validate_enum(variants, 0, [], []) {
-    Error(error) -> Error(error)
-    Ok(Nil) -> {
-      let labels = enum_labels(variants)
-      let codec =
-        new(fn(item) { encode_enum(item, variants) }, fn(raw) {
-          case raw {
-            value.String(label) -> decode_enum(label, variants)
-            _ -> Error(CannotDecode(DecodeExpectedString))
-          }
-        })
-      Ok(Codec(..codec, schema: Ok(StringEnumSchema(labels))))
-    }
-  }
-}
-
-fn validate_enum(
-  variants: List(#(String, a)),
-  index: Int,
-  seen_labels: List(String),
-  seen_values: List(#(Int, a)),
-) -> Result(Nil, EnumError) {
-  case variants {
-    [] ->
-      case index {
-        0 -> Error(EmptyEnum)
-        _ -> Ok(Nil)
-      }
-    [#(label, item), ..rest] ->
-      case list.contains(seen_labels, label) {
-        True -> Error(DuplicateEnumLabel(label))
-        False ->
-          case enum_value_index(item, seen_values) {
-            EnumValueAt(first_index) ->
-              Error(DuplicateEnumValue(first_index, index))
-            NoEnumValue ->
-              validate_enum(rest, index + 1, [label, ..seen_labels], [
-                #(index, item),
-                ..seen_values
-              ])
-          }
-      }
-  }
-}
-
-fn enum_value_index(item: a, seen_values: List(#(Int, a))) -> EnumValueIndex {
-  case seen_values {
-    [] -> NoEnumValue
-    [#(index, seen), ..rest] ->
-      case item == seen {
-        True -> EnumValueAt(index)
-        False -> enum_value_index(item, rest)
-      }
-  }
-}
-
-fn enum_labels(variants: List(#(String, a))) -> List(String) {
-  case variants {
-    [] -> []
-    [#(label, _), ..rest] -> [label, ..enum_labels(rest)]
-  }
-}
-
-fn encode_enum(
-  item: a,
-  variants: List(#(String, a)),
-) -> Result(Value, EncodeError) {
-  case variants {
-    [] ->
-      Error(
-        CannotEncode(EncodeUnknownEnumValue("Value is not in the string enum")),
-      )
-    [#(label, candidate), ..rest] ->
-      case item == candidate {
-        True -> Ok(value.String(label))
-        False -> encode_enum(item, rest)
-      }
-  }
-}
-
-fn decode_enum(
-  label: String,
-  variants: List(#(String, a)),
-) -> Result(a, DecodeError) {
-  case variants {
-    [] -> Error(CannotDecode(DecodeUnknownEnumLabel(label)))
-    [#(candidate, item), ..rest] ->
-      case label == candidate {
-        True -> Ok(item)
-        False -> decode_enum(label, rest)
-      }
-  }
-}
-
-pub type Either(left, right) {
-  Left(left)
-  Right(right)
-}
-
-pub type UnionError {
-  DuplicateTag(String)
-}
-
-pub fn tagged(
-  left_tag: String,
-  left: Codec(a),
-  right_tag: String,
-  right: Codec(b),
-) -> Result(Codec(Either(a, b)), UnionError) {
-  case left_tag == right_tag {
-    True -> Error(DuplicateTag(left_tag))
-    False -> {
-      let description = case left.schema, right.schema {
-        Ok(a), Ok(b) -> Ok(TaggedSchema(left_tag, a, right_tag, b))
-        Error(error), _ -> Error(error)
-        _, Error(error) -> Error(error)
-      }
-      Ok(runtime_codec(
-        fn(item) {
-          case item {
-            Left(item) -> encode_tagged(left_tag, left, item)
-            Right(item) -> encode_tagged(right_tag, right, item)
-          }
-        },
-        fn(raw) {
-          case tagged_parts(raw) {
-            Error(error) -> Error(error)
-            Ok(#(tag, payload)) ->
-              case tag {
-                tag if tag == left_tag ->
-                  case decode_property("value", left, payload) {
-                    Ok(item) -> Ok(Left(item))
-                    Error(error) -> Error(error)
-                  }
-                tag if tag == right_tag ->
-                  case decode_property("value", right, payload) {
-                    Ok(item) -> Ok(Right(item))
-                    Error(error) -> Error(error)
-                  }
-                _ ->
-                  Error(DecodeAtField(
-                    "tag",
-                    CannotDecode(DecodeUnknownTag(tag)),
-                  ))
-              }
-          }
-        },
-        description,
-      ))
-    }
-  }
-}
-
-fn encode_tagged(
-  tag: String,
-  codec: Codec(a),
-  item: a,
-) -> Result(Value, EncodeError) {
-  case encode(codec, item) {
-    Ok(raw) -> Ok(value.Object([#("tag", value.String(tag)), #("value", raw)]))
-    Error(error) -> Error(EncodeAtField("value", error))
-  }
-}
-
-fn tagged_parts(raw: Value) -> Result(#(String, Value), DecodeError) {
-  case raw {
-    value.Object(fields) ->
-      case check_object_keys(fields, ["tag", "value"], []) {
-        Error(error) -> Error(error)
-        Ok(Nil) ->
-          case lookup(fields, "tag"), lookup(fields, "value") {
-            Present(value.String(tag)), Present(payload) -> Ok(#(tag, payload))
-            Present(value.String(_)), Missing ->
-              Error(DecodeAtField(
-                "value",
-                CannotDecode(DecodeMissingTagPayload("Missing payload")),
-              ))
-            Present(_), _ ->
-              Error(DecodeAtField("tag", CannotDecode(DecodeExpectedString)))
-            Missing, _ ->
-              Error(DecodeAtField("tag", CannotDecode(DecodeMissingTag)))
-          }
-      }
-    _ -> Error(CannotDecode(DecodeExpectedTaggedObject))
-  }
-}
-
-pub type ConstraintError {
-  InvalidIntegerBounds(min: Int, max: Int)
-  ReversedNumberBounds(min: Number, max: Number)
-}
-
-pub fn integer_between(
-  min: Int,
-  max: Int,
-) -> Result(Codec(Int), ConstraintError) {
-  case min > max {
-    True -> Error(InvalidIntegerBounds(min, max))
-    False ->
-      case number.from_int(min), number.from_int(max) {
-        Ok(_), Ok(_) ->
-          Ok(runtime_codec(
-            fn(item) { encode_integer_between_value(min, max, item) },
-            fn(raw) { decode_integer_between_value(min, max, raw) },
-            Ok(IntegerRangeSchema(min, max)),
-          ))
-        _, _ -> Error(InvalidIntegerBounds(min, max))
-      }
-  }
-}
-
-pub fn number_between(
-  min: Number,
-  max: Number,
-) -> Result(Codec(Number), ConstraintError) {
-  case number.compare(min, max) {
-    number.GreaterThan -> Error(ReversedNumberBounds(min, max))
-    _ ->
-      Ok(runtime_codec(
-        fn(item) {
-          case
-            number.compare(item, min) != number.LessThan
-            && number.compare(item, max) != number.GreaterThan
-          {
-            True -> Ok(value.Number(item))
-            False ->
-              Error(CannotEncode(EncodeNumberOutsideRange(min, max, item)))
-          }
-        },
-        fn(raw) {
-          case raw {
-            value.Number(item) ->
-              case
-                number.compare(item, min) != number.LessThan
-                && number.compare(item, max) != number.GreaterThan
-              {
-                True -> Ok(item)
-                False ->
-                  Error(CannotDecode(DecodeNumberOutsideRange(min, max, item)))
-              }
-            _ -> Error(CannotDecode(DecodeExpectedNumber))
-          }
-        },
-        Ok(NumberRangeSchema(min, max)),
-      ))
-  }
-}
-
+      <> number.to_string(maximum)
+    Custom(_) -> "custom validation failed"
+  }
+}
+
+/// Render a definition error as text such as `field "name" appears twice`.
+pub fn describe_definition_error(error: DefinitionError) -> String {
+  case error {
+    DuplicateFieldName(name) -> "field " <> quote(name) <> " appears twice"
+    NotARecord(after) ->
+      "the codec after field "
+      <> quote(after)
+      <> " is not another field or success"
+    DuplicateTag(tag) -> "union tag " <> quote(tag) <> " appears twice"
+    EmptyUnion -> "union has no variants"
+    EmptyEnum -> "string enum has no labels"
+    DuplicateEnumLabel(label) ->
+      "enum label " <> quote(label) <> " appears twice"
+    DuplicateEnumValue(label) ->
+      "enum label " <> quote(label) <> " repeats the value of an earlier label"
+    ReversedIntegerBounds(minimum, maximum) ->
+      "integer bounds "
+      <> int.to_string(minimum)
+      <> " to "
+      <> int.to_string(maximum)
+      <> " are reversed"
+    ReversedNumberBounds(minimum, maximum) ->
+      "number bounds "
+      <> number.to_string(minimum)
+      <> " to "
+      <> number.to_string(maximum)
+      <> " are reversed"
+    UnsafeIntegerBound(bound) ->
+      "integer bound "
+      <> int.to_string(bound)
+      <> " is outside the JavaScript safe range"
+  }
+}
+
+fn quote(text: String) -> String {
+  json.to_string(json.string(text))
+}
+
+/// Whether decoding failed because the text exceeded a parse limit, such as
+/// the 1 MiB byte limit, rather than being invalid.
+pub fn is_limit_exceeded(error: DecodeError) -> Bool {
+  case error.reason {
+    InvalidJson(parse_error) -> value.is_limit_exceeded(parse_error)
+    _ -> False
+  }
+}
+
+// --- schema documents --------------------------------------------------------
+
+/// The schema as a JSON Schema object, without `$schema`.
 pub fn schema_value(schema: Schema) -> Value {
   case schema {
     DescribedSchema(description, DescribedSchema(_, inner)) ->
       schema_value(DescribedSchema(description, inner))
     DescribedSchema(description, inner) -> {
-      let assert value.Object(fields) = schema_value(inner)
-      value.Object([#("description", value.String(description)), ..fields])
+      let assert value.Object(members) = schema_value(inner)
+      value.Object([#("description", value.String(description)), ..members])
     }
-    StringSchema -> value.Object([#("type", value.String("string"))])
+    StringSchema -> typed("string", [])
     StringEnumSchema(labels) ->
-      value.Object([
-        #("type", value.String("string")),
-        #("enum", value.Array(list.map(labels, value.String))),
+      typed("string", [#("enum", value.Array(list.map(labels, value.String)))])
+    IntSchema -> typed("integer", [])
+    NumberSchema -> typed("number", [])
+    BoolSchema -> typed("boolean", [])
+    PairSchema(left, right) ->
+      typed("array", [
+        #("prefixItems", value.Array([schema_value(left), schema_value(right)])),
+        #("minItems", integer(2)),
+        #("maxItems", integer(2)),
       ])
-    IntSchema -> value.Object([#("type", value.String("integer"))])
-    NumberSchema -> value.Object([#("type", value.String("number"))])
-    BoolSchema -> value.Object([#("type", value.String("boolean"))])
-    PairSchema(a, b) -> {
-      let assert Ok(two) = number.from_int(2)
-      value.Object([
-        #("type", value.String("array")),
-        #("prefixItems", value.Array([schema_value(a), schema_value(b)])),
-        #("minItems", value.Number(two)),
-        #("maxItems", value.Number(two)),
-      ])
-    }
-    FieldSchema(name, inner) ->
-      value.Object([
-        #("type", value.String("object")),
-        #("properties", value.Object([#(name, schema_value(inner))])),
-        #("required", value.Array([value.String(name)])),
-        #("additionalProperties", value.Bool(False)),
-      ])
-    ListSchema(inner) ->
-      value.Object([
-        #("type", value.String("array")),
-        #("items", schema_value(inner)),
-      ])
+    ListSchema(items) -> typed("array", [#("items", schema_value(items))])
     NullableSchema(inner) ->
       value.Object([
-        #(
-          "anyOf",
-          value.Array([
-            value.Object([#("type", value.String("null"))]),
-            schema_value(inner),
-          ]),
-        ),
+        #("anyOf", value.Array([typed("null", []), schema_value(inner)])),
       ])
     ObjectSchema(properties) ->
-      value.Object([
-        #("type", value.String("object")),
-        #("properties", value.Object(property_schemas(properties))),
-        #("required", value.Array(required_names(properties))),
-        #("additionalProperties", value.Bool(False)),
+      closed_object(
+        list.map(properties, fn(property) {
+          #(property.name, schema_value(property.schema))
+        }),
+        list.filter_map(properties, fn(property) {
+          case property.required {
+            True -> Ok(property.name)
+            False -> Error(Nil)
+          }
+        }),
+      )
+    UnionSchema(variants) ->
+      typed("object", [
+        #("oneOf", value.Array(list.map(variants, variant_schema_value))),
       ])
-    TaggedSchema(left_tag, left, right_tag, right) ->
-      value.Object([
-        #("type", value.String("object")),
-        #(
-          "oneOf",
-          value.Array([
-            tagged_schema(left_tag, left),
-            tagged_schema(right_tag, right),
-          ]),
-        ),
+    IntegerRangeSchema(minimum, maximum) ->
+      typed("integer", [
+        #("minimum", integer(minimum)),
+        #("maximum", integer(maximum)),
       ])
-    IntegerRangeSchema(min, max) -> {
-      let assert Ok(min_num) = number.from_int(min)
-      let assert Ok(max_num) = number.from_int(max)
-      value.Object([
-        #("type", value.String("integer")),
-        #("minimum", value.Number(min_num)),
-        #("maximum", value.Number(max_num)),
-      ])
-    }
-    NumberRangeSchema(min, max) ->
-      value.Object([
-        #("type", value.String("number")),
-        #("minimum", value.Number(min)),
-        #("maximum", value.Number(max)),
+    NumberRangeSchema(minimum, maximum) ->
+      typed("number", [
+        #("minimum", value.Number(minimum)),
+        #("maximum", value.Number(maximum)),
       ])
   }
 }
 
+/// The complete Draft 2020-12 schema document: `schema_value` with `$schema`.
 pub fn schema_document(schema: Schema) -> Value {
-  let assert value.Object(fields) = schema_value(schema)
+  let assert value.Object(members) = schema_value(schema)
   value.Object([
     #("$schema", value.String("https://json-schema.org/draft/2020-12/schema")),
-    ..fields
+    ..members
   ])
 }
 
-fn property_schemas(
-  properties: List(PropertySchema),
-) -> List(#(String, Value)) {
-  case properties {
-    [] -> []
-    [PropertySchema(name, _, schema), ..rest] -> [
-      #(name, schema_value(schema)),
-      ..property_schemas(rest)
-    ]
-  }
+fn typed(kind: String, members: List(#(String, Value))) -> Value {
+  value.Object([#("type", value.String(kind)), ..members])
 }
 
-fn required_names(properties: List(PropertySchema)) -> List(Value) {
-  case properties {
-    [] -> []
-    [PropertySchema(name, True, _), ..rest] -> [
-      value.String(name),
-      ..required_names(rest)
-    ]
-    [_, ..rest] -> required_names(rest)
-  }
+fn integer(item: Int) -> Value {
+  let assert Ok(found) = number.from_int(item)
+  value.Number(found)
 }
 
-fn tagged_schema(tag: String, payload: Schema) -> Value {
-  value.Object([
-    #("type", value.String("object")),
-    #(
-      "properties",
-      value.Object([
-        #("tag", value.Object([#("const", value.String(tag))])),
-        #("value", schema_value(payload)),
-      ]),
-    ),
-    #("required", value.Array([value.String("tag"), value.String("value")])),
+fn closed_object(
+  properties: List(#(String, Value)),
+  required: List(String),
+) -> Value {
+  typed("object", [
+    #("properties", value.Object(properties)),
+    #("required", value.Array(list.map(required, value.String))),
     #("additionalProperties", value.Bool(False)),
   ])
+}
+
+fn variant_schema_value(variant: VariantSchema) -> Value {
+  let tag = #("tag", value.Object([#("const", value.String(variant.tag))]))
+  case variant.payload {
+    None -> closed_object([tag], ["tag"])
+    Some(payload) ->
+      closed_object([tag, #("value", schema_value(payload))], ["tag", "value"])
+  }
 }

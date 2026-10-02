@@ -55,9 +55,13 @@ pub opaque type Definition(a) {
   )
 }
 
-pub opaque type Properties(a) {
+/// The properties of an object definition whose record type is `r`, with
+/// values of type `a`. `combine` pairs them; `object` closes them.
+pub opaque type Properties(r, a) {
   Properties(
-    value: codec.Properties(a),
+    // Continue a record codec of `r` with these properties: `get` reads them
+    // from the record and `next` builds the rest from their values.
+    build: fn(fn(r) -> a, fn(a) -> codec.Codec(r)) -> codec.Codec(r),
     gleam_type: String,
     names: List(String),
     lower: fn(String) -> LoweredProperties,
@@ -95,7 +99,7 @@ pub type CompileError {
   DuplicateSchemaAccessor(String)
   UnsupportedSchemaConstructor(List(String), String)
   NativeNumberUnsupported
-  InvalidEnum(codec.EnumError)
+  InvalidDefinition(codec.DefinitionError)
   UnknownSchema(String)
 }
 
@@ -108,6 +112,7 @@ type Lowered {
     native_supported: Bool,
     declarations: List(String),
     imports: List(String),
+    placeholder: String,
   )
 }
 
@@ -120,6 +125,7 @@ type LoweredProperties {
     native_supported: Bool,
     declarations: List(String),
     imports: List(String),
+    placeholder: String,
   )
 }
 
@@ -162,11 +168,11 @@ pub fn string() -> Definition(String) {
         "fn "
           <> prefix
           <> "_encode(item: String) -> Result(value.Value, codec.EncodeError) {\n"
-          <> "  codec.encode_string_value(item)\n}",
+          <> "  generated.encode_string(item)\n}",
         "fn "
           <> prefix
           <> "_decode(raw: value.Value) -> Result(String, codec.DecodeError) {\n"
-          <> "  codec.decode_string_value(raw)\n}",
+          <> "  generated.decode_string(raw)\n}",
         "fn "
           <> prefix
           <> "_native_encode(item: String) -> Result(json.Json, codec.EncodeError) {\n"
@@ -174,9 +180,10 @@ pub fn string() -> Definition(String) {
         "fn "
           <> prefix
           <> "_native_decode(raw: dynamic.Dynamic) -> Result(String, codec.DecodeError) {\n"
-          <> "  codec.decode_native_string(raw)\n}",
+          <> "  generated.decode_native_string(raw)\n}",
       ],
       imports: ["gleam/dynamic"],
+      placeholder: "\"\"",
     )
   })
 }
@@ -193,21 +200,22 @@ pub fn int() -> Definition(Int) {
         "fn "
           <> prefix
           <> "_encode(item: Int) -> Result(value.Value, codec.EncodeError) {\n"
-          <> "  codec.encode_int_value(item)\n}",
+          <> "  generated.encode_int(item)\n}",
         "fn "
           <> prefix
           <> "_decode(raw: value.Value) -> Result(Int, codec.DecodeError) {\n"
-          <> "  codec.decode_int_value(raw)\n}",
+          <> "  generated.decode_int(raw)\n}",
         "fn "
           <> prefix
           <> "_native_encode(item: Int) -> Result(json.Json, codec.EncodeError) {\n"
-          <> "  codec.encode_native_int(item)\n}",
+          <> "  generated.encode_native_int(item)\n}",
         "fn "
           <> prefix
           <> "_native_decode(raw: dynamic.Dynamic) -> Result(Int, codec.DecodeError) {\n"
-          <> "  codec.decode_native_int(raw)\n}",
+          <> "  generated.decode_native_int(raw)\n}",
       ],
       imports: ["gleam/dynamic"],
+      placeholder: "0",
     )
   })
 }
@@ -224,13 +232,14 @@ pub fn number() -> Definition(number.Number) {
         "fn "
           <> prefix
           <> "_encode(item: number.Number) -> Result(value.Value, codec.EncodeError) {\n"
-          <> "  codec.encode_number_value(item)\n}",
+          <> "  generated.encode_number(item)\n}",
         "fn "
           <> prefix
           <> "_decode(raw: value.Value) -> Result(number.Number, codec.DecodeError) {\n"
-          <> "  codec.decode_number_value(raw)\n}",
+          <> "  generated.decode_number(raw)\n}",
       ],
       imports: ["json/blueprint/number"],
+      placeholder: "generated.zero_number()",
     )
   })
 }
@@ -247,11 +256,11 @@ pub fn bool() -> Definition(Bool) {
         "fn "
           <> prefix
           <> "_encode(item: Bool) -> Result(value.Value, codec.EncodeError) {\n"
-          <> "  codec.encode_bool_value(item)\n}",
+          <> "  generated.encode_bool(item)\n}",
         "fn "
           <> prefix
           <> "_decode(raw: value.Value) -> Result(Bool, codec.DecodeError) {\n"
-          <> "  codec.decode_bool_value(raw)\n}",
+          <> "  generated.decode_bool(raw)\n}",
         "fn "
           <> prefix
           <> "_native_encode(item: Bool) -> Result(json.Json, codec.EncodeError) {\n"
@@ -259,71 +268,57 @@ pub fn bool() -> Definition(Bool) {
         "fn "
           <> prefix
           <> "_native_decode(raw: dynamic.Dynamic) -> Result(Bool, codec.DecodeError) {\n"
-          <> "  codec.decode_native_bool(raw)\n}",
+          <> "  generated.decode_native_bool(raw)\n}",
       ],
       imports: ["gleam/dynamic"],
+      placeholder: "False",
     )
   })
 }
 
-pub fn integer_between(
-  min: Int,
-  max: Int,
-) -> Result(Definition(Int), codec.ConstraintError) {
-  case codec.integer_between(min, max) {
-    Error(error) -> Error(error)
-    Ok(runtime_codec) ->
-      Ok(
-        Definition(runtime_codec, "Int", fn(prefix) {
-          Lowered(
-            encoder: prefix <> "_encode",
-            decoder: prefix <> "_decode",
-            native_encoder: prefix <> "_native_encode",
-            native_decoder: prefix <> "_native_decode",
-            native_supported: True,
-            declarations: [
-              "fn "
-                <> prefix
-                <> "_encode(item: Int) -> Result(value.Value, codec.EncodeError) {\n"
-                <> "  codec.encode_integer_between_value("
-                <> schema_materialize.format_int_literal(min)
-                <> ", "
-                <> schema_materialize.format_int_literal(max)
-                <> ", item)\n}",
-              "fn "
-                <> prefix
-                <> "_decode(raw: value.Value) -> Result(Int, codec.DecodeError) {\n"
-                <> "  codec.decode_integer_between_value("
-                <> schema_materialize.format_int_literal(min)
-                <> ", "
-                <> schema_materialize.format_int_literal(max)
-                <> ", raw)\n}",
-              "fn "
-                <> prefix
-                <> "_native_encode(item: Int) -> Result(json.Json, codec.EncodeError) {\n"
-                <> "  codec.encode_native_integer_between("
-                <> schema_materialize.format_int_literal(min)
-                <> ", "
-                <> schema_materialize.format_int_literal(max)
-                <> ", item)\n}",
-              "fn "
-                <> prefix
-                <> "_native_decode(raw: dynamic.Dynamic) -> Result(Int, codec.DecodeError) {\n"
-                <> "  case codec.decode_native_int(raw) {\n    Error(error) -> Error(error)\n    Ok(item) if item >= "
-                <> schema_materialize.format_int_literal(min)
-                <> " && item <= "
-                <> schema_materialize.format_int_literal(max)
-                <> " -> Ok(item)\n    Ok(item) -> Error(codec.CannotDecode(codec.DecodeIntegerOutsideRange("
-                <> schema_materialize.format_int_literal(min)
-                <> ", "
-                <> schema_materialize.format_int_literal(max)
-                <> ", item)))\n  }\n}",
-            ],
-            imports: ["gleam/dynamic"],
-          )
-        }),
-      )
-  }
+/// An integer from `min` to `max` inclusive. Reversed bounds are a
+/// definition mistake that `compile` reports.
+pub fn integer_between(min: Int, max: Int) -> Definition(Int) {
+  let min_text = schema_materialize.format_int_literal(min)
+  let max_text = schema_materialize.format_int_literal(max)
+  let bounds = min_text <> ", " <> max_text
+  Definition(codec.integer_between(min, max), "Int", fn(prefix) {
+    Lowered(
+      encoder: prefix <> "_encode",
+      decoder: prefix <> "_decode",
+      native_encoder: prefix <> "_native_encode",
+      native_decoder: prefix <> "_native_decode",
+      native_supported: True,
+      declarations: [
+        "fn "
+          <> prefix
+          <> "_encode(item: Int) -> Result(value.Value, codec.EncodeError) {\n"
+          <> "  generated.encode_integer_between("
+          <> bounds
+          <> ", item)\n}",
+        "fn "
+          <> prefix
+          <> "_decode(raw: value.Value) -> Result(Int, codec.DecodeError) {\n"
+          <> "  generated.decode_integer_between("
+          <> bounds
+          <> ", raw)\n}",
+        "fn "
+          <> prefix
+          <> "_native_encode(item: Int) -> Result(json.Json, codec.EncodeError) {\n"
+          <> "  generated.encode_native_integer_between("
+          <> bounds
+          <> ", item)\n}",
+        "fn "
+          <> prefix
+          <> "_native_decode(raw: dynamic.Dynamic) -> Result(Int, codec.DecodeError) {\n"
+          <> "  generated.decode_native_integer_between("
+          <> bounds
+          <> ", raw)\n}",
+      ],
+      imports: ["gleam/dynamic"],
+      placeholder: min_text,
+    )
+  })
 }
 
 pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
@@ -343,8 +338,8 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
         native_supported: left_lowered.native_supported
           && right_lowered.native_supported,
         declarations: list.append(
-          lower_declarations(left_lowered),
-          list.append(lower_declarations(right_lowered), [
+          left_lowered.declarations,
+          list.append(right_lowered.declarations, [
             "fn "
               <> prefix
               <> "_encode(item: #("
@@ -352,10 +347,10 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
               <> ", "
               <> right_type
               <> ")) -> Result(value.Value, codec.EncodeError) {\n"
-              <> "  codec.encode_pair_with("
-              <> lower_encoder(left_lowered)
+              <> "  generated.encode_pair("
+              <> left_lowered.encoder
               <> ", "
-              <> lower_encoder(right_lowered)
+              <> right_lowered.encoder
               <> ", item)\n}",
             "fn "
               <> prefix
@@ -363,10 +358,10 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
               <> left_type
               <> ", "
               <> right_type
-              <> "), codec.DecodeError) {\n  codec.decode_pair_with("
-              <> lower_decoder(left_lowered)
+              <> "), codec.DecodeError) {\n  generated.decode_pair("
+              <> left_lowered.decoder
               <> ", "
-              <> lower_decoder(right_lowered)
+              <> right_lowered.decoder
               <> ", raw)\n}",
             "fn "
               <> prefix
@@ -375,10 +370,10 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
               <> ", "
               <> right_type
               <> ")) -> Result(json.Json, codec.EncodeError) {\n"
-              <> "  codec.encode_native_pair_with("
-              <> lower_native_encoder(left_lowered)
+              <> "  generated.encode_native_pair("
+              <> left_lowered.native_encoder
               <> ", "
-              <> lower_native_encoder(right_lowered)
+              <> right_lowered.native_encoder
               <> ", item)\n}",
             "fn "
               <> prefix
@@ -387,17 +382,19 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
               <> ", "
               <> right_type
               <> "), codec.DecodeError) {\n"
-              <> "  codec.decode_native_pair_with("
-              <> lower_native_decoder(left_lowered)
+              <> "  generated.decode_native_pair("
+              <> left_lowered.native_decoder
               <> ", "
-              <> lower_native_decoder(right_lowered)
+              <> right_lowered.native_decoder
               <> ", raw)\n}",
           ]),
         ),
-        imports: list.append(
-          lower_imports(left_lowered),
-          lower_imports(right_lowered),
-        ),
+        imports: list.append(left_lowered.imports, right_lowered.imports),
+        placeholder: "#("
+          <> left_lowered.placeholder
+          <> ", "
+          <> right_lowered.placeholder
+          <> ")",
       )
     },
   )
@@ -413,50 +410,51 @@ pub fn list(inner: Definition(a)) -> Definition(List(a)) {
       native_encoder: prefix <> "_native_encode",
       native_decoder: prefix <> "_native_decode",
       native_supported: inner_lowered.native_supported,
-      declarations: list.append(lower_declarations(inner_lowered), [
+      declarations: list.append(inner_lowered.declarations, [
         "fn "
           <> prefix
           <> "_encode(items: List("
           <> inner_type
           <> ")) -> Result(value.Value, codec.EncodeError) {\n"
-          <> "  codec.encode_list_with("
-          <> lower_encoder(inner_lowered)
+          <> "  generated.encode_list("
+          <> inner_lowered.encoder
           <> ", items)\n}",
         "fn "
           <> prefix
           <> "_decode(raw: value.Value) -> Result(List("
           <> inner_type
           <> "), codec.DecodeError) {\n"
-          <> "  codec.decode_list_with("
-          <> lower_decoder(inner_lowered)
+          <> "  generated.decode_list("
+          <> inner_lowered.decoder
           <> ", raw)\n}",
         "fn "
           <> prefix
           <> "_native_encode(items: List("
           <> inner_type
           <> ")) -> Result(json.Json, codec.EncodeError) {\n"
-          <> "  codec.encode_native_list_with("
-          <> lower_native_encoder(inner_lowered)
+          <> "  generated.encode_native_list("
+          <> inner_lowered.native_encoder
           <> ", items)\n}",
         "fn "
           <> prefix
           <> "_native_decode(raw: dynamic.Dynamic) -> Result(List("
           <> inner_type
           <> "), codec.DecodeError) {\n"
-          <> "  codec.decode_native_list_with("
-          <> lower_native_decoder(inner_lowered)
+          <> "  generated.decode_native_list("
+          <> inner_lowered.native_decoder
           <> ", raw)\n}",
       ]),
-      imports: lower_imports(inner_lowered),
+      imports: inner_lowered.imports,
+      placeholder: "[]",
     )
   })
 }
 
-pub fn nullable(inner: Definition(a)) -> Definition(codec.Nullable(a)) {
+pub fn nullable(inner: Definition(a)) -> Definition(Option(a)) {
   let Definition(inner_codec, inner_type, lower_inner) = inner
   Definition(
     codec.nullable(inner_codec),
-    "codec.Nullable(" <> inner_type <> ")",
+    "option.Option(" <> inner_type <> ")",
     fn(prefix) {
       let inner_lowered = lower_inner(prefix <> "_inner")
       Lowered(
@@ -465,41 +463,42 @@ pub fn nullable(inner: Definition(a)) -> Definition(codec.Nullable(a)) {
         native_encoder: prefix <> "_native_encode",
         native_decoder: prefix <> "_native_decode",
         native_supported: inner_lowered.native_supported,
-        declarations: list.append(lower_declarations(inner_lowered), [
+        declarations: list.append(inner_lowered.declarations, [
           "fn "
             <> prefix
-            <> "_encode(item: codec.Nullable("
+            <> "_encode(item: option.Option("
             <> inner_type
             <> ")) -> Result(value.Value, codec.EncodeError) {\n"
-            <> "  codec.encode_nullable_with("
-            <> lower_encoder(inner_lowered)
+            <> "  generated.encode_nullable("
+            <> inner_lowered.encoder
             <> ", item)\n}",
           "fn "
             <> prefix
-            <> "_decode(raw: value.Value) -> Result(codec.Nullable("
+            <> "_decode(raw: value.Value) -> Result(option.Option("
             <> inner_type
             <> "), codec.DecodeError) {\n"
-            <> "  codec.decode_nullable_with("
-            <> lower_decoder(inner_lowered)
+            <> "  generated.decode_nullable("
+            <> inner_lowered.decoder
             <> ", raw)\n}",
           "fn "
             <> prefix
-            <> "_native_encode(item: codec.Nullable("
+            <> "_native_encode(item: option.Option("
             <> inner_type
             <> ")) -> Result(json.Json, codec.EncodeError) {\n"
-            <> "  codec.encode_native_nullable_with("
-            <> lower_native_encoder(inner_lowered)
+            <> "  generated.encode_native_nullable("
+            <> inner_lowered.native_encoder
             <> ", item)\n}",
           "fn "
             <> prefix
-            <> "_native_decode(raw: dynamic.Dynamic) -> Result(codec.Nullable("
+            <> "_native_decode(raw: dynamic.Dynamic) -> Result(option.Option("
             <> inner_type
             <> "), codec.DecodeError) {\n"
-            <> "  codec.decode_native_nullable_with("
-            <> lower_native_decoder(inner_lowered)
+            <> "  generated.decode_native_nullable("
+            <> inner_lowered.native_decoder
             <> ", raw)\n}",
         ]),
-        imports: lower_imports(inner_lowered),
+        imports: ["gleam/option", ..inner_lowered.imports],
+        placeholder: "option.None",
       )
     },
   )
@@ -517,361 +516,309 @@ pub fn string_enum(
           let EnumVariant(label, item, _) = variant
           #(label, item)
         })
-      case codec.string_enum(runtime_variants) {
-        Error(error) -> Error(InvalidEnum(error))
-        Ok(runtime_codec) ->
-          Ok(
-            Definition(runtime_codec, type_name, fn(prefix) {
-              let encoder_arms = emit_enum_encoder_arms(variants, [])
-              let decoder_arms = emit_enum_decoder_arms(variants, [])
-              let native_encoder_arms =
-                emit_native_enum_encoder_arms(variants, [])
-              let native_decoder_arms =
-                emit_native_enum_decoder_arms(variants, [])
-              let imports =
-                list.map(variants, fn(variant) {
-                  let EnumVariant(_, _, reference) = variant
-                  reference_module_unchecked(reference)
-                })
-              Lowered(
-                encoder: prefix <> "_encode",
-                decoder: prefix <> "_decode",
-                native_encoder: prefix <> "_native_encode",
-                native_decoder: prefix <> "_native_decode",
-                native_supported: True,
-                declarations: [
-                  "fn "
-                    <> prefix
-                    <> "_encode(item: "
-                    <> type_name
-                    <> ") -> Result(value.Value, codec.EncodeError) {\n  case item {\n"
-                    <> string.join(encoder_arms, "\n")
-                    <> "\n    _ -> Error(codec.CannotEncode(codec.EncodeUnknownEnumValue(\"Value is not in the string enum\")))\n  }\n}",
-                  "fn "
-                    <> prefix
-                    <> "_decode(raw: value.Value) -> Result("
-                    <> type_name
-                    <> ", codec.DecodeError) {\n  case raw {\n"
-                    <> "    value.String(label) -> case label {\n"
-                    <> string.join(decoder_arms, "\n")
-                    <> "\n      _ -> Error(codec.CannotDecode(codec.DecodeUnknownEnumLabel(label)))\n    }\n"
-                    <> "    _ -> Error(codec.CannotDecode(codec.DecodeExpectedString))\n  }\n}",
-                  "fn "
-                    <> prefix
-                    <> "_native_encode(item: "
-                    <> type_name
-                    <> ") -> Result(json.Json, codec.EncodeError) {\n  case item {\n"
-                    <> string.join(native_encoder_arms, "\n")
-                    <> "\n    _ -> Error(codec.CannotEncode(codec.EncodeUnknownEnumValue(\"Value is not in the string enum\")))\n  }\n}",
-                  "fn "
-                    <> prefix
-                    <> "_native_decode(raw: dynamic.Dynamic) -> Result("
-                    <> type_name
-                    <> ", codec.DecodeError) {\n"
-                    <> "  case codec.decode_native_string(raw) {\n"
-                    <> "    Error(error) -> Error(error)\n"
-                    <> "    Ok(label) -> case label {\n"
-                    <> string.join(native_decoder_arms, "\n")
-                    <> "\n      _ -> Error(codec.CannotDecode(codec.DecodeUnknownEnumLabel(label)))\n    }\n  }\n}",
-                ],
-                imports: ["gleam/dynamic", ..imports],
-              )
-            }),
-          )
+      let runtime_codec = codec.string_enum(runtime_variants)
+      let placeholder = case variants {
+        [EnumVariant(_, _, reference), ..] ->
+          normalize_reference_unchecked(reference)
+        [] -> "panic"
+      }
+      {
+        Ok(
+          Definition(runtime_codec, type_name, fn(prefix) {
+            let encoder_arms = emit_enum_encoder_arms(variants, [])
+            let decoder_arms = emit_enum_decoder_arms(variants, [])
+            let native_encoder_arms =
+              emit_native_enum_encoder_arms(variants, [])
+            let native_decoder_arms =
+              emit_native_enum_decoder_arms(variants, [])
+            let imports =
+              list.map(variants, fn(variant) {
+                let EnumVariant(_, _, reference) = variant
+                reference_module_unchecked(reference)
+              })
+            Lowered(
+              encoder: prefix <> "_encode",
+              decoder: prefix <> "_decode",
+              native_encoder: prefix <> "_native_encode",
+              native_decoder: prefix <> "_native_decode",
+              native_supported: True,
+              declarations: [
+                "fn "
+                  <> prefix
+                  <> "_encode(item: "
+                  <> type_name
+                  <> ") -> Result(value.Value, codec.EncodeError) {\n  case item {\n"
+                  <> string.join(encoder_arms, "\n")
+                  <> "\n    _ -> generated.unknown_enum_value()\n  }\n}",
+                "fn "
+                  <> prefix
+                  <> "_decode(raw: value.Value) -> Result("
+                  <> type_name
+                  <> ", codec.DecodeError) {\n  case raw {\n"
+                  <> "    value.String(label) -> case label {\n"
+                  <> string.join(decoder_arms, "\n")
+                  <> "\n      _ -> generated.unknown_enum_label()\n    }\n"
+                  <> "    _ -> generated.expected_string()\n  }\n}",
+                "fn "
+                  <> prefix
+                  <> "_native_encode(item: "
+                  <> type_name
+                  <> ") -> Result(json.Json, codec.EncodeError) {\n  case item {\n"
+                  <> string.join(native_encoder_arms, "\n")
+                  <> "\n    _ -> generated.unknown_enum_value()\n  }\n}",
+                "fn "
+                  <> prefix
+                  <> "_native_decode(raw: dynamic.Dynamic) -> Result("
+                  <> type_name
+                  <> ", codec.DecodeError) {\n"
+                  <> "  case generated.decode_native_string(raw) {\n"
+                  <> "    Error(error) -> Error(error)\n"
+                  <> "    Ok(label) -> case label {\n"
+                  <> string.join(native_decoder_arms, "\n")
+                  <> "\n      _ -> generated.unknown_enum_label()\n    }\n  }\n}",
+              ],
+              imports: ["gleam/dynamic", ..imports],
+              placeholder:,
+            )
+          }),
+        )
       }
     }
   }
 }
 
-pub fn required(name: String, inner: Definition(a)) -> Properties(a) {
+/// A required property.
+pub fn required(name: String, inner: Definition(a)) -> Properties(r, a) {
   let Definition(inner_codec, inner_type, lower_inner) = inner
-  Properties(codec.required(name, inner_codec), inner_type, [name], fn(prefix) {
-    let inner_lowered = lower_inner(prefix <> "_value")
-    LoweredProperties(
-      encoder: prefix <> "_encode",
-      decoder: prefix <> "_decode",
-      native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
-      native_supported: inner_lowered.native_supported,
-      declarations: list.append(lower_declarations(inner_lowered), [
-        "fn "
-          <> prefix
-          <> "_encode(item: "
-          <> inner_type
-          <> ") -> Result(List(#(String, value.Value)), codec.EncodeError) {\n"
-          <> "  codec.encode_required_property_with("
-          <> schema_materialize.escape_string_literal(name)
-          <> ", "
-          <> lower_encoder(inner_lowered)
-          <> ", item)\n}",
-        "fn "
-          <> prefix
-          <> "_decode(fields: List(#(String, value.Value))) -> Result("
-          <> inner_type
-          <> ", codec.DecodeError) {\n"
-          <> "  codec.decode_required_property_with("
-          <> schema_materialize.escape_string_literal(name)
-          <> ", fields, "
-          <> lower_decoder(inner_lowered)
-          <> ")\n}",
-        "fn "
-          <> prefix
-          <> "_native_encode(item: "
-          <> inner_type
-          <> ") -> Result(List(#(String, json.Json)), codec.EncodeError) {\n"
-          <> "  codec.encode_native_required_property_with("
-          <> schema_materialize.escape_string_literal(name)
-          <> ", "
-          <> lower_native_encoder(inner_lowered)
-          <> ", item)\n}",
-        "fn "
-          <> prefix
-          <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
-          <> inner_type
-          <> ", codec.DecodeError) {\n"
-          <> "  codec.decode_native_required_property_with("
-          <> schema_materialize.escape_string_literal(name)
-          <> ", fields, "
-          <> lower_native_decoder(inner_lowered)
-          <> ")\n}",
-      ]),
-      imports: ["gleam/dict", "gleam/dynamic", ..lower_imports(inner_lowered)],
-    )
-  })
-}
-
-pub fn optional(
-  name: String,
-  inner: Definition(a),
-) -> Properties(codec.Optional(a)) {
-  let Definition(inner_codec, inner_type, lower_inner) = inner
-  let optional_type = "codec.Optional(" <> inner_type <> ")"
   Properties(
-    codec.optional(name, inner_codec),
-    optional_type,
-    [name],
-    fn(prefix) {
+    build: fn(get, next) { codec.field(name, inner_codec, get, next) },
+    gleam_type: inner_type,
+    names: [name],
+    lower: fn(prefix) {
       let inner_lowered = lower_inner(prefix <> "_value")
+      let quoted = schema_materialize.escape_string_literal(name)
       LoweredProperties(
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
         native_decoder: prefix <> "_native_decode",
         native_supported: inner_lowered.native_supported,
-        declarations: list.append(lower_declarations(inner_lowered), [
+        declarations: list.append(inner_lowered.declarations, [
           "fn "
             <> prefix
             <> "_encode(item: "
-            <> optional_type
+            <> inner_type
             <> ") -> Result(List(#(String, value.Value)), codec.EncodeError) {\n"
-            <> "  codec.encode_optional_property_with("
-            <> schema_materialize.escape_string_literal(name)
+            <> "  generated.encode_required("
+            <> quoted
             <> ", "
-            <> lower_encoder(inner_lowered)
+            <> inner_lowered.encoder
             <> ", item)\n}",
           "fn "
             <> prefix
             <> "_decode(fields: List(#(String, value.Value))) -> Result("
-            <> optional_type
+            <> inner_type
             <> ", codec.DecodeError) {\n"
-            <> "  codec.decode_optional_property_with("
-            <> schema_materialize.escape_string_literal(name)
+            <> "  generated.decode_required("
+            <> quoted
             <> ", fields, "
-            <> lower_decoder(inner_lowered)
+            <> inner_lowered.decoder
             <> ")\n}",
           "fn "
             <> prefix
             <> "_native_encode(item: "
-            <> optional_type
+            <> inner_type
             <> ") -> Result(List(#(String, json.Json)), codec.EncodeError) {\n"
-            <> "  codec.encode_native_optional_property_with("
-            <> schema_materialize.escape_string_literal(name)
+            <> "  generated.encode_native_required("
+            <> quoted
             <> ", "
-            <> lower_native_encoder(inner_lowered)
+            <> inner_lowered.native_encoder
             <> ", item)\n}",
           "fn "
             <> prefix
             <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
-            <> optional_type
+            <> inner_type
             <> ", codec.DecodeError) {\n"
-            <> "  codec.decode_native_optional_property_with("
-            <> schema_materialize.escape_string_literal(name)
+            <> "  generated.decode_native_required("
+            <> quoted
             <> ", fields, "
-            <> lower_native_decoder(inner_lowered)
+            <> inner_lowered.native_decoder
             <> ")\n}",
         ]),
-        imports: ["gleam/dict", "gleam/dynamic", ..lower_imports(inner_lowered)],
+        imports: ["gleam/dict", "gleam/dynamic", ..inner_lowered.imports],
+        placeholder: inner_lowered.placeholder,
       )
     },
   )
 }
 
-/// A generated optional property using the standard `Option` representation.
-pub fn optional_option(
+/// An optional property: absent is `None`. With a `nullable` inner
+/// definition, absent, `null` and a value are `None`, `Some(None)` and
+/// `Some(Some(x))`.
+pub fn optional(
   name: String,
   inner: Definition(a),
-) -> Properties(Option(a)) {
-  let Properties(_, _, names, lower_optional) = optional(name, inner)
-  let Definition(_, inner_type, _) = inner
-  let option_type = "option.Option(" <> inner_type <> ")"
+) -> Properties(r, Option(a)) {
+  let Definition(inner_codec, inner_type, lower_inner) = inner
+  let optional_type = "option.Option(" <> inner_type <> ")"
   Properties(
-    codec.optional_option(name, runtime(inner)),
-    option_type,
-    names,
-    fn(prefix) {
-      let lowered = lower_optional(prefix <> "_optional")
-      let encode = lower_property_encoder(lowered)
-      let decode = lower_property_decoder(lowered)
-      let native_encode = lower_property_native_encoder(lowered)
-      let native_decode = lower_property_native_decoder(lowered)
+    build: fn(get, next) { codec.optional_field(name, inner_codec, get, next) },
+    gleam_type: optional_type,
+    names: [name],
+    lower: fn(prefix) {
+      let inner_lowered = lower_inner(prefix <> "_value")
+      let quoted = schema_materialize.escape_string_literal(name)
       LoweredProperties(
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
         native_decoder: prefix <> "_native_decode",
-        native_supported: lowered.native_supported,
-        declarations: list.append(lower_property_declarations(lowered), [
+        native_supported: inner_lowered.native_supported,
+        declarations: list.append(inner_lowered.declarations, [
           "fn "
             <> prefix
             <> "_encode(item: "
-            <> option_type
+            <> optional_type
             <> ") -> Result(List(#(String, value.Value)), codec.EncodeError) {\n"
-            <> "  case item {\n    option.None -> "
-            <> encode
-            <> "(codec.Missing)\n    option.Some(value) -> "
-            <> encode
-            <> "(codec.Present(value))\n  }\n}",
+            <> "  generated.encode_optional("
+            <> quoted
+            <> ", "
+            <> inner_lowered.encoder
+            <> ", item)\n}",
           "fn "
             <> prefix
             <> "_decode(fields: List(#(String, value.Value))) -> Result("
-            <> option_type
+            <> optional_type
             <> ", codec.DecodeError) {\n"
-            <> "  case "
-            <> decode
-            <> "(fields) {\n"
-            <> "    Ok(codec.Missing) -> Ok(option.None)\n"
-            <> "    Ok(codec.Present(value)) -> Ok(option.Some(value))\n"
-            <> "    Error(error) -> Error(error)\n  }\n}",
+            <> "  generated.decode_optional("
+            <> quoted
+            <> ", fields, "
+            <> inner_lowered.decoder
+            <> ")\n}",
           "fn "
             <> prefix
             <> "_native_encode(item: "
-            <> option_type
+            <> optional_type
             <> ") -> Result(List(#(String, json.Json)), codec.EncodeError) {\n"
-            <> "  case item {\n    option.None -> "
-            <> native_encode
-            <> "(codec.Missing)\n    option.Some(value) -> "
-            <> native_encode
-            <> "(codec.Present(value))\n  }\n}",
+            <> "  generated.encode_native_optional("
+            <> quoted
+            <> ", "
+            <> inner_lowered.native_encoder
+            <> ", item)\n}",
           "fn "
             <> prefix
             <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
-            <> option_type
+            <> optional_type
             <> ", codec.DecodeError) {\n"
-            <> "  case "
-            <> native_decode
-            <> "(fields) {\n"
-            <> "    Ok(codec.Missing) -> Ok(option.None)\n"
-            <> "    Ok(codec.Present(value)) -> Ok(option.Some(value))\n"
-            <> "    Error(error) -> Error(error)\n  }\n}",
+            <> "  generated.decode_native_optional("
+            <> quoted
+            <> ", fields, "
+            <> inner_lowered.native_decoder
+            <> ")\n}",
         ]),
-        imports: ["gleam/option", ..lower_property_imports(lowered)],
+        imports: [
+          "gleam/dict",
+          "gleam/dynamic",
+          "gleam/option",
+          ..inner_lowered.imports
+        ],
+        placeholder: "option.None",
       )
     },
   )
 }
 
+/// Both groups of properties, as a pair. A name in both groups is a
+/// definition mistake that `compile` reports.
 pub fn combine(
-  left: Properties(a),
-  right: Properties(b),
-) -> Result(Properties(#(a, b)), codec.PropertyError) {
-  let Properties(left_value, left_type, left_names, lower_left) = left
-  let Properties(right_value, right_type, right_names, lower_right) = right
-  case codec.combine(left_value, right_value) {
-    Error(error) -> Error(error)
-    Ok(value) ->
-      Ok(
-        Properties(
-          value,
-          "#(" <> left_type <> ", " <> right_type <> ")",
-          list.append(left_names, right_names),
-          fn(prefix) {
-            let left_lowered = lower_left(prefix <> "_left")
-            let right_lowered = lower_right(prefix <> "_right")
-            LoweredProperties(
-              encoder: prefix <> "_encode",
-              decoder: prefix <> "_decode",
-              native_encoder: prefix <> "_native_encode",
-              native_decoder: prefix <> "_native_decode",
-              native_supported: left_lowered.native_supported
-                && right_lowered.native_supported,
-              declarations: list.append(
-                lower_property_declarations(left_lowered),
-                list.append(lower_property_declarations(right_lowered), [
-                  "fn "
-                    <> prefix
-                    <> "_encode(item: #("
-                    <> left_type
-                    <> ", "
-                    <> right_type
-                    <> ")) -> Result(List(#(String, value.Value)), codec.EncodeError) {\n"
-                    <> "  codec.encode_properties_pair_with("
-                    <> lower_property_encoder(left_lowered)
-                    <> ", "
-                    <> lower_property_encoder(right_lowered)
-                    <> ", item)\n}",
-                  "fn "
-                    <> prefix
-                    <> "_decode(fields: List(#(String, value.Value))) -> Result(#("
-                    <> left_type
-                    <> ", "
-                    <> right_type
-                    <> "), codec.DecodeError) {\n  codec.decode_properties_pair_with("
-                    <> lower_property_decoder(left_lowered)
-                    <> ", "
-                    <> lower_property_decoder(right_lowered)
-                    <> ", fields)\n}",
-                  "fn "
-                    <> prefix
-                    <> "_native_encode(item: #("
-                    <> left_type
-                    <> ", "
-                    <> right_type
-                    <> ")) -> Result(List(#(String, json.Json)), codec.EncodeError) {\n"
-                    <> "  codec.encode_native_properties_pair_with("
-                    <> lower_property_native_encoder(left_lowered)
-                    <> ", "
-                    <> lower_property_native_encoder(right_lowered)
-                    <> ", item)\n}",
-                  "fn "
-                    <> prefix
-                    <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result(#("
-                    <> left_type
-                    <> ", "
-                    <> right_type
-                    <> "), codec.DecodeError) {\n"
-                    <> "  codec.decode_native_properties_pair_with("
-                    <> lower_property_native_decoder(left_lowered)
-                    <> ", "
-                    <> lower_property_native_decoder(right_lowered)
-                    <> ", fields)\n}",
-                ]),
-              ),
-              imports: list.append(
-                lower_property_imports(left_lowered),
-                lower_property_imports(right_lowered),
-              ),
-            )
-          },
-        ),
+  left: Properties(r, a),
+  right: Properties(r, b),
+) -> Properties(r, #(a, b)) {
+  let Properties(build_left, left_type, left_names, lower_left) = left
+  let Properties(build_right, right_type, right_names, lower_right) = right
+  let pair_type = "#(" <> left_type <> ", " <> right_type <> ")"
+  Properties(
+    build: fn(get: fn(r) -> #(a, b), next) {
+      build_left(fn(record) { get(record).0 }, fn(first) {
+        build_right(fn(record) { get(record).1 }, fn(second) {
+          next(#(first, second))
+        })
+      })
+    },
+    gleam_type: pair_type,
+    names: list.append(left_names, right_names),
+    lower: fn(prefix) {
+      let left_lowered = lower_left(prefix <> "_left")
+      let right_lowered = lower_right(prefix <> "_right")
+      LoweredProperties(
+        encoder: prefix <> "_encode",
+        decoder: prefix <> "_decode",
+        native_encoder: prefix <> "_native_encode",
+        native_decoder: prefix <> "_native_decode",
+        native_supported: left_lowered.native_supported
+          && right_lowered.native_supported,
+        declarations: list.flatten([
+          left_lowered.declarations,
+          right_lowered.declarations,
+          [
+            "fn "
+              <> prefix
+              <> "_encode(item: "
+              <> pair_type
+              <> ") -> Result(List(#(String, value.Value)), codec.EncodeError) {\n"
+              <> "  generated.encode_fields_pair("
+              <> left_lowered.encoder
+              <> ", "
+              <> right_lowered.encoder
+              <> ", item)\n}",
+            "fn "
+              <> prefix
+              <> "_decode(fields: List(#(String, value.Value))) -> Result("
+              <> pair_type
+              <> ", codec.DecodeError) {\n  generated.decode_fields_pair("
+              <> left_lowered.decoder
+              <> ", "
+              <> right_lowered.decoder
+              <> ", fields)\n}",
+            "fn "
+              <> prefix
+              <> "_native_encode(item: "
+              <> pair_type
+              <> ") -> Result(List(#(String, json.Json)), codec.EncodeError) {\n"
+              <> "  generated.encode_native_fields_pair("
+              <> left_lowered.native_encoder
+              <> ", "
+              <> right_lowered.native_encoder
+              <> ", item)\n}",
+            "fn "
+              <> prefix
+              <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
+              <> pair_type
+              <> ", codec.DecodeError) {\n"
+              <> "  generated.decode_native_fields_pair("
+              <> left_lowered.native_decoder
+              <> ", "
+              <> right_lowered.native_decoder
+              <> ", fields)\n}",
+          ],
+        ]),
+        imports: list.append(left_lowered.imports, right_lowered.imports),
+        placeholder: "#("
+          <> left_lowered.placeholder
+          <> ", "
+          <> right_lowered.placeholder
+          <> ")",
       )
-  }
+    },
+  )
 }
 
-pub fn object(properties: Properties(a)) -> Definition(a) {
-  let Properties(runtime_properties, object_type, names, lower_props) =
-    properties
-  Definition(codec.object(runtime_properties), object_type, fn(prefix) {
-    let lowered = lower_props(prefix <> "_properties")
+/// A closed object of the properties.
+pub fn object(properties: Properties(a, a)) -> Definition(a) {
+  let Properties(build, object_type, names, lower_properties) = properties
+  let runtime_codec = build(fn(item) { item }, codec.success)
+  Definition(runtime_codec, object_type, fn(prefix) {
+    let lowered = lower_properties(prefix <> "_properties")
     let names_name = prefix <> "_property_names"
     Lowered(
       encoder: prefix <> "_encode",
@@ -881,46 +828,47 @@ pub fn object(properties: Properties(a)) -> Definition(a) {
       native_supported: lowered.native_supported,
       declarations: [
         "const " <> names_name <> ": List(String) = " <> emit_string_list(names),
-        ..list.append(lower_property_declarations(lowered), [
+        ..list.append(lowered.declarations, [
           "fn "
             <> prefix
             <> "_encode(item: "
             <> object_type
             <> ") -> Result(value.Value, codec.EncodeError) {\n"
-            <> "  codec.encode_object_with("
-            <> lower_property_encoder(lowered)
+            <> "  generated.encode_object("
+            <> lowered.encoder
             <> ", item)\n}",
           "fn "
             <> prefix
             <> "_decode(raw: value.Value) -> Result("
             <> object_type
             <> ", codec.DecodeError) {\n"
-            <> "  codec.decode_object_with("
+            <> "  generated.decode_object("
             <> names_name
             <> ", "
-            <> lower_property_decoder(lowered)
+            <> lowered.decoder
             <> ", raw)\n}",
           "fn "
             <> prefix
             <> "_native_encode(item: "
             <> object_type
             <> ") -> Result(json.Json, codec.EncodeError) {\n"
-            <> "  codec.encode_native_object_with("
-            <> lower_property_native_encoder(lowered)
+            <> "  generated.encode_native_object("
+            <> lowered.native_encoder
             <> ", item)\n}",
           "fn "
             <> prefix
             <> "_native_decode(raw: dynamic.Dynamic) -> Result("
             <> object_type
             <> ", codec.DecodeError) {\n"
-            <> "  codec.decode_native_object_with("
+            <> "  generated.decode_native_object("
             <> names_name
             <> ", "
-            <> lower_property_native_decoder(lowered)
+            <> lowered.native_decoder
             <> ", raw)\n}",
         ])
       ],
-      imports: lower_property_imports(lowered),
+      imports: lowered.imports,
+      placeholder: lowered.placeholder,
     )
   })
 }
@@ -936,7 +884,7 @@ pub fn imap(
       let Definition(inner_codec, _, lower_inner) = inner
       let Mapping(from, to, from_reference, to_reference) = mapping
       Ok(
-        Definition(codec.imap(inner_codec, from, to), output_type, fn(prefix) {
+        Definition(codec.map(inner_codec, from, to), output_type, fn(prefix) {
           let inner_lowered = lower_inner(prefix <> "_inner")
           let from_expr = normalize_reference_unchecked(from_reference)
           let to_expr = normalize_reference_unchecked(to_reference)
@@ -950,14 +898,14 @@ pub fn imap(
             native_encoder: prefix <> "_native_encode",
             native_decoder: prefix <> "_native_decode",
             native_supported: inner_lowered.native_supported,
-            declarations: list.append(lower_declarations(inner_lowered), [
+            declarations: list.append(inner_lowered.declarations, [
               "fn "
                 <> prefix
                 <> "_encode(item: "
                 <> output_type
                 <> ") -> Result(value.Value, codec.EncodeError) {\n"
-                <> "  codec.encode_mapped_with("
-                <> lower_encoder(inner_lowered)
+                <> "  generated.encode_mapped("
+                <> inner_lowered.encoder
                 <> ", "
                 <> to_expr
                 <> ", item)\n}",
@@ -966,8 +914,8 @@ pub fn imap(
                 <> "_decode(raw: value.Value) -> Result("
                 <> output_type
                 <> ", codec.DecodeError) {\n"
-                <> "  codec.decode_mapped_with("
-                <> lower_decoder(inner_lowered)
+                <> "  generated.decode_mapped("
+                <> inner_lowered.decoder
                 <> ", "
                 <> from_expr
                 <> ", raw)\n}",
@@ -977,7 +925,7 @@ pub fn imap(
                 <> output_type
                 <> ") -> Result(json.Json, codec.EncodeError) {\n"
                 <> "  "
-                <> lower_native_encoder(inner_lowered)
+                <> inner_lowered.native_encoder
                 <> "("
                 <> to_expr
                 <> "(item))\n}",
@@ -987,12 +935,13 @@ pub fn imap(
                 <> output_type
                 <> ", codec.DecodeError) {\n"
                 <> "  case "
-                <> lower_native_decoder(inner_lowered)
+                <> inner_lowered.native_decoder
                 <> "(raw) {\n    Ok(item) -> Ok("
                 <> from_expr
                 <> "(item))\n    Error(error) -> Error(error)\n  }\n}",
             ]),
-            imports: list.append(lower_imports(inner_lowered), modules),
+            imports: list.append(inner_lowered.imports, modules),
+            placeholder: from_expr <> "(" <> inner_lowered.placeholder <> ")",
           )
         }),
       )
@@ -1057,6 +1006,9 @@ fn compile_valid(
 ) -> Result(GeneratedModule, CompileError) {
   let Definition(runtime_codec, type_name, lower) = definition
   use type_reference <- result.try(parse_type_reference(type_name))
+  use _ <- result.try(
+    codec.check(runtime_codec) |> result.map_error(InvalidDefinition),
+  )
   let lowered = lower(name <> "_compiled")
   case lowered.native_supported {
     False -> Error(NativeNumberUnsupported)
@@ -1082,12 +1034,13 @@ fn compile_supported(
     list.append(
       [
         "gleam/dynamic",
-        "gleam/dynamic/decode",
         "gleam/json",
+        "gleam/option",
         "json/blueprint/codec",
+        "json/blueprint/internal/generated",
         "json/blueprint/value",
       ],
-      lower_imports(lowered),
+      lowered.imports,
     )
     |> unique_sorted
   use validated_imports <- result.try(validate_imports(type_reference, imports))
@@ -1097,13 +1050,12 @@ fn compile_supported(
       case schema_materialize.emit_schema_expression(schema, [name]) {
         Error(error) -> Error(translate_schema_error(error))
         Ok(schema_expression) -> {
-          let declarations = lower_declarations(lowered)
+          let declarations = lowered.declarations
           let encoder_name = "encode_" <> name
           let decoder_name = "decode_" <> name
           let json_encoder_name = "encode_" <> name <> "_json"
           let json_decoder_name = "decode_" <> name <> "_json"
           let native_json_decoder_name = json_decoder_name <> "_native"
-          let native_json_parser_name = "parse_" <> name <> "_json_native"
           let schema_name = name <> "_schema"
           let codec_name = name <> "_codec"
           let body =
@@ -1125,14 +1077,14 @@ fn compile_supported(
             <> "(item: "
             <> type_reference.expression
             <> ") -> Result(value.Value, codec.EncodeError) {\n  "
-            <> lower_encoder(lowered)
+            <> lowered.encoder
             <> "(item)\n}\n\n"
             <> "pub fn "
             <> decoder_name
             <> "(raw: value.Value) -> Result("
             <> type_reference.expression
             <> ", codec.DecodeError) {\n  "
-            <> lower_decoder(lowered)
+            <> lowered.decoder
             <> "(raw)\n}\n\n"
             <> "pub fn "
             <> json_encoder_name
@@ -1140,38 +1092,26 @@ fn compile_supported(
             <> type_reference.expression
             <> ") -> Result(String, codec.EncodeError) {\n"
             <> "  case "
-            <> lower_native_encoder(lowered)
+            <> lowered.native_encoder
             <> "(item) {\n    Error(error) -> Error(error)\n    Ok(encoded) -> Ok(json.to_string(encoded))\n  }\n}\n\n"
             <> "pub fn "
             <> json_decoder_name
             <> "(source: String) -> Result("
             <> type_reference.expression
-            <> ", codec.JsonDecodeError) {\n"
-            <> "  codec.decode_json(codec.from_parts("
-            <> encoder_name
-            <> ", "
-            <> decoder_name
-            <> ", "
-            <> schema_name
-            <> "()), source)\n}\n\n"
+            <> ", codec.DecodeError) {\n"
+            <> "  codec.decode_json("
+            <> codec_name
+            <> "(), source)\n}\n\n"
             <> "pub fn "
             <> native_json_decoder_name
             <> "(source: String) -> Result("
             <> type_reference.expression
-            <> ", codec.JsonDecodeError) {\n"
-            <> "  codec.decode_json_native("
-            <> codec_name
-            <> "(), source)\n}\n\n"
-            <> "fn "
-            <> native_json_parser_name
-            <> "(source: String) -> Result("
-            <> type_reference.expression
-            <> ", codec.JsonDecodeError) {\n"
-            <> "  case json.parse(from: source, using: decode.dynamic) {\n"
-            <> "    Error(error) -> Error(codec.NativeJsonFailure(error))\n"
-            <> "    Ok(raw) -> case "
-            <> lower_native_decoder(lowered)
-            <> "(raw) {\n      Ok(item) -> Ok(item)\n      Error(error) -> Error(codec.TypedCodecFailure(error))\n    }\n  }\n}\n\n"
+            <> ", json.DecodeError) {\n"
+            <> "  generated.decode_json_native(source, "
+            <> lowered.native_decoder
+            <> ", "
+            <> lowered.placeholder
+            <> ")\n}\n\n"
             <> "pub fn "
             <> schema_name
             <> "() -> codec.Schema {\n  "
@@ -1181,17 +1121,15 @@ fn compile_supported(
             <> codec_name
             <> "() -> codec.Codec("
             <> type_reference.expression
-            <> ") {\n  codec.from_json_parts("
+            <> ") {\n  codec.custom(\n    encode: "
             <> encoder_name
-            <> ", "
+            <> ",\n    decode: "
             <> decoder_name
-            <> ", "
-            <> json_encoder_name
-            <> ", "
-            <> native_json_parser_name
-            <> ", "
+            <> ",\n    schema: option.Some("
             <> schema_name
-            <> "())\n}\n"
+            <> "()),\n    placeholder: "
+            <> lowered.placeholder
+            <> ",\n  )\n}\n"
           let fingerprint = fingerprint(body)
           let content =
             string.replace(
@@ -1583,66 +1521,6 @@ fn reference_with_alias(module: String, reference: String) -> String {
     [] -> module
   }
   alias <> "." <> name
-}
-
-fn lower_encoder(lowered: Lowered) -> String {
-  let Lowered(encoder, _, _, _, _, _, _) = lowered
-  encoder
-}
-
-fn lower_decoder(lowered: Lowered) -> String {
-  let Lowered(_, decoder, _, _, _, _, _) = lowered
-  decoder
-}
-
-fn lower_native_encoder(lowered: Lowered) -> String {
-  let Lowered(_, _, encoder, _, _, _, _) = lowered
-  encoder
-}
-
-fn lower_native_decoder(lowered: Lowered) -> String {
-  let Lowered(_, _, _, decoder, _, _, _) = lowered
-  decoder
-}
-
-fn lower_declarations(lowered: Lowered) -> List(String) {
-  let Lowered(_, _, _, _, _, declarations, _) = lowered
-  declarations
-}
-
-fn lower_imports(lowered: Lowered) -> List(String) {
-  let Lowered(_, _, _, _, _, _, imports) = lowered
-  imports
-}
-
-fn lower_property_encoder(lowered: LoweredProperties) -> String {
-  let LoweredProperties(encoder, _, _, _, _, _, _) = lowered
-  encoder
-}
-
-fn lower_property_decoder(lowered: LoweredProperties) -> String {
-  let LoweredProperties(_, decoder, _, _, _, _, _) = lowered
-  decoder
-}
-
-fn lower_property_native_encoder(lowered: LoweredProperties) -> String {
-  let LoweredProperties(_, _, encoder, _, _, _, _) = lowered
-  encoder
-}
-
-fn lower_property_native_decoder(lowered: LoweredProperties) -> String {
-  let LoweredProperties(_, _, _, decoder, _, _, _) = lowered
-  decoder
-}
-
-fn lower_property_declarations(lowered: LoweredProperties) -> List(String) {
-  let LoweredProperties(_, _, _, _, _, declarations, _) = lowered
-  declarations
-}
-
-fn lower_property_imports(lowered: LoweredProperties) -> List(String) {
-  let LoweredProperties(_, _, _, _, _, _, imports) = lowered
-  imports
 }
 
 fn emit_string_list(items: List(String)) -> String {

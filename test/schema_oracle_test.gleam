@@ -1,11 +1,14 @@
-import gleam/json
+//// The schema oracle corpus: each family is a codec and instances it must
+//// accept or reject. `schema_oracle_runner` emits the same corpus for
+//// `schema_check.py`, which checks the emitted schemas with Python
+//// `jsonschema` Draft 2020-12 against `schema_manifest.json`.
+
 import gleam/list
-import gleam/string
+import gleam/option.{type Option}
 import gleeunit/should
 import json/blueprint/codec
-import json/blueprint/document
+import json/blueprint/contract
 import json/blueprint/number
-import json/blueprint/runtime
 import json/blueprint/value
 
 pub type Priority {
@@ -20,14 +23,11 @@ pub type DecorativeLabel {
 }
 
 pub type PriorityRequest {
-  PriorityRequest(
-    priority: Priority,
-    note: codec.Optional(codec.Nullable(String)),
-  )
+  PriorityRequest(priority: Priority, note: Option(Option(String)))
 }
 
 pub type UpdateRecord {
-  UpdateRecord(name: String, note: codec.Optional(codec.Nullable(String)))
+  UpdateRecord(name: String, note: Option(Option(String)))
 }
 
 pub type Decision {
@@ -35,20 +35,118 @@ pub type Decision {
   Decline(reason: String)
 }
 
+pub type Signal {
+  Dim(level: Int)
+  Blink(pattern: List(Bool))
+  On
+  Off
+}
+
 fn int_num(n: Int) -> number.Number {
   let assert Ok(num) = number.from_int(n)
   num
 }
 
+pub fn int_value(n: Int) -> value.Value {
+  value.Number(int_num(n))
+}
+
+// --- corpus codecs -----------------------------------------------------------
+
+pub fn priority_codec() -> codec.Codec(Priority) {
+  codec.string_enum([#("low", Low), #("normal", Normal), #("urgent", Urgent)])
+}
+
+pub fn decorative_codec() -> codec.Codec(DecorativeLabel) {
+  codec.string_enum([#("", EmptyLabel), #("quoted \"雪猫", QuotedUnicodeLabel)])
+}
+
+pub fn priority_request_codec() -> codec.Codec(PriorityRequest) {
+  use priority <- codec.field(
+    "priority",
+    priority_codec(),
+    fn(r: PriorityRequest) { r.priority },
+  )
+  use note <- codec.optional_field(
+    "note",
+    codec.nullable(codec.string()),
+    fn(r: PriorityRequest) { r.note },
+  )
+  codec.success(PriorityRequest(priority:, note:))
+}
+
+pub fn update_record_codec() -> codec.Codec(UpdateRecord) {
+  use name <- codec.field("name", codec.string(), fn(r: UpdateRecord) { r.name })
+  use note <- codec.optional_field(
+    "note",
+    codec.nullable(codec.string()),
+    fn(r: UpdateRecord) { r.note },
+  )
+  codec.success(UpdateRecord(name:, note:))
+}
+
+pub fn decision_codec() -> codec.Codec(Decision) {
+  let approve = {
+    use quantity <- codec.field(
+      "quantity",
+      codec.integer_between(1, 100),
+      fn(q: Int) { q },
+    )
+    codec.success(quantity)
+  }
+  let decline = {
+    use reason <- codec.field("reason", codec.string(), fn(r: String) { r })
+    codec.success(reason)
+  }
+  codec.union({
+    use approve <- codec.variant("approve", approve, Approve)
+    use decline <- codec.variant("decline", decline, Decline)
+    codec.match(fn(decision) {
+      case decision {
+        Approve(quantity) -> approve(quantity)
+        Decline(reason) -> decline(reason)
+      }
+    })
+  })
+}
+
+pub fn signal_codec() -> codec.Codec(Signal) {
+  codec.union({
+    use dim <- codec.variant("dim", codec.integer_between(0, 10), Dim)
+    use blink <- codec.variant("blink", codec.list(codec.bool()), Blink)
+    use on <- codec.unit_variant("on", On)
+    use off <- codec.unit_variant("off", Off)
+    codec.match(fn(signal) {
+      case signal {
+        Dim(level) -> dim(level)
+        Blink(pattern) -> blink(pattern)
+        On -> on
+        Off -> off
+      }
+    })
+  })
+}
+
+pub fn empty_object_codec() -> codec.Codec(Nil) {
+  codec.success(Nil)
+}
+
+// --- the check ---------------------------------------------------------------
+
+/// Decoding and contract validation agree on every instance, and the schema
+/// document loads back to the codec's contract.
 fn run_corpus_case(
   codec: codec.Codec(a),
   instances: List(#(value.Value, Bool)),
 ) {
   let assert Ok(schema) = codec.schema(codec)
-  let assert Ok(contract) = runtime.from_codec(codec)
+  let assert Ok(from_codec) = contract.from_codec(codec)
   let schema_doc = codec.schema_document(schema)
-  let assert Ok(loaded) = document.load(schema_doc)
-  let assert True = runtime.same_schema(contract, loaded)
+  let assert Ok(loaded) = contract.load(schema_doc)
+  let assert True = contract.same_schema(from_codec, loaded)
+  let assert Ok(reparsed) =
+    contract.parse(value.to_string(schema_doc), value.default_limits())
+  let assert True = contract.same_schema(from_codec, reparsed)
 
   list.each(instances, fn(case_data) {
     let #(instance, expected_accepted) = case_data
@@ -56,43 +154,34 @@ fn run_corpus_case(
       Ok(_) -> True
       Error(_) -> False
     }
-    let runtime_accepted = case runtime.validate(contract, instance) {
-      Ok(_) -> True
+    let contract_accepted = case contract.validate(loaded, instance) {
+      Ok(validated) -> {
+        // A validated value decodes through the contract
+        let assert Ok(_) = contract.decode(codec, validated)
+        True
+      }
       Error(_) -> False
     }
     decode_accepted |> should.equal(expected_accepted)
-    runtime_accepted |> should.equal(expected_accepted)
+    contract_accepted |> should.equal(expected_accepted)
   })
 }
 
 pub fn corpus_finite_priority_test() {
-  let assert Ok(priority) =
-    codec.string_enum([
-      #("low", Low),
-      #("normal", Normal),
-      #("urgent", Urgent),
-    ])
-
-  run_corpus_case(priority, [
+  run_corpus_case(priority_codec(), [
     #(value.String("low"), True),
     #(value.String("normal"), True),
     #(value.String("urgent"), True),
     #(value.String("LOW"), False),
     #(value.String("critical"), False),
     #(value.String(""), False),
-    #(value.Number(int_num(1)), False),
+    #(int_value(1), False),
     #(value.Null, False),
   ])
 }
 
 pub fn corpus_finite_unusual_labels_test() {
-  let assert Ok(decorative) =
-    codec.string_enum([
-      #("", EmptyLabel),
-      #("quoted \"雪猫", QuotedUnicodeLabel),
-    ])
-
-  run_corpus_case(decorative, [
+  run_corpus_case(decorative_codec(), [
     #(value.String(""), True),
     #(value.String("quoted \"雪猫"), True),
     #(value.String("雪猫"), False),
@@ -101,26 +190,7 @@ pub fn corpus_finite_unusual_labels_test() {
 }
 
 pub fn corpus_finite_object_test() {
-  let assert Ok(priority) =
-    codec.string_enum([
-      #("low", Low),
-      #("normal", Normal),
-      #("urgent", Urgent),
-    ])
-
-  let assert Ok(props) =
-    codec.combine(
-      codec.required("priority", priority),
-      codec.optional("note", codec.nullable(codec.string())),
-    )
-  let priority_request =
-    codec.imap(
-      codec.object(props),
-      fn(raw) { PriorityRequest(raw.0, raw.1) },
-      fn(req) { #(req.priority, req.note) },
-    )
-
-  run_corpus_case(priority_request, [
+  run_corpus_case(priority_request_codec(), [
     #(value.Object([#("priority", value.String("urgent"))]), True),
     #(
       value.Object([
@@ -147,16 +217,7 @@ pub fn corpus_finite_object_test() {
 }
 
 pub fn corpus_finite_list_nullable_test() {
-  let assert Ok(priority) =
-    codec.string_enum([
-      #("low", Low),
-      #("normal", Normal),
-      #("urgent", Urgent),
-    ])
-
-  let c = codec.list(codec.nullable(priority))
-
-  run_corpus_case(c, [
+  run_corpus_case(codec.list(codec.nullable(priority_codec())), [
     #(value.Array([]), True),
     #(
       value.Array([value.String("low"), value.Null, value.String("urgent")]),
@@ -170,14 +231,14 @@ pub fn corpus_finite_list_nullable_test() {
 pub fn corpus_text_test() {
   run_corpus_case(codec.string(), [
     #(value.String("hello"), True),
-    #(value.Number(int_num(1)), False),
+    #(int_value(1), False),
     #(value.Null, False),
   ])
 }
 
 pub fn corpus_integer_test() {
   run_corpus_case(codec.int(), [
-    #(value.Number(int_num(0)), True),
+    #(int_value(0), True),
     #(value.String("1"), False),
     #(value.Bool(True), False),
   ])
@@ -186,64 +247,39 @@ pub fn corpus_integer_test() {
 pub fn corpus_boolean_test() {
   run_corpus_case(codec.bool(), [
     #(value.Bool(False), True),
-    #(value.Number(int_num(0)), False),
+    #(int_value(0), False),
   ])
 }
 
 pub fn corpus_pair_test() {
-  let c = codec.pair(codec.string(), codec.int())
-
-  run_corpus_case(c, [
-    #(value.Array([value.String("a"), value.Number(int_num(1))]), True),
+  run_corpus_case(codec.pair(codec.string(), codec.int()), [
+    #(value.Array([value.String("a"), int_value(1)]), True),
     #(value.Array([]), False),
     #(value.Array([value.String("a")]), False),
-    #(
-      value.Array([
-        value.String("a"),
-        value.Number(int_num(1)),
-        value.Number(int_num(2)),
-      ]),
-      False,
-    ),
-    #(value.Array([value.Number(int_num(1)), value.String("a")]), False),
+    #(value.Array([value.String("a"), int_value(1), int_value(2)]), False),
+    #(value.Array([int_value(1), value.String("a")]), False),
   ])
 }
 
 pub fn corpus_list_nullable_test() {
-  let c = codec.list(codec.nullable(codec.int()))
-
-  run_corpus_case(c, [
+  run_corpus_case(codec.list(codec.nullable(codec.int())), [
     #(value.Array([]), True),
-    #(value.Array([value.Null, value.Number(int_num(2))]), True),
+    #(value.Array([value.Null, int_value(2)]), True),
     #(value.Array([value.String("bad")]), False),
     #(value.Null, False),
   ])
 }
 
 pub fn corpus_empty_object_test() {
-  let c = codec.object(codec.empty())
-
-  run_corpus_case(c, [
+  run_corpus_case(empty_object_codec(), [
     #(value.Object([]), True),
-    #(value.Object([#("x", value.Number(int_num(1)))]), False),
+    #(value.Object([#("x", int_value(1))]), False),
     #(value.Null, False),
   ])
 }
 
 pub fn corpus_optional_nullable_record_test() {
-  let assert Ok(update_props) =
-    codec.combine(
-      codec.required("name", codec.string()),
-      codec.optional("note", codec.nullable(codec.string())),
-    )
-  let update_codec =
-    codec.imap(
-      codec.object(update_props),
-      fn(raw) { UpdateRecord(raw.0, raw.1) },
-      fn(rec) { #(rec.name, rec.note) },
-    )
-
-  run_corpus_case(update_codec, [
+  run_corpus_case(update_record_codec(), [
     #(value.Object([#("name", value.String("Ada"))]), True),
     #(
       value.Object([#("name", value.String("Ada")), #("note", value.Null)]),
@@ -257,10 +293,7 @@ pub fn corpus_optional_nullable_record_test() {
       True,
     ),
     #(
-      value.Object([
-        #("name", value.String("Ada")),
-        #("note", value.Number(int_num(1))),
-      ]),
+      value.Object([#("name", value.String("Ada")), #("note", int_value(1))]),
       False,
     ),
     #(
@@ -272,56 +305,29 @@ pub fn corpus_optional_nullable_record_test() {
 }
 
 pub fn corpus_inclusive_bounds_test() {
-  let assert Ok(range) = codec.integer_between(-2, 2)
-
-  run_corpus_case(range, [
-    #(value.Number(int_num(-3)), False),
-    #(value.Number(int_num(-2)), True),
-    #(value.Number(int_num(0)), True),
-    #(value.Number(int_num(2)), True),
-    #(value.Number(int_num(3)), False),
+  run_corpus_case(codec.integer_between(-2, 2), [
+    #(int_value(-3), False),
+    #(int_value(-2), True),
+    #(int_value(0), True),
+    #(int_value(2), True),
+    #(int_value(3), False),
     #(value.String("2"), False),
   ])
 }
 
 pub fn corpus_tagged_decision_test() {
-  let assert Ok(quantity) = codec.integer_between(1, 100)
-  let assert Ok(decision_tagged) =
-    codec.tagged(
-      "approve",
-      codec.field("quantity", quantity),
-      "decline",
-      codec.field("reason", codec.string()),
-    )
-  let decision_codec =
-    codec.imap(
-      decision_tagged,
-      fn(choice) {
-        case choice {
-          codec.Left(q) -> Approve(q)
-          codec.Right(r) -> Decline(r)
-        }
-      },
-      fn(d) {
-        case d {
-          Approve(q) -> codec.Left(q)
-          Decline(r) -> codec.Right(r)
-        }
-      },
-    )
-
-  run_corpus_case(decision_codec, [
+  run_corpus_case(decision_codec(), [
     #(
       value.Object([
         #("tag", value.String("approve")),
-        #("value", value.Object([#("quantity", value.Number(int_num(1)))])),
+        #("value", value.Object([#("quantity", int_value(1))])),
       ]),
       True,
     ),
     #(
       value.Object([
         #("tag", value.String("approve")),
-        #("value", value.Object([#("quantity", value.Number(int_num(0)))])),
+        #("value", value.Object([#("quantity", int_value(0))])),
       ]),
       False,
     ),
@@ -353,25 +359,63 @@ pub fn corpus_tagged_decision_test() {
   ])
 }
 
-pub fn value_to_json_string(val: value.Value) -> String {
-  case val {
-    value.Null -> "null"
-    value.Bool(True) -> "true"
-    value.Bool(False) -> "false"
-    value.String(s) -> json.string(s) |> json.to_string
-    value.Number(n) -> number.number_text(n)
-    value.Array(items) ->
-      "[" <> string.join(list.map(items, value_to_json_string), ",") <> "]"
-    value.Object(pairs) ->
-      "{"
-      <> string.join(
-        list.map(pairs, fn(pair) {
-          { json.string(pair.0) |> json.to_string }
-          <> ":"
-          <> value_to_json_string(pair.1)
-        }),
-        ",",
-      )
-      <> "}"
-  }
+pub fn corpus_union_unit_variants_test() {
+  run_corpus_case(
+    signal_codec(),
+    signal_instances()
+      |> list.map(fn(item) { #(item.1, item.2) }),
+  )
+}
+
+/// The `union-unit-variants` family: name, instance, accepted.
+pub fn signal_instances() -> List(#(String, value.Value, Bool)) {
+  [
+    #("valid-unit-on", value.Object([#("tag", value.String("on"))]), True),
+    #("valid-unit-off", value.Object([#("tag", value.String("off"))]), True),
+    #(
+      "valid-payload-dim",
+      value.Object([#("tag", value.String("dim")), #("value", int_value(10))]),
+      True,
+    ),
+    #(
+      "valid-payload-blink",
+      value.Object([
+        #("tag", value.String("blink")),
+        #("value", value.Array([value.Bool(True), value.Bool(False)])),
+      ]),
+      True,
+    ),
+    #(
+      "rejected-unit-with-value",
+      value.Object([#("tag", value.String("on")), #("value", value.Null)]),
+      False,
+    ),
+    #(
+      "rejected-payload-missing-value",
+      value.Object([#("tag", value.String("dim"))]),
+      False,
+    ),
+    #(
+      "rejected-payload-out-of-range",
+      value.Object([#("tag", value.String("dim")), #("value", int_value(11))]),
+      False,
+    ),
+    #(
+      "rejected-unknown-tag",
+      value.Object([#("tag", value.String("strobe"))]),
+      False,
+    ),
+    #("rejected-missing-tag", value.Object([]), False),
+    #(
+      "rejected-non-string-tag",
+      value.Object([#("tag", value.Bool(True))]),
+      False,
+    ),
+    #(
+      "rejected-extra-member",
+      value.Object([#("tag", value.String("off")), #("note", value.Null)]),
+      False,
+    ),
+    #("rejected-type-string", value.String("on"), False),
+  ]
 }

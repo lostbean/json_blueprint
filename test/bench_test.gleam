@@ -4,14 +4,13 @@ import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec
 import json/blueprint/codegen
-import json/blueprint/json_text
+import json/blueprint/contract
 import json/blueprint/number
-import json/blueprint/parser
-import json/blueprint/runtime
 import json/blueprint/value
 import materialize_fixtures
 import vanilla_order
@@ -98,8 +97,17 @@ pub type BenchUser {
 }
 
 pub fn run_all_benchmarks() -> List(BenchResult) {
-  let assert Ok(num_limits) = number.number_limits(1024, 100, 1000)
-  let assert Ok(p_limits) = parser.parser_limits(100_000, 32, num_limits)
+  let num_limits =
+    number.limits(
+      max_token_bytes: 1024,
+      max_significant_digits: 100,
+      max_exponent: 1000,
+    )
+  let p_limits =
+    value.default_limits()
+    |> value.with_max_bytes(100_000)
+    |> value.with_max_depth(32)
+    |> value.with_number_limits(num_limits)
 
   // 1. Number parse and canonicalize benchmark (7 tokens per batch)
   let number_tokens = [
@@ -108,8 +116,8 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
   let bench_number =
     run_benchmark("number_parse_canonical_7_token_batch", 200, 5, 200, fn() {
       list.each(number_tokens, fn(token) {
-        let assert Ok(num) = number.parse_number(num_limits, token)
-        let _ = number.number_text(num)
+        let assert Ok(num) = number.parse(token, num_limits)
+        let _ = number.to_string(num)
         Nil
       })
     })
@@ -119,8 +127,7 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
     "{\"title\": \"bench\", \"count\": 42, \"items\": [1, 2, 3], \"active\": true, \"note\": null}"
   let bench_parser =
     run_benchmark("parser_document_admission", 200, 5, 200, fn() {
-      let assert Ok(_val) =
-        parser.parse_value_from_string(p_limits, sample_json)
+      let assert Ok(_val) = value.parse(sample_json, p_limits)
       Nil
     })
 
@@ -131,7 +138,7 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
       codec.PropertySchema("age", True, codec.IntegerRangeSchema(0, 120)),
       codec.PropertySchema("tags", True, codec.ListSchema(codec.StringSchema)),
     ])
-  let assert Ok(contract) = runtime.from_schema(user_schema)
+  let assert Ok(user_contract) = contract.from_schema(user_schema)
   let assert Ok(num36) = number.from_int(36)
   let sample_user_val =
     value.Object([
@@ -147,29 +154,22 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
     ])
   let bench_runtime =
     run_benchmark("runtime_contract_validation", 200, 5, 200, fn() {
-      let assert Ok(_validated) = runtime.validate(contract, sample_user_val)
+      let assert Ok(_validated) =
+        contract.validate(user_contract, sample_user_val)
       Nil
     })
 
   // 4. Codec roundtrip benchmark
-  let assert Ok(user_props) =
-    codec.combine(
-      codec.required("name", codec.string()),
-      codec.required("age", codec.int()),
+  let user_codec = {
+    use name <- codec.field("name", codec.string(), fn(u: BenchUser) { u.name })
+    use age <- codec.field("age", codec.int(), fn(u: BenchUser) { u.age })
+    use tags <- codec.field(
+      "tags",
+      codec.list(codec.string()),
+      fn(u: BenchUser) { u.tags },
     )
-  let assert Ok(full_props) =
-    codec.combine(
-      user_props,
-      codec.required("tags", codec.list(codec.string())),
-    )
-  let user_codec =
-    codec.imap(
-      codec.object(full_props),
-      fn(raw: #(#(String, Int), List(String))) {
-        BenchUser(raw.0.0, raw.0.1, raw.1)
-      },
-      fn(u: BenchUser) { #(#(u.name, u.age), u.tags) },
-    )
+    codec.success(BenchUser(name:, age:, tags:))
+  }
   let user_instance = BenchUser("Ada Lovelace", 36, ["computing", "math"])
   let bench_codec =
     run_benchmark("codec_encode_decode_roundtrip", 200, 5, 200, fn() {
@@ -187,7 +187,7 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
 pub fn print_benchmark_report(results: List(BenchResult)) -> Nil {
   io.println("\n--- json_blueprint Benchmark Suite Results ---")
   io.println(
-    "order_*_complete_text cases include rendering or parsing; legacy_value_* cases exclude JSON text conversion; native_* diagnostics isolate parser/helper work.",
+    "order_*_complete_text cases include rendering or parsing (generated native_direct cases use gleam/json; strict and wrapper cases use the Blueprint parser); legacy_value_* cases exclude JSON text conversion; native_* diagnostics isolate parser/helper work.",
   )
   list.each(results, fn(r) {
     io.println(
@@ -212,7 +212,7 @@ pub fn print_benchmark_report(results: List(BenchResult)) -> Nil {
 
 pub fn benchmark_suite_test() {
   let results = run_all_benchmarks()
-  list.length(results) |> should.equal(24)
+  list.length(results) |> should.equal(25)
 
   list.each(results, fn(res) {
     should.equal(res.sample_iterations, 1000)
@@ -241,8 +241,9 @@ pub fn order_codec_benchmark_inventory_test() {
     "order_runtime_reused_complete_text_decode",
     "order_generated_native_direct_complete_text_encode",
     "order_generated_native_direct_complete_text_decode",
-    "order_generated_native_wrapper_complete_text_encode",
-    "order_generated_native_wrapper_complete_text_decode",
+    "order_generated_strict_direct_complete_text_decode",
+    "order_generated_wrapper_complete_text_encode",
+    "order_generated_wrapper_complete_text_decode",
     "order_vanilla_complete_text_encode",
     "order_vanilla_complete_text_decode",
     "native_gleam_json_dynamic_parse",
@@ -254,7 +255,7 @@ pub fn order_codec_benchmark_inventory_test() {
     "legacy_value_runtime_reused_decode",
   ]
 
-  should.equal(list.length(results), 20)
+  should.equal(list.length(results), 21)
   list.all(required_cases, fn(required) { list.contains(case_names, required) })
   |> should.be_true
 
@@ -274,11 +275,7 @@ pub fn native_complete_text_backends_match_for_order_variants_test() {
   let runtime = codegen.runtime(materialize_fixtures.order_definition())
   let generated = order_codec.order_codec()
   let vanilla_decoder = vanilla_order.decoder()
-  let notes = [
-    codec.Missing,
-    codec.Present(codec.Null),
-    codec.Present(codec.NonNull("leave\n\r\f\t\\door 🚀")),
-  ]
+  let notes = [None, Some(None), Some(Some("leave\n\r\f\t\\door 🚀"))]
   let statuses = [
     materialize_fixtures.Pending,
     materialize_fixtures.Processing,
@@ -301,6 +298,10 @@ pub fn native_complete_text_backends_match_for_order_variants_test() {
       |> should.equal(Ok(order))
       order_codec.decode_order_json(wire)
       |> should.equal(Ok(order))
+      order_codec.decode_order_json_native(wire)
+      |> should.equal(Ok(order))
+      json.parse(from: wire, using: codec.decoder(generated))
+      |> should.equal(Ok(order))
       json.parse(from: wire, using: vanilla_decoder)
       |> should.equal(Ok(order))
     })
@@ -308,7 +309,7 @@ pub fn native_complete_text_backends_match_for_order_variants_test() {
 }
 
 fn order_for_text_parity(
-  note: codec.Optional(codec.Nullable(String)),
+  note: Option(Option(String)),
   status: materialize_fixtures.OrderStatus,
 ) -> materialize_fixtures.Order {
   materialize_fixtures.Order(
@@ -327,21 +328,21 @@ pub fn vanilla_order_baseline_matches_blueprint_wire_shape_test() {
     materialize_fixtures.Order(
       42,
       [#("widget", 2), #("雪 🚀", 7)],
-      codec.Missing,
+      None,
       True,
       materialize_fixtures.Pending,
     ),
     materialize_fixtures.Order(
       42,
       [#("widget", 2), #("雪 🚀", 7)],
-      codec.Present(codec.Null),
+      Some(None),
       True,
       materialize_fixtures.Processing,
     ),
     materialize_fixtures.Order(
       42,
       [#("widget", 2), #("雪 🚀", 7)],
-      codec.Present(codec.NonNull("leave at door")),
+      Some(Some("leave at door")),
       True,
       materialize_fixtures.DeliveredUnicode,
     ),
@@ -351,12 +352,11 @@ pub fn vanilla_order_baseline_matches_blueprint_wire_shape_test() {
     let assert Ok(blueprint_value) = codec.encode(runtime, order)
     let assert Ok(generated_value) = codec.encode(generated, order)
     let assert Ok(vanilla_json) = vanilla_order.encode(order)
-    let wire = json_text.render_value(blueprint_value)
+    let wire = value.to_string(blueprint_value)
     should.equal(generated_value, blueprint_value)
     should.equal(json.to_string(vanilla_json), wire)
 
-    let assert Ok(blueprint_input) =
-      parser.parse_value_from_string(parser.default_limits(), wire)
+    let assert Ok(blueprint_input) = value.parse(wire, value.default_limits())
     let assert Ok(dynamic_input) = json.parse(from: wire, using: decode.dynamic)
     should.equal(codec.decode(runtime, blueprint_input), Ok(order))
     should.equal(order_codec.decode_order(blueprint_input), Ok(order))
@@ -371,7 +371,7 @@ pub fn vanilla_order_baseline_matches_blueprint_wire_shape_test() {
     materialize_fixtures.Order(
       1_000_000,
       [#("widget", 2)],
-      codec.Missing,
+      None,
       True,
       materialize_fixtures.Pending,
     )
@@ -382,7 +382,7 @@ pub fn vanilla_order_baseline_matches_blueprint_wire_shape_test() {
 
   let assert [valid_order, ..] = candidates
   let assert Ok(valid_value) = codec.encode(runtime, valid_order)
-  let valid_wire = json_text.render_value(valid_value)
+  let valid_wire = value.to_string(valid_value)
   let out_of_range_wire =
     string.replace(
       valid_wire,
@@ -398,7 +398,7 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
     materialize_fixtures.Order(
       42,
       [#("widget", 2), #("雪 🚀", 7)],
-      codec.Present(codec.NonNull("leave at door")),
+      Some(Some("leave at door")),
       True,
       materialize_fixtures.ShippedQuoted,
     )
@@ -424,17 +424,18 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
   |> should.equal(Ok(order))
   order_codec.decode_order_json(wire_json)
   |> should.equal(Ok(order))
+  order_codec.decode_order_json_native(wire_json)
+  |> should.equal(Ok(order))
   codec.decode_json(generated_codec, wire_json)
   |> should.equal(Ok(order))
   json.parse(from: wire_json, using: vanilla_decoder)
   |> should.equal(Ok(order))
 
-  let limits = parser.default_limits()
   let assert Ok(runtime_value) = codec.encode(runtime_codec, order)
-  let legacy_wire = json_text.render_value(runtime_value)
+  let legacy_wire = value.to_string(runtime_value)
   should.equal(legacy_wire, wire_json)
   let assert Ok(blueprint_input) =
-    parser.parse_value_from_string(limits, legacy_wire)
+    value.parse(legacy_wire, value.default_limits())
   should.equal(codec.decode(runtime_codec, blueprint_input), Ok(order))
   should.equal(order_codec.decode_order(blueprint_input), Ok(order))
 
@@ -549,7 +550,17 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
       },
     ),
     run_benchmark(
-      "order_generated_native_wrapper_complete_text_encode",
+      "order_generated_strict_direct_complete_text_decode",
+      200,
+      5,
+      200,
+      fn() {
+        let assert Ok(_) = order_codec.decode_order_json(wire_json)
+        Nil
+      },
+    ),
+    run_benchmark(
+      "order_generated_wrapper_complete_text_encode",
       200,
       5,
       200,
@@ -559,12 +570,12 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
       },
     ),
     run_benchmark(
-      "order_generated_native_wrapper_complete_text_decode",
+      "order_generated_wrapper_complete_text_decode",
       200,
       5,
       200,
       fn() {
-        let assert Ok(_) = codec.decode_json_native(generated_codec, wire_json)
+        let assert Ok(_) = codec.decode_json(generated_codec, wire_json)
         Nil
       },
     ),
@@ -581,7 +592,7 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
 
   // These isolate parts of native decoding. JSON parsing creates the
   // Dynamic object once per operation; decode.dict then materializes the
-  // object's entries as a Gleam Dict, as decode_native_object_with currently
+  // object's entries as a Gleam Dict, as generated.decode_native_object
   // does before validating property names and decoding their values. The
   // vanilla typed-only case uses the same parsed Dynamic without JSON parsing.
   let native_decode_diagnostics = [

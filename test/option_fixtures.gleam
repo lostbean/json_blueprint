@@ -1,10 +1,8 @@
 import gleam/option.{type Option}
-import json/blueprint/codec
 import json/blueprint/codegen
 
-pub fn definition() -> codegen.Definition(Option(codec.Nullable(String))) {
-  codegen.object(codegen.optional_option(
-    "note",
-    codegen.nullable(codegen.string()),
-  ))
+/// An object whose only property is optional and nullable: absent, `null`
+/// and a string are `None`, `Some(None)` and `Some(Some(text))`.
+pub fn definition() -> codegen.Definition(Option(Option(String))) {
+  codegen.object(codegen.optional("note", codegen.nullable(codegen.string())))
 }

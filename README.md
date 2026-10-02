@@ -1,6 +1,7 @@
 # json_blueprint
 
-json_blueprint is a Gleam library that simplifies JSON encoding and decoding while automatically generating JSON schemas for your data types.
+Describe a JSON shape once in Gleam, and get an encoder, a strict decoder and
+a JSON Schema (Draft 2020-12) from the same definition.
 
 [![Package Version](https://img.shields.io/hexpm/v/json_blueprint)](https://hex.pm/packages/json_blueprint)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
@@ -9,750 +10,283 @@ json_blueprint is a Gleam library that simplifies JSON encoding and decoding whi
 gleam add json_blueprint
 ```
 
-## Schema-aware core (planned 2.0 facade)
-
-`json_blueprint` provides a schema-aware JSON core for Gleam applications. These APIs are on the implementation branch and are planned for 2.0; the package manifest still identifies the published 1.7.1 release. See [unreleased changes](CHANGELOG.md) and the [migration guide](docs/migration-2.0.md).
-
-- **`Value`**: Explicit, JSON-exact value model (`Null`, `Bool`, `String`, `Number`, `Array`, `Object`) with duplicate key preservation until rejection.
-- **Exact `Number`**: Canonical arbitrary-precision decimal representation representing all numeric values. Native `Int` and `Float` are checked projections.
-- **`Codec(a)`**: Bidirectional typed combinator deriving encoder, decoder, and Draft 2020-12 schema from a single definition.
-- **`RuntimeContract`**: Validated schema contract for runtime schema matching and value validation.
-- **`Document`**: Finite Draft 2020-12 schema document loader from parsed values or raw bytes.
-- **`Parser`**: Bounded whole-document byte admission parser enforcing byte size, depth, number token, significand, and exponent limits, with duplicate key rejection and structured location errors.
-- **Advanced `Decoder`**: The released one-way decoder remains available for recursive types and its existing `$ref`/`$defs` schema output, which the finite `Codec` schema does not represent.
-
-### Target Support Matrix
-
-| Target                   | Status       | Exact Number Model                                                                     | Native Integer Bounds                                                                                                                      | Binary64 Float Projections            | Exercised Environment        |
-| :----------------------- | :----------- | :------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------ | :--------------------------- |
-| **BEAM / Erlang**        | Full Support | Arbitrary-precision decimal                                                            | Unlimited (bignum)                                                                                                                         | Exact binary64 conversions            | Verified on OTP 28           |
-| **JavaScript (Node.js)** | Full Support | Arbitrary-precision decimal                                                            | `[-9007199254740991, 9007199254740991]` (typed `UnsafeNativeInteger` construction refusal / `UnsupportedNativeInteger` projection refusal) | Exact binary64 conversions via BigInt | Verified on Node.js v24.19.0 |
-| **JavaScript (Browser)** | Unverified   | Target-neutral ESM (`TextEncoder`, `DataView`, `BigInt`), but unverified in test suite | Same as Node.js                                                                                                                            | Same as Node.js                       | Untested in CI               |
-
-The CI matrix exercises Gleam 1.17.0, OTP 28, and Node.js 24. The browser target is not exercised there.
-
-### Supported finite Draft 2020-12 profile
-
-- **Closed Objects**: `ObjectSchema(properties)` with explicit required and optional fields.
-- **Exact Pairs**: `PairSchema(left, right)` representing fixed 2-element tuples.
-- **Collections**: `ListSchema(element)` representing homogenous arrays.
-- **Nullable Values**: `NullableSchema(inner)` accepts JSON `null` or an inner value. Object property presence is modeled separately with `codec.optional`.
-- **Bounded Integers**: `IntegerRangeSchema(min, max)` enforcing integer bounds.
-- **String Enums**: `StringEnumSchema(labels)` representing finite string variants.
-- **Tagged Alternatives**: `TaggedSchema(tag1, s1, tag2, s2)` representing discriminated unions.
-
-### Documented Design-Deferred Families (Retained Future Scope)
-
-These capabilities are outside the 2.0 codec schema. They are listed here so that their absence is explicit:
-
-- **Recursive References (`$ref`, `$defs`)**: Deferred pending resource and cycle policies.
-- **Arbitrary Unions**: Untagged unions (`anyOf`, general `oneOf`) deferred pending subtyping policy.
-- **Pattern / Regex**: String format regex validation deferred.
-
-### Schema-Aware Core Quickstart
-
-A complete example using one codec for a native record, JSON text, and a Draft 2020-12 schema document (tested verbatim in `test/readme_example_test.gleam`):
+## A record, both ways
 
 ```gleam
-pub type Task {
-  Task(id: Int, title: String)
+import gleam/option.{type Option}
+import gleam/result
+import json/blueprint/codec.{type Codec}
+
+pub type Role {
+  Admin
+  Member
 }
 
-pub fn run_task_pipeline() -> Result(Task, String) {
-  // One bidirectional codec defines the record's JSON and schema.
-  use id_codec <- result.try(
-    codec.integer_between(1, 100_000)
-    |> result.map_error(fn(_) { "Invalid id range" }),
-  )
-  use task_codec <- result.try(
-    codec.record2(
-      codec.required("id", id_codec),
-      codec.required("title", codec.string()),
-      Task,
-      fn(task) { task.id },
-      fn(task) { task.title },
-    )
-    |> result.map_error(fn(_) { "Invalid record properties" }),
-  )
+pub type User {
+  User(name: String, age: Int, email: Option(String), role: Role)
+}
 
-  use task <- result.try(
-    codec.decode_json(task_codec, "{\"id\":42,\"title\":\"Verify Blueprint\"}")
-    |> result.map_error(fn(_) { "Invalid task JSON" }),
+pub fn user_codec() -> Codec(User) {
+  let role = codec.string_enum([#("admin", Admin), #("member", Member)])
+  use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
+  use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+    u.age
+  })
+  use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+    u.email
+  })
+  use role <- codec.field("role", role, fn(u: User) { u.role })
+  codec.success(User(name:, age:, email:, role:))
+}
+
+pub fn round_trip() -> Result(User, String) {
+  let text = "{\"name\":\"Ada\",\"age\":36,\"role\":\"admin\"}"
+  use user <- result.try(
+    codec.decode_json(user_codec(), text)
+    |> result.map_error(codec.describe_decode_error),
   )
-  use _encoded <- result.try(
-    codec.encode_json(task_codec, task)
-    |> result.map_error(fn(_) { "Cannot encode task" }),
-  )
-  use _schema_json <- result.try(
-    codec.schema_json(task_codec)
-    |> result.map_error(fn(_) { "Unknown schema" }),
-  )
-  Ok(task)
+  let assert Ok(_text) = codec.encode_json(user_codec(), user)
+  let assert Ok(_schema) = codec.schema_json(user_codec())
+  Ok(user)
 }
 ```
 
-`codec.record2` and `codec.record3` accept `required` or `optional` properties, a native constructor, and one accessor per property. They return `Result(Codec(a), PropertyError)` so duplicate names fail during construction. The underlying object stays closed and retains declaration order. `codec.Optional(a)` distinguishes a missing property from a present value; use `codec.nullable` separately when JSON `null` is allowed. `codec.optional_option` and `codegen.optional_option` use standard `gleam/option.Option(a)` for optional properties. With a nullable inner codec, `None`, `Some(codec.Null)`, and `Some(codec.NonNull(value))` remain distinct. For larger records, compose `Properties` with `codec.combine`, then map the tuple with `codec.imap`. Use `codec.try_imap` when either native conversion may fail; its callbacks return `codec.DecodeError` and `codec.EncodeError`, and the base wire schema is retained.
+- `codec.field` adds a required field and `codec.optional_field` an optional
+  one; `codec.success` builds the record from the decoded fields. Each getter
+  needs its record type annotated (`fn(u: User)`).
+- Decoding is strict: unknown fields, duplicate keys and wrong types fail,
+  with the path to the failure, such as
+  `$["age"]: integer outside range 0 to 150`.
+- `schema_json` renders the Draft 2020-12 schema: closed objects, the
+  `required` list, the enum labels and the integer bounds.
 
-`codec.schema_json` renders the full Draft 2020-12 document from a known codec schema. A custom codec built without a schema returns `Error(codec.UnknownSchema)`. `codec.decode_json` always uses Blueprint's strict parser, including for generated and mapped codecs. It rejects duplicate keys and retains exact number tokens. `codec.decode_json_with_limits(codec, limits, source)` accepts a `parser.ParserLimits` value when the application needs a smaller byte, depth, or number bound. Start with `parser.default_limits()` and use `parser_limits.with_max_bytes`, `with_max_depth`, or `with_number_limits` to adjust one policy. The ordinary default allows exact finite-float decimal expansions, including subnormal values, while retaining finite resource limits.
+Every function here is pure: none blocks, waits, retries or starts a process.
 
-Use `codec.describe(codec.string(), "City to look up")` as the inner codec of `codec.required("city", ...)` to describe that property in the exported schema. Describe the completed object codec to annotate its root. `codegen.describe` does the same for a generated definition. Descriptions do not change value admission. `codec.render_json_decode_error(error)` turns a `JsonDecodeError` into readable feedback such as `$["city"]: expected a string`; it omits actual input values and custom reason text. The error remains structured for callers that need to classify it, and callers decide whether to expose the rendered text externally.
+## Defaults
 
-For schema validation or runtime contract inspection, use the advanced `json/blueprint/parser` and `json/blueprint/runtime` modules with the same `Codec(a)`. The ordinary typed text path is `codec.decode_json` and `codec.encode_json`.
+| Operation                                                           | Default                                                                     | Change it with                                                                   |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Text size: `codec.decode_json`, `value.parse`, `contract.parse`     | 1 MiB (1,048,576 bytes of UTF-8)                                            | `value.with_max_bytes`, passed to `codec.decode_json_with_limits` or the parsers |
+| Array and object nesting                                            | depth 64                                                                    | `value.with_max_depth`                                                           |
+| Values in one document (every scalar, array and object counts once) | 262,144: one per 4 bytes of the byte limit                                  | `value.with_max_elements`                                                        |
+| Number tokens: bytes, significant digits, exponent magnitude        | 1,024, 800, 1,200                                                           | `value.with_number_limits(number.limits(..))`                                    |
+| `codec.int()` decoding                                              | at most 24 digits; on JavaScript also within ±9,007,199,254,740,991         | fixed; use `codec.number()` for larger values                                    |
+| `codec.decoder` (for `gleam/json`)                                  | none of its own: the parser that produced the data sets the limits          | that parser                                                                      |
+| 1.x `blueprint.decode`, generated `decode_<name>_json_native`       | 1 MiB, checked before `gleam/json` parses; no depth, value or number limits | `blueprint.decode_with_max_bytes`                                                |
+| `contract.validate`, `contract.load`                                | no separate limit: they walk a value that a bounded parse produced          | the parse limits                                                                 |
+| Duplicate object keys and unknown object fields                     | rejected                                                                    | not configurable                                                                 |
 
-### Defaults
+A parse error names the setter of the limit it hit, and
+`codec.is_limit_exceeded` tells a too-large input from an invalid one.
 
-Every operation is pure: none blocks, waits, retries or starts a process. Parsing is bounded by default:
+Parsed values take more memory than their text. The table lists the peak
+process heap during `value.parse` at the defaults on Erlang/OTP 28, measured
+from garbage-collection events with the old and new heap counted together,
+and the heap growth on Node.js 24:
 
-| Operation | Default | Change it with |
-| --- | --- | --- |
-| Input size: `codec.decode_json`, `parser.parse_value`, `parser.parse_schema_document` (and their `_from_string` forms) | 1 MiB (1,048,576 bytes of UTF-8) | `parser_limits.with_max_bytes`, passed to `codec.decode_json_with_limits` or the `parser` functions |
-| Array and object nesting | depth 64 | `parser_limits.with_max_depth` |
-| Number tokens: bytes, significant digits, decimal exponent magnitude | 1,024, 800, 1,200 | `number.number_limits` and `parser_limits.with_number_limits` |
-| `codec.int()` decoding, including generated codecs | at most 24 digits; on JavaScript also within ±9,007,199,254,740,991 | fixed; use `codec.number()` for larger values |
-| Input size: `codec.decode_json_native` and generated `decode_<name>_json_native` | 1 MiB, checked before `gleam/json` parses; no depth or number limits | `codec.decode_json_native_with_max_bytes` |
-| Input size: 1.x `blueprint.decode` | 1 MiB, checked before `gleam/json` parses; no depth or number limits | `blueprint.decode_with_max_bytes` |
-| `runtime` validation and `document.load` | no separate limit; they walk an already parsed `Value` | not applicable |
-| Duplicate object keys in the strict parser | rejected | not configurable |
+| Input at the defaults                          | Text    | Peak heap, OTP 28 | Parsed value, OTP 28 | Heap growth, Node.js 24 |
+| ---------------------------------------------- | ------- | ----------------- | -------------------- | ----------------------- |
+| `[1,1,...]`: 262,143 integers, the value limit | 512 KiB | 42 MB             | 16 MB                | about 120 MB            |
+| `["a","a",...]`: 262,143 strings               | 1 MiB   | 40 MB             | 16 MB                | about 75 MB             |
+| `[{"k":1},...]`: 87,001 objects                | 680 KiB | 32 MB             | 13 MB                | about 75 MB             |
+| 61,001 fifteen-digit decimals                  | 1 MiB   | 16 MB             | 6 MB                 | about 80 MB             |
 
-Parsed values take more memory than their text. The densest input is an array of one-digit integers: 1 MiB of `[1,1,1,...]` (524,288 integers) peaks at 69 MB of process heap on Erlang/OTP 28 and leaves a 34 MB value, about 70 bytes of peak heap per input byte. On Node.js 24 the same input peaks near 175 MB. 1 MiB of 15-digit decimals peaks at 16 MB and 1 MiB of short strings at 14 MB on OTP 28. Choose a byte limit with these figures in mind before raising it.
+The value limit bounds the densest input: with it raised, 1 MiB of
+`[1,1,...]` (524,288 integers) peaks at 80 MB by the same measure. Raise the
+byte limit with these figures in mind.
 
-### Runtime and Build-Time Codecs
+## Optional, nullable and absent
 
-Define a codec once with `json/blueprint/codegen` combinators. The same typed `Definition(a)` is the input to the runtime codec and to generated encoder, decoder, and schema artifacts; keep the definition and its mappings as the single maintained source.
+`optional_field` omits the field for `None` and decodes an absent field as
+`None`; JSON `null` fails. `codec.nullable(c)` accepts `null` as `None`. With
+`optional_field(name, codec.nullable(c), ..)`, an absent field, `null` and a
+value decode as `None`, `Some(None)` and `Some(Some(x))`, and encode back the
+same way.
 
-For example, `order_definition()` below is the application's canonical nested `Order` definition. The following compiled fixture uses `materialize_fixtures` as its application data module and `generated/order_codec` as its generated module. Replace both module names with the corresponding modules in your application:
-
-```gleam
-pub fn runtime_and_generated_order_example(
-  order: materialize_fixtures.Order,
-  json_text: String,
-) {
-  let definition = materialize_fixtures.order_definition()
-
-  // Runtime construction: use when the application wants a dynamic codec.
-  let runtime_codec = codegen.runtime(definition)
-
-  // Generated module: construct once and use interchangeably as a Codec(Order).
-  let generated_codec = generated_order_codec.order_codec()
-  let _ = codec.encode_json(generated_codec, order)
-  let _ = codec.decode_json(generated_codec, json_text)
-
-  // Direct generated operations expose the same strict text admission.
-  let _ = generated_order_codec.encode_order_json(order)
-  let _ = generated_order_codec.decode_order_json(json_text)
-  let _ = generated_order_codec.order_schema()
-  let _ = codec.encode_json(runtime_codec, order)
-  Nil
-}
-```
-
-To generate at build time, call `codegen.compile("generated/order_codec", "order", order_definition())`. It returns a `GeneratedModule` containing the module path, Gleam source content, and a fingerprint. The application's build/generation task writes that content to `src/generated/order_codec.gleam`, then runs `gleam format src/generated/order_codec.gleam` before compiling the application. Check the generated module into source control and add a freshness test that recompiles the canonical definition and compares the result with the checked-in source; this catches stale output without maintaining the generated implementation by hand.
-
-Generated text encoders use `gleam/json` for rendering. Ordinary generated decoders use Blueprint's strict parser. For the distinct performance and parser behavior of `gleam/json`, call the generated `decode_<name>_json_native` function or `codec.decode_json_native(generated_codec, source)` explicitly; the native parser may normalize number tokens and collapse duplicate keys. A definition containing arbitrary `number.Number` values is refused by `codegen.compile` with `NativeNumberUnsupported`, since native JSON cannot preserve Blueprint's exact arbitrary-precision number contract.
-
-### Moving from 1.x decoders to Codec
-
-For ordinary application records, replace the one-way `json/blueprint.Decoder(a)` definition with one `json/blueprint/codec.Codec(a)`. The codec supplies both directions and a known Draft 2020-12 schema. This example is compiled in `test/readme_example_test.gleam`:
+## Unions
 
 ```gleam
-pub type MyRecord {
-  MyRecord(name: String, count: Int)
+pub type Shape {
+  Circle(radius: Int)
+  Label(text: String)
+  Empty
 }
 
-pub fn example() -> codec.Codec(MyRecord) {
-  let assert Ok(record_codec) =
-    codec.record2(
-      codec.required("name", codec.string()),
-      codec.required("count", codec.int()),
-      MyRecord,
-      fn(record) { record.name },
-      fn(record) { record.count },
-    )
-  record_codec
-}
-```
-
-The released root `json/blueprint.Decoder` remains supported for recursive typed decoding and its existing `$ref`/`$defs` schema output. `Codec.Schema` has no recursive reference constructor, so a recursive decoder does not have an equivalent finite codec definition. See [the 2.0 migration guide](docs/migration-2.0.md) for API mappings, missing/null behavior, and the removed adapter.
-
----
-
-## Advanced recursive Decoder and legacy schema output
-
-The released decoder and schema modules remain available when recursive decoding or constraints beyond the finite codec schema are needed. Their renderer labels output as Draft-07 and currently uses `$defs`; consumers that need strict dialect interoperability should inspect the generated document. Prefer `Codec` for ordinary bidirectional application data.
-
-## Examples
-
-<details>
-  <summary>Encoding Union Types</summary>
-
-Here's an example of encoding a union type to JSON:
-
-```gleam
-import gleam/io
-import gleam/json
-import gleeunit
-import gleeunit/should
-import json/blueprint
-
-pub fn main() {
-  gleeunit.main()
-}
-
-type Shape {
-  Circle(Float)
-  Rectangle(Float, Float)
-  Void
-}
-
-fn encode_shape(shape: Shape) -> json.Json {
-  blueprint.union_type_encoder(shape, fn(shape_case) {
-    case shape_case {
-      Circle(radius) -> #(
-        "circle",
-        json.object([#("radius", json.float(radius))]),
-      )
-      Rectangle(width, height) -> #(
-        "rectangle",
-        json.object([
-          #("width", json.float(width)),
-          #("height", json.float(height)),
-        ]),
-      )
-      Void -> #("void", json.object([]))
-    }
+pub fn shape_codec() -> Codec(Shape) {
+  codec.union({
+    use circle <- codec.variant("circle", codec.int(), Circle)
+    use label <- codec.variant("label", codec.string(), Label)
+    use empty <- codec.unit_variant("empty", Empty)
+    codec.match(fn(shape) {
+      case shape {
+        Circle(radius) -> circle(radius)
+        Label(text) -> label(text)
+        Empty -> empty
+      }
+    })
   })
 }
-
-fn shape_decoder() -> blueprint.Decoder(Shape) {
-  blueprint.union_type_decoder([
-    #(
-      "circle",
-      blueprint.decode1(Circle, blueprint.field("radius", blueprint.float())),
-    ),
-    #(
-      "rectangle",
-      blueprint.decode2(
-        Rectangle,
-        blueprint.field("width", blueprint.float()),
-        blueprint.field("height", blueprint.float()),
-      ),
-    ),
-    #("void", blueprint.decode0(Void)),
-  ])
-}
-
-pub fn union_type_test() {
-  let circle = Circle(5.0)
-  let rectangle = Rectangle(10.0, 20.0)
-
-  let decoder = shape_decoder()
-
-  //test decoding
-  encode_shape(circle)
-  |> json.to_string
-  |> blueprint.decode(using: decoder)
-  |> should.equal(Ok(circle))
-
-  encode_shape(rectangle)
-  |> json.to_string
-  |> blueprint.decode(using: decoder)
-  |> should.equal(Ok(rectangle))
-
-  encode_shape(Void)
-  |> json.to_string
-  |> blueprint.decode(using: decoder)
-  |> should.equal(Ok(Void))
-
-  blueprint.generate_json_schema(shape_decoder())
-  |> json.to_string
-  |> io.println
-}
 ```
 
-#### Generated JSON Schema
+The JSON is `{"tag": "circle", "value": 2}`, and `{"tag": "empty"}` for a
+unit variant. Gleam checks that the `case` covers every constructor.
 
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "anyOf": [
-    {
-      "required": ["type", "data"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["circle"]
-        },
-        "data": {
-          "required": ["radius"],
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {
-            "radius": {
-              "type": "number"
-            }
-          }
-        }
-      }
-    },
-    {
-      "required": ["type", "data"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["rectangle"]
-        },
-        "data": {
-          "required": ["width", "height"],
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {
-            "width": {
-              "type": "number"
-            },
-            "height": {
-              "type": "number"
-            }
-          }
-        }
-      }
-    },
-    {
-      "required": ["type", "data"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["void"]
-        },
-        "data": {
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {}
-        }
-      }
-    }
-  ]
-}
-```
+## Your own types
 
-This will encode your union types into a standardized JSON format with `type` and `data` fields, making it easy to decode on the receiving end.
-
-</details>
-
-<details>
-  <summary>Type aliases and optional fields</summary>
-
-And here's an example using type aliases, optional fields, and single constructor types:
+`codec.map` converts with total functions, `codec.try_map` with functions
+that may fail, and `codec.custom` builds a codec from functions over `Value`.
+`try_map` and `custom` take a placeholder: any value of the type, used where a
+value is needed without input, as `decode.failure` does.
 
 ```gleam
-import gleam/io
-import gleam/json
-import gleam/option.{type Option, None, Some}
-import gleeunit
-import gleeunit/should
-import json/blueprint
-
-pub fn main() {
-  gleeunit.main()
+pub type Email {
+  Email(address: String)
 }
 
-type Color {
-  Red
-  Green
-  Blue
+pub fn email_codec() -> Codec(Email) {
+  codec.try_map(
+    codec.string(),
+    decode: fn(text) {
+      case string.contains(text, "@") {
+        True -> Ok(Email(text))
+        False -> Error("an email address needs an @")
+      }
+    },
+    encode: fn(email: Email) { Ok(email.address) },
+    placeholder: Email(""),
+  )
 }
-
-type Coordinate =
-  #(Float, Float)
-
-type Drawing {
-  Box(Float, Float, Coordinate, Option(Color))
-}
-
-fn color_decoder() {
-  blueprint.enum_type_decoder([
-    #("red", Red),
-    #("green", Green),
-    #("blue", Blue),
-  ])
-}
-
-fn color_encoder(input) {
-  blueprint.enum_type_encoder(input, fn(color) {
-    case color {
-      Red -> "red"
-      Green -> "green"
-      Blue -> "blue"
-    }
-  })
-}
-
-fn encode_coordinate(coord: Coordinate) -> json.Json {
-  blueprint.encode_tuple2(coord, json.float, json.float)
-}
-
-fn coordinate_decoder() {
-  blueprint.tuple2(blueprint.float(), blueprint.float())
-}
-
-fn encode_drawing(drawing: Drawing) -> json.Json {
-  blueprint.union_type_encoder(drawing, fn(shape) {
-    case shape {
-      Box(width, height, position, color) -> #(
-        "box",
-        json.object([
-          #("width", json.float(width)),
-          #("height", json.float(height)),
-          #("position", encode_coordinate(position)),
-          #("color", json.nullable(color, color_encoder)),
-        ]),
-      )
-    }
-  })
-}
-
-fn drawing_decoder() -> blueprint.Decoder(Drawing) {
-  blueprint.union_type_decoder([
-    #(
-      "box",
-      blueprint.decode4(
-        Box,
-        blueprint.field("width", blueprint.float()),
-        blueprint.field("height", blueprint.float()),
-        blueprint.field("position", coordinate_decoder()),
-        blueprint.optional_field("color", color_decoder()),
-      ),
-    ),
-  ])
-}
-
-pub fn drawing_test() {
-  // Test cases
-  let box = Box(15.0, 25.0, #(30.0, 40.0), None)
-
-  // Test encoding
-  let encoded_box = encode_drawing(box)
-
-  // Test decoding
-  encoded_box
-  |> json.to_string
-  |> blueprint.decode(using: drawing_decoder())
-  |> should.equal(Ok(box))
-
-  blueprint.generate_json_schema(drawing_decoder())
-  |> json.to_string
-  |> io.println
-}
-
 ```
 
-#### Generated JSON Schema
+A failed conversion is the reason `Custom(message)` at the codec's path. The
+other building blocks are `string`, `int`, `float`, `number` (exact), `bool`,
+`list`, `pair`, `string_enum`, `integer_between`, `number_between` and
+`describe`, which adds a schema description.
 
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "required": ["type", "data"],
-  "additionalProperties": false,
-  "type": "object",
-  "properties": {
-    "type": {
-      "type": "string",
-      "enum": ["box"]
-    },
-    "data": {
-      "required": ["width", "height", "position"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "width": {
-          "type": "number"
-        },
-        "height": {
-          "type": "number"
-        },
-        "position": {
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "number"
-            }
-          ],
-          "type": "array"
-        },
-        "color": {
-          "required": ["enum"],
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {
-            "enum": {
-              "type": "string",
-              "enum": ["red", "green", "blue"]
-            }
-          }
-        }
+## Errors
+
+`DecodeError` and `EncodeError` are `{path, reason}` records. Branch on the
+reason, or render the error:
+
+```gleam
+pub fn explain(text: String) -> String {
+  case codec.decode_json(user_codec(), text) {
+    Ok(_) -> "ok"
+    Error(error) ->
+      case codec.is_limit_exceeded(error) {
+        True -> "the request is too large"
+        False -> codec.describe_decode_error(error)
       }
-    }
   }
 }
 ```
 
-</details>
+The rendered text never contains input values, unknown keys from the input
+or `Custom` messages. `Reason` may gain variants in minor releases, so match
+it with a `_` branch.
 
-<details>
-  <summary>Recursive data types</summary>
-
-And here's an example using type aliases, optional fields, and single constructor types:
+A codec written wrongly, such as a field named twice, an enum label repeated
+or reversed bounds, panics with a message naming the field, label or bounds
+when that part is first used. For a definition built from runtime data, call
+`codec.check` to get the mistake as a `DefinitionError` instead:
 
 ```gleam
-import gleam/io
-import gleam/json
-import gleam/option.{type Option, None, Some}
-import gleeunit
-import gleeunit/should
-import json/blueprint
-
-pub fn main() {
-  gleeunit.main()
-}
-
-type Tree {
-  Node(value: Int, left: Option(Tree), right: Option(Tree))
-}
-
-type ListOfTrees(t) {
-  ListOfTrees(head: t, tail: ListOfTrees(t))
-  NoTrees
-}
-
-fn encode_tree(tree: Tree) -> json.Json {
-  blueprint.union_type_encoder(tree, fn(node) {
-    case node {
-      Node(value, left, right) -> #(
-        "node",
-        [
-          #("value", json.int(value)),
-          #("right", json.nullable(right, encode_tree)),
-        ]
-          |> blueprint.encode_optional_field("left", left, encode_tree)
-          |> json.object(),
-      )
-    }
-  })
-}
-
-fn encode_list_of_trees(tree: ListOfTrees(Tree)) -> json.Json {
-  blueprint.union_type_encoder(tree, fn(list) {
-    case list {
-      ListOfTrees(head, tail) -> #(
-        "list",
-        json.object([
-          #("head", encode_tree(head)),
-          #("tail", encode_list_of_trees(tail)),
-        ]),
-      )
-      NoTrees -> #("no_trees", json.object([]))
-    }
-  })
-}
-
-// Without reuse_decoder, recursive types would cause infinite schema expansion
-fn tree_decoder() {
-  blueprint.union_type_decoder([
-    #(
-      "node",
-      blueprint.decode3(
-        Node,
-        blueprint.field("value", blueprint.int()),
-        // testing both an optional field a field with a possible null
-        blueprint.optional_field("left", blueprint.self_decoder(tree_decoder)),
-        blueprint.field(
-          "right",
-          blueprint.optional(blueprint.self_decoder(tree_decoder)),
-        ),
-      ),
-    ),
-  ])
-  // !!!IMPORTANT!!! Add the reuse_decoder when there are nested recursive types so
-  // the schema references (`#`) get rewritten correctly and self-references from the
-  // different types don't get mixed up. As a recommendation, always add it when
-  // decoding recursive types.
-  |> blueprint.reuse_decoder
-}
-
-fn decode_list_of_trees() {
-  blueprint.union_type_decoder([
-    #(
-      "list",
-      blueprint.decode2(
-        ListOfTrees,
-        blueprint.field("head", tree_decoder()),
-        blueprint.field("tail", blueprint.self_decoder(decode_list_of_trees)),
-      ),
-    ),
-    #("no_trees", blueprint.decode0(NoTrees)),
-  ])
-}
-
-pub fn tree_decoder_test() {
-  // Create a sample tree structure:
-  //       5
-  //      / \
-  //     3   7
-  //    /     \
-  //   1       9
-  let tree =
-    Node(
-      value: 5,
-      left: Some(Node(value: 3, left: Some(Node(1, None, None)), right: None)),
-      right: Some(Node(value: 7, left: None, right: Some(Node(9, None, None)))),
-    )
-
-  // Create a list of trees
-  let tree_list =
-    ListOfTrees(
-      Node(value: 1, left: None, right: None),
-      ListOfTrees(
-        Node(
-          value: 10,
-          left: Some(Node(value: 1, left: None, right: None)),
-          right: None,
-        ),
-        NoTrees,
-      ),
-    )
-
-  // Test encoding
-  let json_str = tree |> encode_tree |> json.to_string()
-  let list_json_str = tree_list |> encode_list_of_trees |> json.to_string()
-
-  // Test decoding
-  let decoded = blueprint.decode(using: tree_decoder(), from: json_str)
-
-  decoded
-  |> should.equal(Ok(tree))
-
-  let decoded_list =
-    blueprint.decode(using: decode_list_of_trees(), from: list_json_str)
-
-  decoded_list
-  |> should.equal(Ok(tree_list))
-
-  // Test schema generation
-  blueprint.generate_json_schema(decode_list_of_trees())
-  |> json.to_string
-  |> io.println
+pub fn status_codec(
+  labels: List(String),
+) -> Result(Codec(String), codec.DefinitionError) {
+  codec.string_enum(list.map(labels, fn(label) { #(label, label) }))
+  |> codec.check
 }
 ```
 
-#### Generated JSON Schema
+## gleam/json and other libraries
 
-```json
-{
-  "$defs": {
-    "ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2": {
-      "required": ["type", "data"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["node"]
-        },
-        "data": {
-          "required": ["value", "right"],
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {
-            "value": {
-              "type": "integer"
-            },
-            "left": {
-              "$ref": "#/$defs/ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2"
-            },
-            "right": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        }
-      }
-    }
-  },
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "anyOf": [
-    {
-      "required": ["type", "data"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["list"]
-        },
-        "data": {
-          "required": ["head", "tail"],
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {
-            "head": {
-              "$ref": "#/$defs/ref_CEF475B4CA96DC7B2C0C206AC7598AFFC4B66FD2"
-            },
-            "tail": {
-              "$ref": "#"
-            }
-          }
-        }
-      }
-    },
-    {
-      "required": ["type", "data"],
-      "additionalProperties": false,
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["no_trees"]
-        },
-        "data": {
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {}
-        }
-      }
-    }
-  ]
+`codec.to_json` returns a `json.Json` and `codec.decoder` a
+`decode.Decoder`, so the same codec serves libraries that speak `gleam/json`:
+
+```gleam
+pub fn with_gleam_json(user: User) -> Result(User, json.DecodeError) {
+  let assert Ok(encoded) = codec.to_json(user_codec(), user)
+  json.parse(json.to_string(encoded), codec.decoder(user_codec()))
 }
 ```
 
-</details>
+`to_json` is exact: a number without an exact `gleam/json` form, such as
+`1e400` in a `codec.number()`, fails with `UnrepresentableNumber`. With
+`decoder`, the parser that produced the data owns duplicate keys, number
+precision and size limits.
 
-## Features
+## Larger inputs
 
-- 🎯 Type-safe JSON encoding and decoding
-- 🔄 Support for union types with standardized encoding
-- 📋 Automatic JSON schema generation
-- ✨ Clean and intuitive API
+```gleam
+pub fn decode_many(text: String) -> Result(List(User), codec.DecodeError) {
+  let limits =
+    value.default_limits()
+    |> value.with_max_bytes(8 * 1024 * 1024)
+    |> value.with_max_elements(2_000_000)
+  codec.decode_json_with_limits(codec.list(user_codec()), text, limits)
+}
+```
 
-Further documentation can be found at <https://hexdocs.pm/json_blueprint>.
+## Schemas that arrive at runtime
+
+`json/blueprint/contract` accepts a Draft 2020-12 schema document inside the
+profile that codecs describe, such as a tool's input schema from a remote
+server, and validates values against it:
+
+```gleam
+pub fn check_arguments(
+  schema_text: String,
+  arguments: String,
+) -> Result(value.Value, String) {
+  let limits = value.default_limits()
+  use remote <- result.try(
+    contract.parse(schema_text, limits)
+    |> result.map_error(contract.describe_load_error),
+  )
+  use parsed <- result.try(
+    value.parse(arguments, limits)
+    |> result.map_error(value.describe_parse_error),
+  )
+  contract.validate(remote, parsed)
+  |> result.map(contract.value)
+  |> result.map_error(contract.describe_validation_error)
+}
+```
+
+`contract.value_codec(contract)` is a `Codec(Value)` with the contract's
+schema that validates while decoding, and `contract.decode` decodes a
+validated value with a codec whose schema matches.
+
+The profile covers closed objects with required and optional properties,
+pairs, lists, nullable values, bounded integers and numbers, string enums and
+tagged unions. Recursive references (`$ref`), untagged unions and string
+patterns are outside it.
+
+## Modules
+
+| Module                                    | Use it for                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `json/blueprint/codec`                    | codecs: the common path                                                     |
+| `json/blueprint/value`                    | the JSON `Value`, the strict bounded parser, `Limits`, `gleam/json` bridges |
+| `json/blueprint/number`                   | exact JSON numbers and checked `Int` and `Float` conversions                |
+| `json/blueprint/contract`                 | schemas that arrive at runtime, and validation                              |
+| `json/blueprint`, `json/blueprint/schema` | the frozen 1.x API; see [the 1.x guide](docs/v1.md)                         |
+
+Code generation is a separate dev-only package in
+[`codegen/`](codegen/README.md). Moving from 1.x is described in
+[the 2.0 migration guide](docs/migration-2.0.md).
+
+## Targets
+
+Erlang/OTP 28 and JavaScript on Node.js 24 are tested on every change. On
+JavaScript, native integers are limited to the safe range: `codec.int()`
+refuses larger ones instead of rounding them, and `codec.number()` keeps them
+exact. Browser JavaScript is not tested.
 
 ## Development
 
 ```sh
-gleam run   # Run the project
-gleam test  # Run the tests
+nix develop          # Gleam 1.17, Erlang/OTP 28, Node.js 24
+sh scripts/gate.sh   # format, warnings and tests on both targets, for both packages
 ```

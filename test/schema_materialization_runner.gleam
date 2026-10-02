@@ -67,7 +67,8 @@ pub fn generate_fixture() -> Result(String, String) {
 }
 
 fn fixture_test_source() -> String {
-  "import gleeunit
+  "import gleam/option.{type Option}
+import gleeunit
 import gleeunit/should
 import generated/schema_catalog
 import json/blueprint/codec
@@ -88,55 +89,35 @@ pub type Order {
   Order(
     order_id: Int,
     items: List(#(String, Int)),
-    note: codec.Optional(codec.Nullable(String)),
+    note: Option(Option(String)),
     active: Bool,
     status: OrderStatus,
   )
 }
 
 fn build_order_codec() -> codec.Codec(Order) {
-  let assert Ok(status_c) =
+  let status_c =
     codec.string_enum([
       #(\"pending\", Pending),
       #(\"processing\", Processing),
       #(\"shipped\\n\\r\\f\\t\\\"quoted\\\"\", ShippedQuoted),
       #(\"delivered 🚀 fn\", DeliveredUnicode),
     ])
-
-  let assert Ok(id_c) = codec.integer_between(1, 999_999)
   let items_c = codec.list(codec.pair(codec.string(), codec.int()))
-  let note_c = codec.nullable(codec.string())
-
-  let assert Ok(p1) =
-    codec.combine(
-      codec.required(\"order_id\", id_c),
-      codec.required(\"items_\\\"list\\\"\", items_c),
-    )
-  let assert Ok(p2) =
-    codec.combine(
-      p1,
-      codec.optional(\"customer\\n\\r\\f\\t\\\\note\", note_c),
-    )
-  let assert Ok(p3) =
-    codec.combine(
-      p2,
-      codec.required(\"type\", codec.bool()),
-    )
-  let assert Ok(full_props) =
-    codec.combine(
-      p3,
-      codec.required(\"status\", status_c),
-    )
-
-  codec.imap(
-    codec.object(full_props),
-    fn(raw: #(#(#(#(Int, List(#(String, Int))), codec.Optional(codec.Nullable(String))), Bool), OrderStatus)) {
-      Order(raw.0.0.0.0, raw.0.0.0.1, raw.0.0.1, raw.0.1, raw.1)
-    },
-    fn(o: Order) {
-      #(#(#(#(o.order_id, o.items), o.note), o.active), o.status)
-    },
+  use order_id <- codec.field(
+    \"order_id\",
+    codec.integer_between(1, 999_999),
+    fn(o: Order) { o.order_id },
   )
+  use items <- codec.field(\"items_\\\"list\\\"\", items_c, fn(o: Order) { o.items })
+  use note <- codec.optional_field(
+    \"customer\\n\\r\\f\\t\\\\note\",
+    codec.nullable(codec.string()),
+    fn(o: Order) { o.note },
+  )
+  use active <- codec.field(\"type\", codec.bool(), fn(o: Order) { o.active })
+  use status <- codec.field(\"status\", status_c, fn(o: Order) { o.status })
+  codec.success(Order(order_id:, items:, note:, active:, status:))
 }
 
 pub type ApprovePayload {
@@ -150,76 +131,53 @@ pub type DeclinePayload {
 pub type Decision {
   Approve(ApprovePayload)
   Decline(DeclinePayload)
+  Defer
 }
 
 fn build_decision_codec() -> codec.Codec(Decision) {
-  let assert Ok(quantity_c) = codec.integer_between(1, 100)
-  let ratio_c = codec.number()
-
-  let assert Ok(approve_props) =
-    codec.combine(
-      codec.required(\"quantity\", quantity_c),
-      codec.required(\"ratio\", ratio_c),
+  let approve = {
+    use quantity <- codec.field(
+      \"quantity\",
+      codec.integer_between(1, 100),
+      fn(a: ApprovePayload) { a.quantity },
     )
-  let approve_obj =
-    codec.imap(
-      codec.object(approve_props),
-      fn(pair: #(Int, number.Number)) { ApprovePayload(pair.0, pair.1) },
-      fn(a: ApprovePayload) { #(a.quantity, a.ratio) },
-    )
-
-  let assert Ok(decline_props) =
-    codec.combine(
-      codec.required(\"reason\", codec.string()),
-      codec.required(\"code\", codec.int()),
-    )
-  let decline_obj =
-    codec.imap(
-      codec.object(decline_props),
-      fn(pair: #(String, Int)) { DeclinePayload(pair.0, pair.1) },
-      fn(d: DeclinePayload) { #(d.reason, d.code) },
-    )
-
-  let assert Ok(tagged_c) =
-    codec.tagged(
-      \"approve \\\"let\\\"\",
-      approve_obj,
-      \"decline \\n\\r\\f\\t\\\\import\",
-      decline_obj,
-    )
-
-  codec.imap(
-    tagged_c,
-    fn(choice) {
-      case choice {
-        codec.Left(app) -> Approve(app)
-        codec.Right(dec) -> Decline(dec)
+    use ratio <- codec.field(\"ratio\", codec.number(), fn(a: ApprovePayload) {
+      a.ratio
+    })
+    codec.success(ApprovePayload(quantity:, ratio:))
+  }
+  let decline = {
+    use reason <- codec.field(\"reason\", codec.string(), fn(d: DeclinePayload) {
+      d.reason
+    })
+    use code <- codec.field(\"code\", codec.int(), fn(d: DeclinePayload) {
+      d.code
+    })
+    codec.success(DeclinePayload(reason:, code:))
+  }
+  codec.union({
+    use approve <- codec.variant(\"approve \\\"let\\\"\", approve, Approve)
+    use decline <- codec.variant(\"decline \\n\\r\\f\\t\\\\import\", decline, Decline)
+    use defer <- codec.unit_variant(\"defer\", Defer)
+    codec.match(fn(decision) {
+      case decision {
+        Approve(payload) -> approve(payload)
+        Decline(payload) -> decline(payload)
+        Defer -> defer
       }
-    },
-    fn(d: Decision) {
-      case d {
-        Approve(app) -> codec.Left(app)
-        Decline(dec) -> codec.Right(dec)
-      }
-    },
-  )
+    })
+  })
 }
 
 pub fn order_schema_structural_identity_test() {
-  let order_c = build_order_codec()
-  let assert Ok(expected_schema) = codec.schema(order_c)
-  let generated_schema = schema_catalog.order_schema()
-
-  generated_schema
+  let assert Ok(expected_schema) = codec.schema(build_order_codec())
+  schema_catalog.order_schema()
   |> should.equal(expected_schema)
 }
 
 pub fn decision_schema_structural_identity_test() {
-  let decision_c = build_decision_codec()
-  let assert Ok(expected_schema) = codec.schema(decision_c)
-  let generated_schema = schema_catalog.decision_schema()
-
-  generated_schema
+  let assert Ok(expected_schema) = codec.schema(build_decision_codec())
+  schema_catalog.decision_schema()
   |> should.equal(expected_schema)
 }
 "
