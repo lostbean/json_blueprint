@@ -7,7 +7,7 @@ import json/blueprint/codec
 import json/blueprint/value
 import materialize_fixtures
 
-pub const generated_fingerprint: String = "03AB1113133259C1D06018D68BAA37EADFB342B8"
+pub const generated_fingerprint: String = "A1DCE86323109F5AC7A5942A48CF543B9A221C6C"
 
 const order_schema_value: codec.Schema = codec.ObjectSchema(
   [
@@ -895,6 +895,12 @@ pub fn decode_order_json(
 pub fn decode_order_json_native(
   source: String,
 ) -> Result(materialize_fixtures.Order, codec.JsonDecodeError) {
+  codec.decode_json_native(order_codec(), source)
+}
+
+fn parse_order_json_native(
+  source: String,
+) -> Result(materialize_fixtures.Order, codec.JsonDecodeError) {
   case json.parse(from: source, using: decode.dynamic) {
     Error(error) -> Error(codec.NativeJsonFailure(error))
     Ok(raw) ->
@@ -914,7 +920,7 @@ pub fn order_codec() -> codec.Codec(materialize_fixtures.Order) {
     encode_order,
     decode_order,
     encode_order_json,
-    decode_order_json_native,
+    parse_order_json_native,
     order_schema(),
   )
 }

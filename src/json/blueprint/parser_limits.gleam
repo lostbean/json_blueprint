@@ -22,13 +22,28 @@ pub fn new(
   }
 }
 
-/// Admit exact decimal expansions of every finite binary64 value, including
-/// the smallest subnormal, while keeping all resource bounds finite.
+/// The default limits: 1 MiB (1,048,576 bytes) of JSON text, nesting depth
+/// 64, and number tokens of at most 1,024 bytes, 800 significant digits and
+/// a decimal exponent magnitude of 1,200.
+///
+/// The number bounds admit the exact decimal expansion of every finite
+/// binary64 value, including the smallest subnormal. Change the byte or
+/// depth bound with `with_max_bytes` or `with_max_depth`. The 1.x
+/// `json/blueprint.decode` and `codec.decode_json_native` apply the same byte
+/// bound before parsing.
+///
+/// Parsed values take more memory than their text. An array of one-digit
+/// integers, the densest input, peaks at about 70 bytes of process heap per
+/// input byte on Erlang/OTP 28 (69 MB for 1 MiB) and about 170 on Node.js.
 pub fn default() -> ParserLimits {
   let assert Ok(numbers) = number.number_limits(1024, 800, 1200)
-  let assert Ok(limits) = new(10_485_760, 128, numbers)
+  let assert Ok(limits) = new(default_max_bytes, default_max_depth, numbers)
   limits
 }
+
+const default_max_bytes = 1_048_576
+
+const default_max_depth = 64
 
 /// Change only the JSON text byte bound, preserving depth and number policy.
 pub fn with_max_bytes(

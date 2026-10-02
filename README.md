@@ -99,6 +99,23 @@ Use `codec.describe(codec.string(), "City to look up")` as the inner codec of `c
 
 For schema validation or runtime contract inspection, use the advanced `json/blueprint/parser` and `json/blueprint/runtime` modules with the same `Codec(a)`. The ordinary typed text path is `codec.decode_json` and `codec.encode_json`.
 
+### Defaults
+
+Every operation is pure: none blocks, waits, retries or starts a process. Parsing is bounded by default:
+
+| Operation | Default | Change it with |
+| --- | --- | --- |
+| Input size: `codec.decode_json`, `parser.parse_value`, `parser.parse_schema_document` (and their `_from_string` forms) | 1 MiB (1,048,576 bytes of UTF-8) | `parser_limits.with_max_bytes`, passed to `codec.decode_json_with_limits` or the `parser` functions |
+| Array and object nesting | depth 64 | `parser_limits.with_max_depth` |
+| Number tokens: bytes, significant digits, decimal exponent magnitude | 1,024, 800, 1,200 | `number.number_limits` and `parser_limits.with_number_limits` |
+| `codec.int()` decoding, including generated codecs | at most 24 digits; on JavaScript also within ±9,007,199,254,740,991 | fixed; use `codec.number()` for larger values |
+| Input size: `codec.decode_json_native` and generated `decode_<name>_json_native` | 1 MiB, checked before `gleam/json` parses; no depth or number limits | `codec.decode_json_native_with_max_bytes` |
+| Input size: 1.x `blueprint.decode` | 1 MiB, checked before `gleam/json` parses; no depth or number limits | `blueprint.decode_with_max_bytes` |
+| `runtime` validation and `document.load` | no separate limit; they walk an already parsed `Value` | not applicable |
+| Duplicate object keys in the strict parser | rejected | not configurable |
+
+Parsed values take more memory than their text. The densest input is an array of one-digit integers: 1 MiB of `[1,1,1,...]` (524,288 integers) peaks at 69 MB of process heap on Erlang/OTP 28 and leaves a 34 MB value, about 70 bytes of peak heap per input byte. On Node.js 24 the same input peaks near 175 MB. 1 MiB of 15-digit decimals peaks at 16 MB and 1 MiB of short strings at 14 MB on OTP 28. Choose a byte limit with these figures in mind before raising it.
+
 ### Runtime and Build-Time Codecs
 
 Define a codec once with `json/blueprint/codegen` combinators. The same typed `Definition(a)` is the input to the runtime codec and to generated encoder, decoder, and schema artifacts; keep the definition and its mappings as the single maintained source.

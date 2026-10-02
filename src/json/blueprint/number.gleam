@@ -1,6 +1,19 @@
+/// An exact JSON number.
+///
+/// The representation is canonical, so two `Number` values are equal exactly
+/// when they denote the same mathematical value.
 pub opaque type Number {
-  Number(negative: Bool, coefficient: List(Int), exponent10: Int)
+  /// An integer whose magnitude has at most `small_integer_digits` digits,
+  /// stored as a native integer. Such values are exact on every target.
+  SmallInteger(value: Int)
+  /// Every other value: the sign, the coefficient's ASCII digits without
+  /// leading or trailing zeros, and the power of ten that scales them.
+  Decimal(negative: Bool, digits: String, exponent10: Int)
 }
+
+/// Integers up to 15 digits are exact both as BEAM small integers and as
+/// JavaScript doubles.
+const small_integer_digits = 15
 
 pub opaque type NumberLimits {
   NumberLimits(
@@ -122,7 +135,7 @@ pub fn integer_projection_limit_for_range_value(
 pub fn integer_projection_limit_for_number(
   number: Number,
 ) -> IntegerProjectionLimit {
-  let Number(_, coefficient, exponent10) = number
+  let #(_, coefficient, exponent10) = parts(number)
   let digits = list_length(coefficient) + exponent10
   case digits > 0 {
     True -> IntegerProjectionLimit(digits)
@@ -229,6 +242,38 @@ pub fn parse_number(
   }
 }
 
+/// Build a parsed integer token of at most 15 digits without leading zeros,
+/// when it satisfies `limits`. The strict parser uses this to skip the
+/// general decimal path for ordinary integers; `Error(Nil)` sends the token
+/// down that path, which reports the precise error.
+@internal
+pub fn small_integer_token(
+  limits: NumberLimits,
+  negative: Bool,
+  magnitude: Int,
+  digits: Int,
+) -> Result(Number, Nil) {
+  let NumberLimits(max_token_bytes, max_significand_digits, max_abs_exponent) =
+    limits
+  let token_bytes = case negative {
+    True -> digits + 1
+    False -> digits
+  }
+  case
+    digits <= small_integer_digits
+    && token_bytes <= max_token_bytes
+    && digits <= max_significand_digits
+    && digits - 1 <= max_abs_exponent
+  {
+    False -> Error(Nil)
+    True ->
+      case negative {
+        True -> Ok(SmallInteger(0 - magnitude))
+        False -> Ok(SmallInteger(magnitude))
+      }
+  }
+}
+
 fn parse_within_token_limit(
   max_significand_digits: Int,
   max_abs_exponent: Int,
@@ -284,7 +329,7 @@ fn normalize_parsed_number(
     Error(error) -> Error(error)
     Ok(written_exponent) ->
       case significant_digits {
-        [] -> Ok(Number(False, [48], 0))
+        [] -> Ok(zero)
         _ -> {
           let #(coefficient, removed_zeroes) =
             trim_trailing_zeroes(significant_digits, 0)
@@ -295,7 +340,7 @@ fn normalize_parsed_number(
             || normalized_exponent < -max_abs_exponent
           {
             True -> Error(ExponentOutOfRange)
-            False -> Ok(Number(negative, coefficient, normalized_exponent))
+            False -> Ok(make(negative, coefficient, normalized_exponent))
           }
         }
       }
@@ -303,7 +348,7 @@ fn normalize_parsed_number(
 }
 
 pub fn number_text(number: Number) -> String {
-  let Number(negative, coefficient, exponent10) = number
+  let #(negative, coefficient, exponent10) = parts(number)
   case coefficient {
     [48] -> "0"
     _ -> {
@@ -331,8 +376,18 @@ fn match_coefficient_digits(digits: List(Int)) -> String {
 }
 
 pub fn compare(left: Number, right: Number) -> NumberOrder {
-  let Number(left_negative, left_digits, left_exponent) = left
-  let Number(right_negative, right_digits, right_exponent) = right
+  case left, right {
+    SmallInteger(left), SmallInteger(right) -> compare_ints(left, right)
+    _, _ -> compare_parts(parts(left), parts(right))
+  }
+}
+
+fn compare_parts(
+  left: #(Bool, List(Int), Int),
+  right: #(Bool, List(Int), Int),
+) -> NumberOrder {
+  let #(left_negative, left_digits, left_exponent) = left
+  let #(right_negative, right_digits, right_exponent) = right
   case left_digits == [48], right_digits == [48] {
     True, True -> EqualTo
     True, False ->
@@ -423,7 +478,21 @@ pub fn to_int_exact(
   limit: IntegerProjectionLimit,
 ) -> Result(Int, IntegerProjectionError) {
   let IntegerProjectionLimit(max_digits) = limit
-  let Number(negative, coefficient, exponent10) = number
+  case number {
+    SmallInteger(value) ->
+      case decimal_digit_count(absolute(value), 1) > max_digits {
+        True -> Error(IntegerDigitLimitExceeded)
+        False -> Ok(value)
+      }
+    Decimal(..) -> decimal_to_int_exact(parts(number), max_digits)
+  }
+}
+
+fn decimal_to_int_exact(
+  parts: #(Bool, List(Int), Int),
+  max_digits: Int,
+) -> Result(Int, IntegerProjectionError) {
+  let #(negative, coefficient, exponent10) = parts
   case coefficient == [48] {
     True -> Ok(0)
     False ->
@@ -447,8 +516,10 @@ pub fn to_int_exact(
 }
 
 pub fn is_integer(number: Number) -> Bool {
-  let Number(_, coefficient, exponent10) = number
-  coefficient == [48] || exponent10 >= 0
+  case number {
+    SmallInteger(_) -> True
+    Decimal(exponent10:, ..) -> exponent10 >= 0
+  }
 }
 
 pub fn from_int(value: Int) -> Result(Number, IntegerConstructionError) {
@@ -466,11 +537,11 @@ pub fn from_int(value: Int) -> Result(Number, IntegerConstructionError) {
       let #(negative, digits) = strip_negative_sign(chars)
       let normalized_digits = drop_leading_zeroes(digits)
       case normalized_digits {
-        [] -> Ok(Number(False, [48], 0))
+        [] -> Ok(zero)
         _ -> {
           let #(coefficient, exponent10) =
             trim_trailing_zeroes(normalized_digits, 0)
-          Ok(Number(negative, coefficient, exponent10))
+          Ok(make(negative, coefficient, exponent10))
         }
       }
     }
@@ -482,19 +553,19 @@ pub fn from_float_exact(
 ) -> Result(Number, FloatConstructionError) {
   case native_float_parts(value) {
     Error(Nil) -> Error(NonFiniteFloat)
-    Ok(#(_, 0, _)) -> Ok(Number(False, [48], 0))
+    Ok(#(_, 0, _)) -> Ok(zero)
     Ok(#(negative, significand, exponent2)) -> {
       let #(digits, exponent10) =
         native_float_to_decimal(significand, exponent2)
       let #(coefficient, normalized_exponent) =
         trim_trailing_zeroes(digits, exponent10)
-      Ok(Number(negative, coefficient, normalized_exponent))
+      Ok(make(negative, coefficient, normalized_exponent))
     }
   }
 }
 
 pub fn to_float_exact(number: Number) -> Result(Float, FloatProjectionError) {
-  let Number(negative, coefficient, exponent10) = number
+  let #(negative, coefficient, exponent10) = parts(number)
   case coefficient == [48] {
     True -> Ok(0.0)
     False ->
@@ -763,5 +834,74 @@ fn append(left: List(a), right: List(a)) -> List(a) {
   case left {
     [] -> right
     [item, ..rest] -> [item, ..append(rest, right)]
+  }
+}
+
+const zero = SmallInteger(0)
+
+/// Build the canonical representation from a sign, coefficient digit codes
+/// without leading or trailing zeros (or `[48]` for zero), and a power of ten.
+fn make(negative: Bool, coefficient: List(Int), exponent10: Int) -> Number {
+  case coefficient {
+    [48] -> zero
+    _ ->
+      case
+        exponent10 >= 0
+        && list_length(coefficient) + exponent10 <= small_integer_digits
+      {
+        True -> {
+          let magnitude = scale_by_ten(digits_value(coefficient, 0), exponent10)
+          case negative {
+            True -> SmallInteger(0 - magnitude)
+            False -> SmallInteger(magnitude)
+          }
+        }
+        False -> Decimal(negative, native_ascii_string(coefficient), exponent10)
+      }
+  }
+}
+
+/// Expand a number into its sign, coefficient digit codes and power of ten.
+fn parts(number: Number) -> #(Bool, List(Int), Int) {
+  case number {
+    SmallInteger(0) -> #(False, [48], 0)
+    SmallInteger(value) -> {
+      let digits = native_byte_codes(native_integer_to_string(absolute(value)))
+      let #(coefficient, exponent10) = trim_trailing_zeroes(digits, 0)
+      #(value < 0, coefficient, exponent10)
+    }
+    Decimal(negative, digits, exponent10) -> #(
+      negative,
+      native_byte_codes(digits),
+      exponent10,
+    )
+  }
+}
+
+fn digits_value(digits: List(Int), accumulator: Int) -> Int {
+  case digits {
+    [] -> accumulator
+    [digit, ..rest] -> digits_value(rest, accumulator * 10 + digit_value(digit))
+  }
+}
+
+fn scale_by_ten(value: Int, exponent10: Int) -> Int {
+  case exponent10 <= 0 {
+    True -> value
+    False -> scale_by_ten(value * 10, exponent10 - 1)
+  }
+}
+
+fn absolute(value: Int) -> Int {
+  case value < 0 {
+    True -> 0 - value
+    False -> value
+  }
+}
+
+fn decimal_digit_count(magnitude: Int, count: Int) -> Int {
+  case magnitude < 10 {
+    True -> count
+    False -> decimal_digit_count(magnitude / 10, count + 1)
   }
 }

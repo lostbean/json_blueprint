@@ -7,7 +7,7 @@ import gleam/option
 import json/blueprint/codec
 import json/blueprint/value
 
-pub const generated_fingerprint: String = "ED5131CE2F2A8E4866C90F2A86C07652CB01B557"
+pub const generated_fingerprint: String = "2CF84E24FA08D6F2C26C7FC221EE93EFB8D961A1"
 
 const option_schema_value: codec.Schema = codec.ObjectSchema(
   [
@@ -230,6 +230,12 @@ pub fn decode_option_json(
 pub fn decode_option_json_native(
   source: String,
 ) -> Result(option.Option(codec.Nullable(String)), codec.JsonDecodeError) {
+  codec.decode_json_native(option_codec(), source)
+}
+
+fn parse_option_json_native(
+  source: String,
+) -> Result(option.Option(codec.Nullable(String)), codec.JsonDecodeError) {
   case json.parse(from: source, using: decode.dynamic) {
     Error(error) -> Error(codec.NativeJsonFailure(error))
     Ok(raw) ->
@@ -249,7 +255,7 @@ pub fn option_codec() -> codec.Codec(option.Option(codec.Nullable(String))) {
     encode_option,
     decode_option,
     encode_option_json,
-    decode_option_json_native,
+    parse_option_json_native,
     option_schema(),
   )
 }
