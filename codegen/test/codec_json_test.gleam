@@ -1,7 +1,6 @@
 import gleam/dynamic/decode
 import gleam/json
 import gleam/option.{None, Some}
-import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{DecodeError, EncodeError, Field}
 import json/blueprint/number
@@ -204,11 +203,10 @@ pub fn custom_codec_failure_helpers_build_custom_reasons_test() {
   |> should.equal(
     Error(DecodeError([Field("text")], codec.Custom("never decodes"))),
   )
-  // The rendered text leaves out the message.
+  // The rendered text is the library's path and the caller's message.
   let assert Error(error) = codec.decode_json(wrapped, "{\"text\":\"x\"}")
   codec.describe_decode_error(error)
-  |> string.contains("never decodes")
-  |> should.be_false
+  |> should.equal("$[\"text\"]: never decodes")
 }
 
 fn prefixed_encode(item: String) -> Result(value.Value, codec.EncodeError) {

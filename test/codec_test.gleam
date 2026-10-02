@@ -1,6 +1,7 @@
 import gleam/dynamic/decode
 import gleam/json
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{type Codec, DecodeError, EncodeError, Field, Index}
@@ -487,7 +488,70 @@ pub fn try_map_reports_a_custom_reason_at_the_path_test() {
   |> should.equal(Error(EncodeError([Index(0)], codec.Custom("odd"))))
   let assert Error(error) = codec.decode_json(pairs, "[3]")
   codec.describe_decode_error(error)
-  |> should.equal("$[0]: custom validation failed")
+  |> should.equal("$[0]: odd")
+}
+
+type Span {
+  Span(start: Int, end: Int)
+}
+
+fn span_fields() -> Codec(Span) {
+  use start <- codec.field("start", codec.int(), fn(s: Span) { s.start })
+  use end <- codec.field("end", codec.int(), fn(s: Span) { s.end })
+  codec.success(Span(start:, end:))
+}
+
+fn ordered(span: Span) -> Result(Span, String) {
+  case span.start <= span.end {
+    True -> Ok(span)
+    False -> Error("end is before start")
+  }
+}
+
+pub fn record_level_try_map_fails_at_the_record_path_test() {
+  let span =
+    codec.try_map(
+      span_fields(),
+      decode: ordered,
+      encode: ordered,
+      placeholder: Span(0, 0),
+    )
+  let nested = {
+    use span <- codec.field("span", span, fn(s: Span) { s })
+    codec.success(span)
+  }
+  codec.decode_json(span, "{\"start\":2,\"end\":1}")
+  |> should.equal(fail([], codec.Custom("end is before start")))
+  let assert Error(error) =
+    codec.decode_json(nested, "{\"span\":{\"start\":2,\"end\":1}}")
+  codec.describe_decode_error(error)
+  |> should.equal("$[\"span\"]: end is before start")
+  codec.encode(span, Span(2, 1))
+  |> should.equal(Error(EncodeError([], codec.Custom("end is before start"))))
+}
+
+pub fn cross_field_check_fails_at_the_dependent_field_test() {
+  let span = {
+    use start <- codec.field("start", codec.int(), fn(s: Span) { s.start })
+    let end =
+      codec.try_map(
+        codec.int(),
+        decode: fn(end) { ordered(Span(start, end)) |> result.replace(end) },
+        encode: fn(end) { ordered(Span(start, end)) |> result.replace(end) },
+        placeholder: start,
+      )
+    use end <- codec.field("end", end, fn(s: Span) { s.end })
+    codec.success(Span(start:, end:))
+  }
+  codec.decode_json(span, "{\"start\":1,\"end\":2}")
+  |> should.equal(Ok(Span(1, 2)))
+  codec.decode_json(span, "{\"end\":1,\"start\":2}")
+  |> should.equal(fail([Field("end")], codec.Custom("end is before start")))
+  codec.encode(span, Span(2, 1))
+  |> should.equal(
+    Error(EncodeError([Field("end")], codec.Custom("end is before start"))),
+  )
+  codec.schema(span) |> should.equal(codec.schema(span_fields()))
 }
 
 pub fn custom_codec_test() {

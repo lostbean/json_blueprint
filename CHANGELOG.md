@@ -28,10 +28,16 @@ until a release decision.
   number without an exact form is an `UnrepresentableNumber` error) and
   `codec.decoder`.
 - Errors are flat `DecodeError(path, reason)` and `EncodeError(path, reason)`
-  records with one `Reason` union and no string payloads.
-  `describe_decode_error` and `describe_encode_error` render them without
-  input values; `is_limit_exceeded` tells a too-large input from an invalid
-  one.
+  records with one `Reason` union. `describe_decode_error` and
+  `describe_encode_error` render them: the library writes the path and its
+  own reasons without input values, and a `Custom(message)` from `try_map`,
+  `decode_failure` or `encode_failure` renders as the caller's message (an
+  empty one as `custom validation failed`). `is_limit_exceeded` tells a
+  too-large input from an invalid one.
+- A `try_map` over a whole record fails at the record's path. A check across
+  fields reports the field it concerns when that field's codec is built
+  inside the record from the fields decoded before it; the README's
+  `order_codec` shows the pattern.
 - Constructors return `Codec(a)`. A mistaken definition, such as a field
   named twice, a repeated enum label or reversed bounds, panics with a
   message naming the field, label or bounds where it is first used.

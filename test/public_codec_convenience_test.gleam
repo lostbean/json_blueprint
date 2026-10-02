@@ -137,8 +137,17 @@ pub fn public_decode_error_renderer_handles_paths_and_private_values_test() {
   ))
   |> should.equal("$[\"amount\"]: integer outside range 1 to 100")
 
-  codec.describe_decode_error(codec.decode_failure("secret value"))
+  codec.describe_decode_error(codec.decode_failure("caller's message"))
+  |> should.equal("$: caller's message")
+
+  codec.describe_decode_error(codec.decode_failure(""))
   |> should.equal("$: custom validation failed")
+
+  codec.describe_encode_error(codec.EncodeError(
+    [Field("total")],
+    codec.Custom("total differs from the line sum"),
+  ))
+  |> should.equal("$[\"total\"]: total differs from the line sum")
 
   codec.describe_decode_error(codec.DecodeError(
     [Field("account-secret")],

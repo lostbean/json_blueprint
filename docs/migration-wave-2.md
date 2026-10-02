@@ -47,7 +47,9 @@ The sections:
 
 All of these are replaced by one `use`-based builder: `field` (required),
 `optional_field` (optional, as `Option`), and `success` (the end of the
-record). Each getter needs its record type annotated. `Properties`,
+record). Each getter needs its record type annotated: Gleam infers a call's
+arguments in order and does not use the expected result type, so `get` is
+checked before anything fixes the record type. `Properties`,
 `PropertyError`, `Optional`, `Missing` and `Present` are removed.
 
 ```gleam
@@ -286,6 +288,36 @@ The placeholder is any value of the type; `decoder` uses it on failure, as
 `codec.decode_failure(message)` and `codec.encode_failure(message)`, or return
 the errors of the codecs you call.
 
+A `try_map` over a whole record fails at the record's own path, `[]` at the
+root. To keep a check across fields located at the field it concerns, build
+that field's codec inside the record from the fields decoded before it:
+
+```gleam
+// before: the failure is at [], whatever field it concerns
+codec.try_map(
+  invoice_fields(),
+  decode: check_total,
+  encode: check_total,
+  placeholder: blank(),
+)
+
+// after: the failure is at [Field("total_cents")], in both directions
+use line_items <- codec.field(
+  "line_items",
+  codec.list(line_item_codec()),
+  fn(i: Invoice) { i.line_items },
+)
+use total_cents <- codec.field(
+  "total_cents",
+  total_matching(line_items),
+  fn(i: Invoice) { i.total_cents },
+)
+```
+
+where `total_matching(line_items)` is a `try_map` over `codec.int()`. When
+the record describes itself, it receives placeholder values, so its schema
+must not depend on them. The README's `order_codec` is a tested example.
+
 ### Errors: `EncodeError`, `DecodeError`, `EncodeReason`, `DecodeReason`, `JsonDecodeError`
 
 Errors are flat `{path, reason}` records with one shared `Reason` union.
@@ -356,8 +388,13 @@ case error {
 
 A hand-written renderer over `string.inspect` (fabric's
 `internal/invocation.gleam`) becomes `codec.describe_encode_error` or
-`codec.describe_decode_error`. Both omit input values, unknown keys from the
-input and `Custom` messages.
+`codec.describe_decode_error`. The library writes the path and the text of
+its own reasons, which omit input values and unknown keys from the input. A
+`Custom(message)` renders as the caller's message, verbatim, such as
+`$["total_cents"]: total 9999 differs from line sum 4490`; an empty message
+renders as `custom validation failed`. Up to `c96a8c3` every `Custom`
+rendered as `custom validation failed`, so update any test or caller that
+matches that text.
 
 `Reason` may gain variants in minor releases: match it with a `_` branch.
 
