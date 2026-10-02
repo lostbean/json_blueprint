@@ -1,5 +1,5 @@
 import gleam/io
-import json/blueprint/internal/schema_materialize
+import json/blueprint/codegen/internal/schema_materialize
 import materialize_fixtures
 
 @external(erlang, "file_test_ffi", "write_file")

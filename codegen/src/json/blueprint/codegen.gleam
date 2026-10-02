@@ -1,19 +1,20 @@
-//// Inspectable codec definitions that run as a `Codec(a)` and compile to a
-//// Gleam module with the same encoder, decoders and schema.
+//// Codec definitions that run as a `Codec(a)` and compile to a Gleam module
+//// with the same encoder, decoders and schema.
 ////
-//// Use this module when a codec should also exist as generated Gleam source
-//// that is checked in and reviewed. A `Definition(a)` is built from the same
-//// shapes as
-//// `json/blueprint/codec`; mappings to your own types name their functions
-//// (`named_mapping`, `enum_variant`) because the generated source must call
-//// them. `runtime` returns the definition's codec. `compile` returns a
-//// `GeneratedModule` whose content the caller writes under `src/`, formats
-//// with `gleam format` and keeps fresh with a test that compiles again and
-//// compares.
+//// This module belongs to `json_blueprint_codegen`, a dev-only package: use
+//// it in a build task or a test, not at run time. A `Definition(a)` is built
+//// from the same shapes as `json/blueprint/codec`; mappings to your own types
+//// name their functions (`named_mapping`, `enum_variant`) because the
+//// generated source must call them. `runtime` returns the definition's codec.
+//// `compile` returns a `GeneratedModule` whose content the caller writes
+//// under `src/`, formats with `gleam format`, and keeps fresh with a test
+//// that compiles again and compares. A definition mistake, such as a
+//// property named twice, is a `CompileError`.
 ////
-//// Generated modules decode text with the strict parser. Their
-//// `decode_<name>_json_native` function uses `gleam/json` instead and rejects
-//// text above 1 MiB before parsing.
+//// Generated modules call `json/blueprint/internal/generated`, whose names
+//// json_blueprint keeps stable within a major version. They decode text with
+//// the strict parser; `decode_<name>_json_native` uses `gleam/json` instead,
+//// returns `json.DecodeError`, and rejects text above 1 MiB before parsing.
 ////
 //// ```gleam
 //// import json/blueprint/codec
@@ -40,7 +41,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import json/blueprint/codec
-import json/blueprint/internal/schema_materialize
+import json/blueprint/codegen/internal/schema_materialize
 import json/blueprint/number
 
 // Inspectable definitions for primitives, bounded integers, pairs, lists,

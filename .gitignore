@@ -3,4 +3,5 @@
 *.beam
 *.ez
 /build
+/codegen/build
 erl_crash.dump
