@@ -5,6 +5,15 @@ This guide moves code written against the unreleased 2.0 branch (up to commit
 removed or changed, with its replacement and a before→after snippet, grouped
 by module. For 1.7.1 code, see [the 1.x → 2.0 guide](migration-2.0.md).
 
+**Erlang and JavaScript FFI callers.** The Gleam compiler does not check
+calls from Erlang or JavaScript source into this package. Generated module
+names and function arities changed (for example
+`json@blueprint@number:number_limits/3` became `limits/3` without an
+`{ok, _}` wrapper, and `parse_number(Limits, Token)` became
+`parse(Token, Limits)`). Search native sources (`*.erl`, `*.mjs`) for
+`json@blueprint@` and update every call; a missed call fails only at run
+time.
+
 The sections:
 
 1. [Module map](#module-map)
