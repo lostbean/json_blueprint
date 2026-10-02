@@ -10,7 +10,7 @@ import gleeunit/should
 import json/blueprint/codec
 import json/blueprint/codegen
 import json/blueprint/document
-import json/blueprint/dynamic as legacy_dynamic
+import json/blueprint/internal/dynamic as legacy_dynamic
 import json/blueprint/number
 import json/blueprint/parser
 import json/blueprint/parser_limits

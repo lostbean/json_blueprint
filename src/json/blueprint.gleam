@@ -1,12 +1,14 @@
-//// The 1.x API: one-way `Decoder(t)` values that decode JSON text into Gleam
-//// values and describe that JSON as a schema document labelled Draft-07,
-//// plus encoders for unions, enums, optional fields and tuples.
+//// The 1.x API, frozen: one-way `Decoder(t)` values that decode JSON text
+//// into Gleam values and describe that JSON as a schema document labelled
+//// Draft-07, plus encoders for unions, enums, optional fields and tuples.
 ////
-//// Use this module for recursive types, which `self_decoder` and
-//// `reuse_decoder` express with `$ref` and `$defs`, and for existing 1.x
-//// code. For other data, `json/blueprint/codec` gives one `Codec(a)` that
-//// encodes, decodes strictly and describes a Draft 2020-12 schema. The schema
-//// types used here live in `json/blueprint/schema`.
+//// Use `json/blueprint/codec` for new code: one `Codec(a)` encodes, decodes
+//// strictly and describes a Draft 2020-12 schema. Keep this module for
+//// recursive types, which `self_decoder` and `reuse_decoder` express with
+//// `$ref` and `$defs`, and for existing 1.x code. Its wire formats differ from
+//// `codec`: unions use `{"type", "data"}`, enums encode as `{"enum": label}`,
+//// and objects ignore unknown fields. The schema types live in
+//// `json/blueprint/schema`.
 ////
 //// `decode` parses with `gleam/json` and rejects text above 1 MiB before
 //// parsing; `decode_with_max_bytes` accepts another bound.
@@ -46,7 +48,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import json/blueprint/dynamic
+import json/blueprint/internal/dynamic
 import json/blueprint/internal/parser_core
 import json/blueprint/parser_limits
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
@@ -54,7 +56,7 @@ import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 type DynamicDecoder(t) =
   fn(gleam_dynamic.Dynamic) -> Result(t, List(dynamic.DecodeError))
 
-pub type Decoder(t) {
+pub opaque type Decoder(t) {
   Decoder(
     dyn_decoder: DynamicDecoder(t),
     schema: SchemaDefinition,
@@ -62,7 +64,7 @@ pub type Decoder(t) {
   )
 }
 
-pub type FieldDecoder(t) {
+pub opaque type FieldDecoder(t) {
   FieldDecoder(
     dyn_decoder: DynamicDecoder(t),
     field_schema: #(String, SchemaDefinition),
@@ -177,8 +179,23 @@ pub fn self_decoder(lazy: LazyDecoder(t)) -> Decoder(t) {
   Decoder(fn(input) { lazy().dyn_decoder(input) }, jsch.Ref("#"), [])
 }
 
-pub fn get_dynamic_decoder(decoder: Decoder(t)) -> DynamicDecoder(t) {
-  decoder.dyn_decoder
+/// The decoder as a function over `Dynamic` data, for use with a parser
+/// other than `decode`. Errors use `gleam/dynamic/decode.DecodeError`.
+pub fn get_dynamic_decoder(
+  decoder: Decoder(t),
+) -> fn(gleam_dynamic.Dynamic) -> Result(t, List(decode.DecodeError)) {
+  fn(data) {
+    decoder.dyn_decoder(data)
+    |> result.map_error(fn(errors) { list.map(errors, to_decode_error) })
+  }
+}
+
+fn to_decode_error(error: dynamic.DecodeError) -> decode.DecodeError {
+  decode.DecodeError(
+    expected: error.expected,
+    found: error.found,
+    path: error.path,
+  )
 }
 
 /// Parse JSON text with `gleam/json` and decode it with `decoder`.
@@ -224,18 +241,8 @@ pub fn decode_with_max_bytes(
   // takes a `gleam/dynamic/decode.Decoder`. We parse to a raw `Dynamic` using
   // the identity decoder and then run this library's vendored decoder on it.
   use dyn <- result.try(json.parse(from: json_string, using: decode.dynamic))
-  decoder.dyn_decoder(dyn)
-  |> result.map_error(fn(errors) {
-    json.UnableToDecode(
-      list.map(errors, fn(error) {
-        decode.DecodeError(
-          expected: error.expected,
-          found: error.found,
-          path: error.path,
-        )
-      }),
-    )
-  })
+  get_dynamic_decoder(decoder)(dyn)
+  |> result.map_error(json.UnableToDecode)
 }
 
 pub fn string() -> Decoder(String) {
