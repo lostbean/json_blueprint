@@ -13,7 +13,7 @@ import {
 // `gleam_stdlib` 0.60.0 removed the `DecodeError` export from
 // `gleam/dynamic`, so we import it from this library's own vendored decoder
 // module (which now defines it) instead.
-import { DecodeError } from "./json/blueprint/dynamic.mjs";
+import { DecodeError } from "./json/blueprint/internal/dynamic.mjs";
 import { Some, None } from "../gleam_stdlib/gleam/option.mjs";
 import Dict from "../gleam_stdlib/dict.mjs";
 import { get as dict_get } from "../gleam_stdlib/gleam/dict.mjs";

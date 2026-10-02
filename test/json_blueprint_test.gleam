@@ -1,3 +1,4 @@
+import gleam/dynamic/decode
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleeunit
@@ -359,4 +360,21 @@ pub fn reuse_decoder_test() {
   |> should.equal(
     "{\"$defs\":{\"ref_707AD0AE2AF80DF30FAB6C677D270B616C19AF94\":{\"required\":[\"name\",\"age\",\"email\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"},\"email\":{\"type\":[\"string\",\"null\"]}}}},\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"required\":[\"person\",\"address\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"person\":{\"$ref\":\"#/$defs/ref_707AD0AE2AF80DF30FAB6C677D270B616C19AF94\"},\"address\":{\"required\":[\"street\",\"city\",\"zip\"],\"additionalProperties\":false,\"type\":\"object\",\"properties\":{\"street\":{\"type\":\"string\"},\"city\":{\"type\":\"string\"},\"zip\":{\"type\":\"string\"}}}}}",
   )
+}
+
+pub fn dynamic_decoder_returns_stdlib_decode_errors_test() {
+  let decoder =
+    blueprint.decode2(
+      fn(name, age) { #(name, age) },
+      blueprint.field("name", blueprint.string()),
+      blueprint.field("age", blueprint.int()),
+    )
+  let assert Ok(raw) =
+    json.parse("{\"name\":\"Ada\",\"age\":\"old\"}", decode.dynamic)
+  let assert Error([decode.DecodeError(expected: "Int", found: _, path: path)]) =
+    blueprint.get_dynamic_decoder(decoder)(raw)
+  path |> should.equal(["age"])
+  let assert Ok(raw) =
+    json.parse("{\"name\":\"Ada\",\"age\":36}", decode.dynamic)
+  blueprint.get_dynamic_decoder(decoder)(raw) |> should.equal(Ok(#("Ada", 36)))
 }
