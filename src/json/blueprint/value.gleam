@@ -1,3 +1,12 @@
+//// The JSON value model: null, booleans, strings, exact numbers, arrays and
+//// objects.
+////
+//// `Value` is what the strict parser returns, what `runtime` validates and
+//// what `codec.encode` and `codec.decode` exchange. Object members keep their
+//// order. Construct an object with `object(entries, RejectDuplicates)` to
+//// reject a repeated key; the `Object` constructor accepts any list.
+//// Numbers are `number.Number`, so they are exact.
+
 import gleam/list
 import json/blueprint/number.{type Number}
 

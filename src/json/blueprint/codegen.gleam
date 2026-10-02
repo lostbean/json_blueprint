@@ -1,3 +1,38 @@
+//// Inspectable codec definitions that run as a `Codec(a)` and compile to a
+//// Gleam module with the same encoder, decoders and schema.
+////
+//// Use this module when a codec should also exist as generated Gleam source
+//// that is checked in and reviewed. A `Definition(a)` is built from the same
+//// shapes as
+//// `json/blueprint/codec`; mappings to your own types name their functions
+//// (`named_mapping`, `enum_variant`) because the generated source must call
+//// them. `runtime` returns the definition's codec. `compile` returns a
+//// `GeneratedModule` whose content the caller writes under `src/`, formats
+//// with `gleam format` and keeps fresh with a test that compiles again and
+//// compares.
+////
+//// Generated modules decode text with the strict parser. Their
+//// `decode_<name>_json_native` function uses `gleam/json` instead and rejects
+//// text above 1 MiB before parsing.
+////
+//// ```gleam
+//// import json/blueprint/codec
+//// import json/blueprint/codegen
+////
+//// pub fn names_definition() -> codegen.Definition(List(String)) {
+////   codegen.list(codegen.string())
+//// }
+////
+//// pub fn example() {
+////   let assert Ok(["a", "b"]) =
+////     codec.decode_json(codegen.runtime(names_definition()), "[\"a\",\"b\"]")
+////   // In a build task: write `content` to "src/" <> path.
+////   let assert Ok(codegen.GeneratedModule(path:, content:, fingerprint: _)) =
+////     codegen.compile("generated/names_codec", "names", names_definition())
+////   #(path, content)
+//// }
+//// ```
+
 import gleam/bit_array
 import gleam/crypto
 import gleam/list

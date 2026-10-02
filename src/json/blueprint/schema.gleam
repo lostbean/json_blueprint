@@ -1,3 +1,12 @@
+//// JSON Schema documents for the 1.x `json/blueprint.Decoder`.
+////
+//// `Schema` and `SchemaDefinition` describe the schemas that 1.x decoders
+//// produce, including `$ref` and `$defs` for recursive types, and `to_json`
+//// renders a document whose `$schema` is `json_schema_version`, the Draft-07
+//// URI. `json/blueprint.generate_json_schema` calls it. Codecs from
+//// `json/blueprint/codec` use their own `codec.Schema` and render Draft
+//// 2020-12 instead.
+
 import gleam/bit_array
 import gleam/crypto
 import gleam/json

@@ -1,3 +1,57 @@
+//// Bidirectional JSON codecs: one `Codec(a)` encodes a Gleam value, decodes
+//// JSON text or a parsed `Value` strictly, and describes the JSON as a
+//// Draft 2020-12 schema.
+////
+//// This is the module for ordinary application data. Build codecs from
+//// `string`, `int`, `number`, `bool`, `list`, `pair`, `nullable`,
+//// `string_enum`, `tagged`, the bounded `integer_between` and
+//// `number_between`, and objects of `required` and `optional` properties
+//// (`record2`, `record3`, or `combine` with `object` and `imap`).
+////
+//// `decode_json` uses the strict parser with `parser_limits.default()`
+//// (1 MiB, depth 64): it rejects duplicate keys and keeps numbers exact.
+//// `decode_json_with_limits` takes other limits and `render_json_decode_error`
+//// turns an error into readable text without input values. `schema_json`
+//// renders the schema document.
+////
+//// `json/blueprint/codegen` builds the same codecs from definitions that can
+//// also be compiled to Gleam source. `json/blueprint/runtime` validates parsed
+//// values against a codec's schema. The functions named `encode_*_value`,
+//// `decode_*_value`, `*_with`, `encode_native_*` and `decode_native_*` are
+//// called by generated modules; application code uses the combinators.
+////
+//// ```gleam
+//// import json/blueprint/codec
+////
+//// pub type Task {
+////   Task(id: Int, title: String)
+//// }
+////
+//// pub fn task_codec() -> codec.Codec(Task) {
+////   let assert Ok(id) = codec.integer_between(1, 100_000)
+////   let assert Ok(task) =
+////     codec.record2(
+////       codec.required("id", id),
+////       codec.required("title", codec.string()),
+////       Task,
+////       fn(task) { task.id },
+////       fn(task) { task.title },
+////     )
+////   task
+//// }
+////
+//// pub fn example() -> Result(String, String) {
+////   case codec.decode_json(task_codec(), "{\"id\":42,\"title\":\"Ship\"}") {
+////     Error(error) -> Error(codec.render_json_decode_error(error))
+////     Ok(task) ->
+////       case codec.encode_json(task_codec(), task) {
+////         Ok(text) -> Ok(text)
+////         Error(_) -> Error("cannot encode")
+////       }
+////   }
+//// }
+//// ```
+
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode

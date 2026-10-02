@@ -1,3 +1,12 @@
+//// Bounds for the strict JSON parser: input bytes, nesting depth and number
+//// size.
+////
+//// Start from `default()` (1 MiB, depth 64, numbers of up to 1,024 bytes,
+//// 800 significant digits and exponent 1,200) and change one bound with
+//// `with_max_bytes`, `with_max_depth` or `with_number_limits`. Pass the result
+//// to `codec.decode_json_with_limits` or to the `json/blueprint/parser`
+//// functions. `parser.ParserLimits` is an alias of `ParserLimits`.
+
 import json/blueprint/number.{type NumberLimits}
 
 /// Validated bounds for strict JSON admission.
