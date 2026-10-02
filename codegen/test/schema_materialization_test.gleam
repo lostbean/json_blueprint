@@ -3,7 +3,7 @@ import gleam/option.{None, Some}
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec
-import json/blueprint/internal/schema_materialize.{
+import json/blueprint/codegen/internal/schema_materialize.{
   DuplicateAccessor, InvalidAccessorName, SchemaExport, UnknownSchema,
   UnsupportedConstructor,
 }

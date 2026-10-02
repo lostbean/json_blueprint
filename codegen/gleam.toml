@@ -1,0 +1,15 @@
+name = "json_blueprint_codegen"
+version = "0.1.0"
+description = "Compile json_blueprint codec definitions to Gleam source. A dev-only tool; not published."
+licences = ["MIT"]
+repository = { type = "github", user = "lostbean", repo = "json_blueprint", path = "codegen" }
+internal_modules = ["json/blueprint/codegen/internal", "json/blueprint/codegen/internal/*"]
+
+[dependencies]
+gleam_stdlib = ">= 0.60.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+gleam_crypto = ">= 1.3.0 and < 2.0.0"
+json_blueprint = { path = ".." }
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

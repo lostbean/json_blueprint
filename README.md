@@ -290,3 +290,6 @@ exact. Browser JavaScript is not tested.
 nix develop          # Gleam 1.17, Erlang/OTP 28, Node.js 24
 sh scripts/gate.sh   # format, warnings and tests on both targets, for both packages
 ```
+
+`test/schema_check.py` compares the emitted schemas with the Python
+`jsonschema` Draft 2020-12 validator; it needs `jsonschema` 4.26 or later.

@@ -21,7 +21,6 @@ pub fn every_public_module_starts_with_a_module_doc_test() {
   |> should.equal([
     "src/json/blueprint.gleam",
     "src/json/blueprint/codec.gleam",
-    "src/json/blueprint/codegen.gleam",
     "src/json/blueprint/contract.gleam",
     "src/json/blueprint/number.gleam",
     "src/json/blueprint/schema.gleam",
