@@ -83,6 +83,37 @@ pub fn email_codec() -> Codec(Email) {
   )
 }
 
+import gleam/int
+
+pub type Order {
+  Order(items: List(Int), total: Int)
+}
+
+pub fn order_codec() -> Codec(Order) {
+  use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+    o.items
+  })
+  use total <- codec.field("total", total_of(items), fn(o: Order) { o.total })
+  codec.success(Order(items:, total:))
+}
+
+fn total_of(items: List(Int)) -> Codec(Int) {
+  let sum = int.sum(items)
+  let check = fn(total) {
+    case total == sum {
+      True -> Ok(total)
+      False ->
+        Error(
+          "total "
+          <> int.to_string(total)
+          <> " differs from the item sum "
+          <> int.to_string(sum),
+        )
+    }
+  }
+  codec.try_map(codec.int(), decode: check, encode: check, placeholder: sum)
+}
+
 pub fn explain(text: String) -> String {
   case codec.decode_json(user_codec(), text) {
     Ok(_) -> "ok"
@@ -144,7 +175,7 @@ pub fn readme_snippets_are_in_this_file_verbatim_test() {
   let assert Ok(readme) = read_file_to_string("README.md")
   let assert Ok(source) = read_file_to_string("test/readme_example_test.gleam")
   let snippets = gleam_snippets(string.replace(readme, "\r\n", "\n"), [])
-  list.length(snippets) |> should.equal(8)
+  list.length(snippets) |> should.equal(9)
   snippets
   |> list.filter(fn(snippet) { !string.contains(source, snippet) })
   |> should.equal([])
@@ -178,6 +209,42 @@ pub fn email_codec_test() {
   |> should.equal(
     Error(codec.DecodeError([], codec.Custom("an email address needs an @"))),
   )
+}
+
+pub fn email_message_test() {
+  let assert Error(error) = codec.decode_json(email_codec(), "\"ab\"")
+  codec.describe_decode_error(error)
+  |> should.equal("$: an email address needs an @")
+}
+
+pub fn order_codec_test() {
+  codec.decode_json(order_codec(), "{\"items\":[1,2],\"total\":3}")
+  |> should.equal(Ok(Order([1, 2], 3)))
+  let assert Error(error) =
+    codec.decode_json(order_codec(), "{\"items\":[1,2],\"total\":4}")
+  error
+  |> should.equal(codec.DecodeError(
+    [codec.Field("total")],
+    codec.Custom("total 4 differs from the item sum 3"),
+  ))
+  codec.describe_decode_error(error)
+  |> should.equal("$[\"total\"]: total 4 differs from the item sum 3")
+  let assert Error(error) = codec.encode_json(order_codec(), Order([1, 2], 4))
+  codec.describe_encode_error(error)
+  |> should.equal("$[\"total\"]: total 4 differs from the item sum 3")
+  codec.encode_json(order_codec(), Order([1, 2], 3))
+  |> should.equal(Ok("{\"items\":[1,2],\"total\":3}"))
+  let assert Ok(schema) = codec.schema_json(order_codec())
+  let assert Ok(expected) =
+    {
+      use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+        o.items
+      })
+      use total <- codec.field("total", codec.int(), fn(o: Order) { o.total })
+      codec.success(Order(items:, total:))
+    }
+    |> codec.schema_json
+  schema |> should.equal(expected)
 }
 
 pub fn explain_test() {

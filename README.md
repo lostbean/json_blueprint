@@ -158,8 +158,50 @@ pub fn email_codec() -> Codec(Email) {
 }
 ```
 
-A failed conversion is the reason `Custom(message)` at the codec's path. The
-other building blocks are `string`, `int`, `float`, `number` (exact), `bool`,
+A failed conversion is the reason `Custom(message)` at the codec's path, and
+`describe_decode_error` renders it as `$: an email address needs an @`.
+
+A `try_map` over a whole record fails at the record's own path, `[]` at the
+root. To report a check across fields at the field it concerns, build that
+field's codec inside the record from the fields decoded before it:
+
+```gleam
+pub type Order {
+  Order(items: List(Int), total: Int)
+}
+
+pub fn order_codec() -> Codec(Order) {
+  use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+    o.items
+  })
+  use total <- codec.field("total", total_of(items), fn(o: Order) { o.total })
+  codec.success(Order(items:, total:))
+}
+
+fn total_of(items: List(Int)) -> Codec(Int) {
+  let sum = int.sum(items)
+  let check = fn(total) {
+    case total == sum {
+      True -> Ok(total)
+      False ->
+        Error(
+          "total "
+          <> int.to_string(total)
+          <> " differs from the item sum "
+          <> int.to_string(sum),
+        )
+    }
+  }
+  codec.try_map(codec.int(), decode: check, encode: check, placeholder: sum)
+}
+```
+
+Decoding `{"items":[1,2],"total":4}` fails with
+`$["total"]: total 4 differs from the item sum 3`, and encoding such an
+`Order` fails at the same path. When the codec describes itself, `total_of`
+receives placeholder values, so its schema must not depend on them.
+
+The other building blocks are `string`, `int`, `float`, `number` (exact), `bool`,
 `list`, `pair`, `string_enum`, `integer_between`, `number_between` and
 `describe`, which adds a schema description.
 
@@ -181,9 +223,11 @@ pub fn explain(text: String) -> String {
 }
 ```
 
-The rendered text never contains input values, unknown keys from the input
-or `Custom` messages. `Reason` may gain variants in minor releases, so match
-it with a `_` branch.
+The library writes the path and the text of its own reasons, which never
+contain input values or unknown keys from the input. A `Custom` reason
+renders the caller's message verbatim, so leave input values out of a
+message that must not show them. `Reason` may gain variants in minor
+releases, so match it with a `_` branch.
 
 A codec written wrongly, such as a field named twice, an enum label repeated
 or reversed bounds, panics with a message naming the field, label or bounds

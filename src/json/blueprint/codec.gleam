@@ -51,7 +51,9 @@
 //// omits the field for `None`; wrap the inner codec in `nullable` to also
 //// accept `null`. `union` with `variant` and `unit_variant` describes a sum
 //// type as `{"tag": ..., "value": ...}`. `map` and `try_map` convert to your
-//// own types, and `custom` builds a codec from functions.
+//// own types, and `custom` builds a codec from functions. A check across
+//// fields reports its path when the dependent field's codec is built from
+//// the fields before it; see `try_map`.
 ////
 //// `decode_json` parses with `value.default_limits()`: 1 MiB of text, depth
 //// 64 and 262,144 values; `decode_json_with_limits` takes other limits.
@@ -65,7 +67,9 @@
 //// `DefinitionError` instead, for codecs built from runtime data such as enum
 //// labels loaded from a database; call it at startup.
 ////
-//// `DecodeError` and `EncodeError` are `{path, reason}` records. `Reason`
+//// `DecodeError` and `EncodeError` are `{path, reason}` records, rendered
+//// by `describe_decode_error` and `describe_encode_error`: the library owns
+//// the path, and a `Custom` reason renders the caller's message. `Reason`
 //// and `Schema` may gain variants in minor releases; match them with a `_`
 //// branch, and build errors with `decode_failure` and `encode_failure`.
 
@@ -1223,6 +1227,24 @@ pub fn map(
 /// Like `map`, with conversions that may fail with a message. A failure is
 /// `Custom(message)` at the codec's path. `placeholder` is any value of `b`,
 /// used where a value is needed without input, as `decode.failure` does.
+///
+/// Over a whole record, the path of a failure is the record's own, `[]` at
+/// the root. To report a check across fields at the field it concerns, build
+/// that field's codec inside the record from the fields decoded before it:
+///
+/// ```gleam
+/// use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+///   o.items
+/// })
+/// use total <- codec.field("total", total_of(items), fn(o: Order) { o.total })
+/// codec.success(Order(items:, total:))
+/// ```
+///
+/// where `total_of(items)` is a `try_map` over `codec.int()` that fails when
+/// the total differs from the sum. A failure then has the path
+/// `[Field("total")]`, in both directions. When the codec describes itself,
+/// `total_of` receives placeholder values, so its schema must not depend on
+/// them.
 pub fn try_map(
   codec: Codec(a),
   decode from: fn(a) -> Result(b, String),
@@ -1336,16 +1358,18 @@ fn first_repeated(items: List(String), seen: Set(String)) -> Option(String) {
 // --- rendering ---------------------------------------------------------------
 
 /// Render a decode error as text such as
-/// `$["user"]["age"]: integer outside range 0 to 150`. The text contains no
-/// input values, no unknown or repeated keys from the input, and no `Custom`
-/// message; a path may still contain names from your own codecs.
+/// `$["user"]["age"]: integer outside range 0 to 150`. The library writes the
+/// path and the text of its own reasons, which contain no input values and no
+/// unknown or repeated keys from the input. A `Custom(message)` renders as
+/// the message, verbatim, such as `$["total"]: total 4 differs from 3`, so
+/// leave input values out of the messages that must not show them. An empty
+/// message renders as `custom validation failed`.
 pub fn describe_decode_error(error: DecodeError) -> String {
   describe_failure(error.path, error.reason)
 }
 
 /// Render an encode error as text such as
-/// `$["role"]: value is not in the enum`, with the same omissions as
-/// `describe_decode_error`.
+/// `$["role"]: value is not in the enum`, like `describe_decode_error`.
 pub fn describe_encode_error(error: EncodeError) -> String {
   describe_failure(error.path, error.reason)
 }
@@ -1404,7 +1428,8 @@ fn describe_reason(reason: Reason) -> String {
       <> number.to_string(minimum)
       <> " to "
       <> number.to_string(maximum)
-    Custom(_) -> "custom validation failed"
+    Custom("") -> "custom validation failed"
+    Custom(message) -> message
   }
 }
 
