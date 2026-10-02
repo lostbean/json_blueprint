@@ -14,14 +14,14 @@ pub type User {
 
 pub fn user_codec() -> Codec(User) {
   let role = codec.string_enum([#("admin", Admin), #("member", Member)])
-  use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
-  use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+  use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
+  use age <- codec.field("age", codec.integer_between(0, 150), get: fn(u) {
     u.age
   })
-  use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+  use email <- codec.optional_field("email", codec.string(), get: fn(u) {
     u.email
   })
-  use role <- codec.field("role", role, fn(u: User) { u.role })
+  use role <- codec.field("role", role, get: fn(u) { u.role })
   codec.success(User(name:, age:, email:, role:))
 }
 

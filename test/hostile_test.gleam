@@ -259,7 +259,7 @@ pub fn codec_rejection_laws_property_test() {
 
   // Array where object expected
   let obj_c = {
-    use id <- codec.field("id", int_c, fn(id: Int) { id })
+    use id <- codec.field("id", int_c, get: fn(id) { id })
     codec.success(id)
   }
   codec.decode(obj_c, value.Array([]))

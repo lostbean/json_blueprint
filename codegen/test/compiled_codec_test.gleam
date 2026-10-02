@@ -306,9 +306,7 @@ pub fn generated_codec_is_interchangeable_with_runtime_codec_test() {
   codec.decode(codec.list(generated), both)
   |> should.equal(codec.decode(codec.list(runtime), both))
   let wrapped = fn(inner) {
-    use order <- codec.field("order", inner, fn(o: materialize_fixtures.Order) {
-      o
-    })
+    use order <- codec.field("order", inner, get: fn(o) { o })
     codec.success(order)
   }
   codec.schema(wrapped(generated))

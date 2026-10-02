@@ -28,14 +28,14 @@ pub type User {
 
 pub fn user_codec() -> Codec(User) {
   let role = codec.string_enum([#("admin", Admin), #("member", Member)])
-  use name <- codec.field("name", codec.string(), fn(u: User) { u.name })
-  use age <- codec.field("age", codec.integer_between(0, 150), fn(u: User) {
+  use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
+  use age <- codec.field("age", codec.integer_between(0, 150), get: fn(u) {
     u.age
   })
-  use email <- codec.optional_field("email", codec.string(), fn(u: User) {
+  use email <- codec.optional_field("email", codec.string(), get: fn(u) {
     u.email
   })
-  use role <- codec.field("role", role, fn(u: User) { u.role })
+  use role <- codec.field("role", role, get: fn(u) { u.role })
   codec.success(User(name:, age:, email:, role:))
 }
 
@@ -52,8 +52,9 @@ pub fn round_trip() -> Result(User, String) {
 ```
 
 - `codec.field` adds a required field and `codec.optional_field` an optional
-  one; `codec.success` builds the record from the decoded fields. Each getter
-  needs its record type annotated (`fn(u: User)`).
+  one; `codec.success` builds the record from the decoded fields. Pass each
+  getter with its `get:` label; it needs no type annotation, because the
+  rest of the block, which ends in `success`, fixes the record type first.
 - Decoding is strict: unknown fields, duplicate keys and wrong types fail,
   with the path to the failure, such as
   `$["age"]: integer outside range 0 to 150`.
@@ -171,10 +172,10 @@ pub type Order {
 }
 
 pub fn order_codec() -> Codec(Order) {
-  use items <- codec.field("items", codec.list(codec.int()), fn(o: Order) {
+  use items <- codec.field("items", codec.list(codec.int()), get: fn(o) {
     o.items
   })
-  use total <- codec.field("total", total_of(items), fn(o: Order) { o.total })
+  use total <- codec.field("total", total_of(items), get: fn(o) { o.total })
   codec.success(Order(items:, total:))
 }
 
@@ -327,6 +328,30 @@ Erlang/OTP 28 and JavaScript on Node.js 24 are tested on every change. On
 JavaScript, native integers are limited to the safe range: `codec.int()`
 refuses larger ones instead of rounding them, and `codec.number()` keeps them
 exact. Browser JavaScript is not tested.
+
+## Design notes
+
+**Record builder.** `field` binds each decoded value by name in a `use`
+block and takes the getter last, as `get:`. Gleam checks arguments in
+parameter order, so the rest of the block, which ends in `success`, fixes
+the record type before the getter is checked, and getters need no
+annotation. A pipe builder in the style of `sinal/fields` (`record` with
+`parameter`, then `|> field(...)` and `build`) was measured against it on
+three application records, formatted by `gleam format` (Gleam 1.17 and
+1.18):
+
+| Record (fields)                    | `use`, annotated getters | `use`, `get:`  | pipe           | pipe, record type first |
+| ---------------------------------- | ------------------------ | -------------- | -------------- | ----------------------- |
+| 1 required                         | 4 / 155 / 1              | 4 / 148 / 0    | 8 / 188 / 1    | 8 / 191 / 0             |
+| 6 with a nested list of 3, an enum | 50 / 1,076 / 9           | 40 / 1,020 / 0 | 33 / 1,161 / 2 | 38 / 1,170 / 0          |
+| 3 with an optional field           | 14 / 359 / 3             | 8 / 335 / 0    | 12 / 405 / 1   | 12 / 406 / 0            |
+
+Each cell is lines / characters without indentation / getter annotations.
+The pipe forms also bind fields by constructor position, so two fields of
+one type listed out of order swap silently, and a field's codec cannot be
+built from the fields decoded before it, which locates a check across
+fields at its field. The `use` form keeps both, so it stays the one record
+builder.
 
 ## Development
 

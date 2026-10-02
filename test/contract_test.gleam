@@ -38,11 +38,11 @@ pub type Decision {
 
 fn decision_codec() -> Codec(Decision) {
   let approve = {
-    use qty <- codec.field("qty", codec.integer_between(1, 10), fn(q: Int) { q })
+    use qty <- codec.field("qty", codec.integer_between(1, 10), get: fn(q) { q })
     codec.success(qty)
   }
   let decline = {
-    use reason <- codec.field("reason", codec.string(), fn(r: String) { r })
+    use reason <- codec.field("reason", codec.string(), get: fn(r) { r })
     codec.success(reason)
   }
   codec.union({
@@ -480,8 +480,8 @@ pub type Level {
 }
 
 fn person_codec() -> Codec(#(String, Int)) {
-  use name <- codec.field("name", codec.string(), fn(p: #(String, Int)) { p.0 })
-  use age <- codec.field("age", codec.int(), fn(p: #(String, Int)) { p.1 })
+  use name <- codec.field("name", codec.string(), get: fn(p) { p.0 })
+  use age <- codec.field("age", codec.int(), get: fn(p) { p.1 })
   codec.success(#(name, age))
 }
 
@@ -793,8 +793,8 @@ pub fn value_codec_has_the_contract_schema_test() {
 
   // The schema appears inside the schema of codecs built from it
   let envelope = {
-    use id <- codec.field("id", codec.int(), fn(e: #(Int, Value)) { e.0 })
-    use body <- codec.field("body", payload, fn(e: #(Int, Value)) { e.1 })
+    use id <- codec.field("id", codec.int(), get: fn(e) { e.0 })
+    use body <- codec.field("body", payload, get: fn(e) { e.1 })
     codec.success(#(id, body))
   }
   codec.schema(envelope)
@@ -811,8 +811,8 @@ pub fn value_codec_has_the_contract_schema_test() {
 pub fn value_codec_error_paths_test() {
   let payload = contract.value_codec(limit_contract())
   let envelope = {
-    use id <- codec.field("id", codec.int(), fn(e: #(Int, Value)) { e.0 })
-    use body <- codec.field("body", payload, fn(e: #(Int, Value)) { e.1 })
+    use id <- codec.field("id", codec.int(), get: fn(e) { e.0 })
+    use body <- codec.field("body", payload, get: fn(e) { e.1 })
     codec.success(#(id, body))
   }
 

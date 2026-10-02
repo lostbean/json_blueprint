@@ -161,13 +161,11 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
 
   // 4. Codec roundtrip benchmark
   let user_codec = {
-    use name <- codec.field("name", codec.string(), fn(u: BenchUser) { u.name })
-    use age <- codec.field("age", codec.int(), fn(u: BenchUser) { u.age })
-    use tags <- codec.field(
-      "tags",
-      codec.list(codec.string()),
-      fn(u: BenchUser) { u.tags },
-    )
+    use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
+    use age <- codec.field("age", codec.int(), get: fn(u) { u.age })
+    use tags <- codec.field("tags", codec.list(codec.string()), get: fn(u) {
+      u.tags
+    })
     codec.success(BenchUser(name:, age:, tags:))
   }
   let user_instance = BenchUser("Ada Lovelace", 36, ["computing", "math"])

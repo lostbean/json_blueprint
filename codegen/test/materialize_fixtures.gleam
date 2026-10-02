@@ -126,20 +126,14 @@ pub fn build_decision_codec() -> codec.Codec(Decision) {
     use quantity <- codec.field(
       "quantity",
       codec.integer_between(1, 100),
-      fn(a: ApprovePayload) { a.quantity },
+      get: fn(a) { a.quantity },
     )
-    use ratio <- codec.field("ratio", codec.number(), fn(a: ApprovePayload) {
-      a.ratio
-    })
+    use ratio <- codec.field("ratio", codec.number(), get: fn(a) { a.ratio })
     codec.success(ApprovePayload(quantity:, ratio:))
   }
   let decline = {
-    use reason <- codec.field("reason", codec.string(), fn(d: DeclinePayload) {
-      d.reason
-    })
-    use code <- codec.field("code", codec.int(), fn(d: DeclinePayload) {
-      d.code
-    })
+    use reason <- codec.field("reason", codec.string(), get: fn(d) { d.reason })
+    use code <- codec.field("code", codec.int(), get: fn(d) { d.code })
     codec.success(DeclinePayload(reason:, code:))
   }
 
