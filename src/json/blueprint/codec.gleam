@@ -198,11 +198,40 @@ pub fn decode_json_with_limits(
 
 /// Use a codec's native JSON parser when its distinct performance and parser
 /// semantics are explicitly required. Generated codecs use `gleam/json` here.
+///
+/// Text above the default byte limit of `parser_limits.default()` (1 MiB) is
+/// rejected before parsing with a `BlueprintByteLimitExceeded` reason. The
+/// native parser has no depth or number limits. Use
+/// `decode_json_native_with_max_bytes` to accept larger text.
 pub fn decode_json_native(
   codec: Codec(a),
   source: String,
 ) -> Result(a, JsonDecodeError) {
-  codec.json_decoder(source)
+  decode_json_native_with_max_bytes(
+    codec,
+    parser_limits.max_bytes(parser_limits.default()),
+    source,
+  )
+}
+
+/// Like `decode_json_native`, but reject text above `max_bytes` bytes of
+/// UTF-8 instead of the default limit. A `max_bytes` below 1 rejects every
+/// non-empty text.
+pub fn decode_json_native_with_max_bytes(
+  codec: Codec(a),
+  max_bytes: Int,
+  source: String,
+) -> Result(a, JsonDecodeError) {
+  case parser_core.exceeds_byte_limit(source, max_bytes) {
+    True ->
+      Error(
+        BlueprintParserFailure(BlueprintJsonParseFailure(
+          BlueprintJsonLocation(0, 1, 1),
+          BlueprintByteLimitExceeded(max_bytes),
+        )),
+      )
+    False -> codec.json_decoder(source)
+  }
 }
 
 fn encode_json_with(
@@ -1106,6 +1135,13 @@ pub fn string() -> Codec(String) {
   Codec(..codec, schema: Ok(StringSchema))
 }
 
+/// A JSON integer as a native `Int`, with the schema `{"type": "integer"}`.
+///
+/// Decoding accepts any exact integer spelling, such as `12`, `12.0` or
+/// `1.2e1`, of at most 24 digits. A longer integer, a fraction, or on
+/// JavaScript an integer outside -9007199254740991 to 9007199254740991, fails
+/// with `DecodeExpectedInt`. The 24-digit limit is fixed; use `number()` for
+/// larger values. Generated codecs apply the same limit.
 pub fn int() -> Codec(Int) {
   let codec = new(encode_int_value, decode_int_value)
   Codec(..codec, schema: Ok(IntSchema))

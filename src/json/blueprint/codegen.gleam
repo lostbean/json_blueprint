@@ -1068,6 +1068,7 @@ fn compile_supported(
           let json_encoder_name = "encode_" <> name <> "_json"
           let json_decoder_name = "decode_" <> name <> "_json"
           let native_json_decoder_name = json_decoder_name <> "_native"
+          let native_json_parser_name = "parse_" <> name <> "_json_native"
           let schema_name = name <> "_schema"
           let codec_name = name <> "_codec"
           let body =
@@ -1123,6 +1124,14 @@ fn compile_supported(
             <> "(source: String) -> Result("
             <> type_reference.expression
             <> ", codec.JsonDecodeError) {\n"
+            <> "  codec.decode_json_native("
+            <> codec_name
+            <> "(), source)\n}\n\n"
+            <> "fn "
+            <> native_json_parser_name
+            <> "(source: String) -> Result("
+            <> type_reference.expression
+            <> ", codec.JsonDecodeError) {\n"
             <> "  case json.parse(from: source, using: decode.dynamic) {\n"
             <> "    Error(error) -> Error(codec.NativeJsonFailure(error))\n"
             <> "    Ok(raw) -> case "
@@ -1144,7 +1153,7 @@ fn compile_supported(
             <> ", "
             <> json_encoder_name
             <> ", "
-            <> native_json_decoder_name
+            <> native_json_parser_name
             <> ", "
             <> schema_name
             <> "())\n}\n"

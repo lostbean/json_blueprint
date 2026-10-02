@@ -1,5 +1,11 @@
+//// Strict JSON text admission over UTF-8 bytes.
+////
+//// The parser reads bytes directly and keeps only the byte offset while it
+//// parses. Line and column are computed from the input once, when an error
+//// is reported, so a successful parse allocates no per-character state.
+
 import gleam/bit_array
-import gleam/dict
+import gleam/dict.{type Dict}
 import gleam/list
 import gleam/string
 import json/blueprint/number.{type NumberError}
@@ -31,33 +37,43 @@ pub type ParseError {
   ParseError(location: Location, kind: ParseErrorKind)
 }
 
-type State {
-  State(
-    chars: List(String),
-    offset: Int,
-    line: Int,
-    column: Int,
-    depth: Int,
-    limits: ParserLimits,
-  )
+/// A failure at a byte offset whose line and column are not yet known.
+type Failure {
+  Failure(offset: Int, kind: FailureKind)
 }
+
+type FailureKind {
+  /// The grapheme at the offset is not allowed there.
+  Unexpected
+  Known(ParseErrorKind)
+}
+
+type Parsed(a) =
+  Result(#(a, BitArray, Int), Failure)
+
+/// Report whether `source` has more than `max_bytes` bytes of UTF-8, without
+/// encoding it on targets whose strings are not UTF-8.
+@external(erlang, "json_blueprint_ffi", "utf8_byte_size_exceeds")
+@external(javascript, "../../../json_blueprint_ffi.mjs", "utf8_byte_size_exceeds")
+pub fn exceeds_byte_limit(source: String, max_bytes: Int) -> Bool
+
+/// Copy a string so that it does not share memory with the parser's input.
+@external(erlang, "json_blueprint_ffi", "copy_string")
+@external(javascript, "../../../json_blueprint_ffi.mjs", "copy_string")
+fn copy_string(text: String) -> String
 
 pub fn parse_value(
   limits: ParserLimits,
   bytes: BitArray,
 ) -> Result(Value, ParseError) {
   let max_bytes = parser_limits.max_bytes(limits)
-  let byte_size = bit_array.byte_size(bytes)
-  case byte_size > max_bytes {
+  case bit_array.byte_size(bytes) > max_bytes {
     True -> Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(max_bytes)))
     False ->
       case bit_array.is_utf8(bytes) {
         False ->
           Error(ParseError(find_invalid_utf8(bytes, 0, 1, 1), InvalidUtf8))
-        True -> {
-          let assert Ok(source) = bit_array.to_string(bytes)
-          parse_value_from_string(limits, source)
-        }
+        True -> parse_document(limits, bytes)
       }
   }
 }
@@ -67,541 +83,505 @@ pub fn parse_value_from_string(
   source: String,
 ) -> Result(Value, ParseError) {
   let max_bytes = parser_limits.max_bytes(limits)
-  let byte_size = string.byte_size(source)
-  case byte_size > max_bytes {
+  case exceeds_byte_limit(source, max_bytes) {
     True -> Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(max_bytes)))
-    False -> {
-      let chars = string.to_graphemes(source)
-      let initial_state = State(chars, 0, 1, 1, 0, limits)
-      let state = skip_whitespace(initial_state)
-      case state.chars {
-        [] -> Error(ParseError(current_location(state), UnexpectedEndOfInput))
-        _ ->
-          case parse_any_value(state) {
-            Error(error) -> Error(error)
-            Ok(#(val, state_after)) -> {
-              let final_state = skip_whitespace(state_after)
-              case final_state.chars {
-                [] -> Ok(val)
-                _ ->
-                  Error(ParseError(
-                    current_location(final_state),
-                    TrailingContent,
-                  ))
-              }
-            }
-          }
-      }
-    }
+    False -> parse_document(limits, bit_array.from_string(source))
   }
 }
 
-fn current_location(state: State) -> Location {
-  Location(state.offset, state.line, state.column)
-}
-
-fn advance_char(state: State, char: String, rest: List(String)) -> State {
-  let byte_len = string.byte_size(char)
-  case char {
-    "\n" | "\r\n" | "\r" ->
-      State(
-        ..state,
-        chars: rest,
-        offset: state.offset + byte_len,
-        line: state.line + 1,
-        column: 1,
-      )
+fn parse_document(
+  limits: ParserLimits,
+  source: BitArray,
+) -> Result(Value, ParseError) {
+  let #(rest, offset) = skip_whitespace(source, 0)
+  let result = case rest {
+    <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
     _ ->
-      State(
-        ..state,
-        chars: rest,
-        offset: state.offset + byte_len,
-        column: state.column + 1,
-      )
-  }
-}
-
-fn skip_whitespace(state: State) -> State {
-  case state.chars {
-    [" ", ..rest] -> skip_whitespace(advance_char(state, " ", rest))
-    ["\t", ..rest] -> skip_whitespace(advance_char(state, "\t", rest))
-    ["\r\n", ..rest] -> skip_whitespace(advance_char(state, "\r\n", rest))
-    ["\r", ..rest] -> skip_whitespace(advance_char(state, "\r", rest))
-    ["\n", ..rest] -> skip_whitespace(advance_char(state, "\n", rest))
-    _ -> state
-  }
-}
-
-fn parse_any_value(state: State) -> Result(#(Value, State), ParseError) {
-  let loc = current_location(state)
-  case state.chars {
-    [] -> Error(ParseError(loc, UnexpectedEndOfInput))
-    ["n", "u", "l", "l", ..rest] -> {
-      let s1 = advance_char(state, "n", ["u", "l", "l", ..rest])
-      let s2 = advance_char(s1, "u", ["l", "l", ..rest])
-      let s3 = advance_char(s2, "l", ["l", ..rest])
-      let s4 = advance_char(s3, "l", rest)
-      Ok(#(value.Null, s4))
-    }
-    ["t", "r", "u", "e", ..rest] -> {
-      let s1 = advance_char(state, "t", ["r", "u", "e", ..rest])
-      let s2 = advance_char(s1, "r", ["u", "e", ..rest])
-      let s3 = advance_char(s2, "u", ["e", ..rest])
-      let s4 = advance_char(s3, "e", rest)
-      Ok(#(value.Bool(True), s4))
-    }
-    ["f", "a", "l", "s", "e", ..rest] -> {
-      let s1 = advance_char(state, "f", ["a", "l", "s", "e", ..rest])
-      let s2 = advance_char(s1, "a", ["l", "s", "e", ..rest])
-      let s3 = advance_char(s2, "l", ["s", "e", ..rest])
-      let s4 = advance_char(s3, "s", ["e", ..rest])
-      let s5 = advance_char(s4, "e", rest)
-      Ok(#(value.Bool(False), s5))
-    }
-    ["\"", ..] -> parse_string_literal(state)
-    ["[", ..] -> parse_array_literal(state)
-    ["{", ..] -> parse_object_literal(state)
-    ["-", ..]
-    | ["0", ..]
-    | ["1", ..]
-    | ["2", ..]
-    | ["3", ..]
-    | ["4", ..]
-    | ["5", ..]
-    | ["6", ..]
-    | ["7", ..]
-    | ["8", ..]
-    | ["9", ..] -> parse_number_literal(state)
-    [ch, ..] -> Error(ParseError(loc, UnexpectedByte(ch)))
-  }
-}
-
-fn parse_number_literal(state: State) -> Result(#(Value, State), ParseError) {
-  let loc = current_location(state)
-  let #(token_chars, state_after) = scan_number_chars(state, [])
-  let token = string.concat(list.reverse(token_chars))
-  let num_limits = parser_limits.number_limits(state.limits)
-  case number.parse_number(num_limits, token) {
-    Error(err) -> Error(ParseError(loc, InvalidNumberToken(err)))
-    Ok(num) -> Ok(#(value.Number(num), state_after))
-  }
-}
-
-fn scan_number_chars(
-  state: State,
-  acc: List(String),
-) -> #(List(String), State) {
-  case state.chars {
-    [ch, ..rest]
-      if ch == "0"
-      || ch == "1"
-      || ch == "2"
-      || ch == "3"
-      || ch == "4"
-      || ch == "5"
-      || ch == "6"
-      || ch == "7"
-      || ch == "8"
-      || ch == "9"
-      || ch == "-"
-      || ch == "+"
-      || ch == "."
-      || ch == "e"
-      || ch == "E"
-    -> scan_number_chars(advance_char(state, ch, rest), [ch, ..acc])
-    _ -> #(acc, state)
-  }
-}
-
-fn parse_string_literal(state: State) -> Result(#(Value, State), ParseError) {
-  let loc = current_location(state)
-  case state.chars {
-    ["\"", ..rest] -> {
-      let state_in_str = advance_char(state, "\"", rest)
-      case scan_string_contents(state_in_str, loc, []) {
-        Error(err) -> Error(err)
-        Ok(#(content, state_after_quote)) ->
-          Ok(#(value.String(content), state_after_quote))
-      }
-    }
-    _ -> Error(ParseError(loc, UnexpectedByte("expected \"")))
-  }
-}
-
-fn scan_string_contents(
-  state: State,
-  start_loc: Location,
-  acc: List(String),
-) -> Result(#(String, State), ParseError) {
-  let loc = current_location(state)
-  case state.chars {
-    [] -> Error(ParseError(start_loc, UnterminatedString))
-    ["\"", ..rest] -> {
-      let state_after = advance_char(state, "\"", rest)
-      Ok(#(string.concat(list.reverse(acc)), state_after))
-    }
-    ["\\", ..rest] -> {
-      let esc_loc = loc
-      let state_esc = advance_char(state, "\\", rest)
-      case state_esc.chars {
-        [] -> Error(ParseError(start_loc, UnterminatedString))
-        ["\"", ..r] ->
-          scan_string_contents(advance_char(state_esc, "\"", r), start_loc, [
-            "\"",
-            ..acc
-          ])
-        ["\\", ..r] ->
-          scan_string_contents(advance_char(state_esc, "\\", r), start_loc, [
-            "\\",
-            ..acc
-          ])
-        ["/", ..r] ->
-          scan_string_contents(advance_char(state_esc, "/", r), start_loc, [
-            "/",
-            ..acc
-          ])
-        ["b", ..r] ->
-          scan_string_contents(advance_char(state_esc, "b", r), start_loc, [
-            "\u{0008}",
-            ..acc
-          ])
-        ["f", ..r] ->
-          scan_string_contents(advance_char(state_esc, "f", r), start_loc, [
-            "\u{000C}",
-            ..acc
-          ])
-        ["n", ..r] ->
-          scan_string_contents(advance_char(state_esc, "n", r), start_loc, [
-            "\n",
-            ..acc
-          ])
-        ["r", ..r] ->
-          scan_string_contents(advance_char(state_esc, "r", r), start_loc, [
-            "\r",
-            ..acc
-          ])
-        ["t", ..r] ->
-          scan_string_contents(advance_char(state_esc, "t", r), start_loc, [
-            "\t",
-            ..acc
-          ])
-        ["u", ..r] ->
-          case parse_unicode_escape(advance_char(state_esc, "u", r), esc_loc) {
-            Error(err) -> Error(err)
-            Ok(#(decoded_char, state_after_unicode)) ->
-              scan_string_contents(state_after_unicode, start_loc, [
-                decoded_char,
-                ..acc
-              ])
+      case parse_any(limits, rest, offset, 0) {
+        Error(failure) -> Error(failure)
+        Ok(#(parsed, rest, offset)) -> {
+          let #(rest, offset) = skip_whitespace(rest, offset)
+          case rest {
+            <<>> -> Ok(parsed)
+            _ -> Error(Failure(offset, Known(TrailingContent)))
           }
-        [_invalid, ..] -> Error(ParseError(esc_loc, InvalidEscapeSequence))
+        }
+      }
+  }
+  case result {
+    Ok(parsed) -> Ok(parsed)
+    Error(failure) -> Error(locate(source, failure))
+  }
+}
+
+fn skip_whitespace(bytes: BitArray, offset: Int) -> #(BitArray, Int) {
+  case bytes {
+    <<0x20, rest:bytes>>
+    | <<0x09, rest:bytes>>
+    | <<0x0A, rest:bytes>>
+    | <<0x0D, rest:bytes>> -> skip_whitespace(rest, offset + 1)
+    _ -> #(bytes, offset)
+  }
+}
+
+fn parse_any(
+  limits: ParserLimits,
+  bytes: BitArray,
+  offset: Int,
+  depth: Int,
+) -> Parsed(Value) {
+  case bytes {
+    <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+    // null
+    <<0x6E, 0x75, 0x6C, 0x6C, rest:bytes>> ->
+      Ok(#(value.Null, rest, offset + 4))
+    // true
+    <<0x74, 0x72, 0x75, 0x65, rest:bytes>> ->
+      Ok(#(value.Bool(True), rest, offset + 4))
+    // false
+    <<0x66, 0x61, 0x6C, 0x73, 0x65, rest:bytes>> ->
+      Ok(#(value.Bool(False), rest, offset + 5))
+    <<0x22, rest:bytes>> ->
+      case parse_string(rest, offset + 1, offset) {
+        Error(failure) -> Error(failure)
+        Ok(#(text, rest, offset)) -> Ok(#(value.String(text), rest, offset))
+      }
+    <<0x5B, rest:bytes>> -> parse_array(limits, rest, offset, depth)
+    <<0x7B, rest:bytes>> -> parse_object(limits, rest, offset, depth)
+    <<byte, _:bytes>> if byte == 0x2D || byte >= 0x30 && byte <= 0x39 ->
+      parse_number(limits, bytes, offset)
+    _ -> Error(Failure(offset, Unexpected))
+  }
+}
+
+fn parse_number(
+  limits: ParserLimits,
+  bytes: BitArray,
+  offset: Int,
+) -> Parsed(Value) {
+  let #(length, rest) = number_span(bytes, 0)
+  let assert Ok(token_bytes) = bit_array.slice(bytes, 0, length)
+  let number_limits = parser_limits.number_limits(limits)
+  let small = case simple_integer(token_bytes) {
+    Ok(#(negative, magnitude, digits)) ->
+      number.small_integer_token(number_limits, negative, magnitude, digits)
+    Error(Nil) -> Error(Nil)
+  }
+  case small {
+    Ok(parsed) -> Ok(#(value.Number(parsed), rest, offset + length))
+    Error(Nil) -> {
+      let assert Ok(token) = bit_array.to_string(token_bytes)
+      case number.parse_number(number_limits, token) {
+        Error(error) -> Error(Failure(offset, Known(InvalidNumberToken(error))))
+        Ok(parsed) -> Ok(#(value.Number(parsed), rest, offset + length))
       }
     }
-    [ch, ..rest] ->
-      case is_control_char(ch) {
-        True -> Error(ParseError(loc, UnexpectedByte(ch)))
-        False ->
-          scan_string_contents(advance_char(state, ch, rest), start_loc, [
-            ch,
-            ..acc
-          ])
+  }
+}
+
+/// Read an integer token of at most 15 digits without leading zeros as its
+/// sign, magnitude and digit count.
+fn simple_integer(bytes: BitArray) -> Result(#(Bool, Int, Int), Nil) {
+  let #(negative, digits) = case bytes {
+    <<0x2D, rest:bytes>> -> #(True, rest)
+    _ -> #(False, bytes)
+  }
+  case digits {
+    <<0x30>> -> Ok(#(negative, 0, 1))
+    <<digit, rest:bytes>> if digit >= 0x31 && digit <= 0x39 ->
+      case simple_digits(rest, digit - 0x30, 1) {
+        Ok(#(magnitude, count)) -> Ok(#(negative, magnitude, count))
+        Error(Nil) -> Error(Nil)
       }
+    _ -> Error(Nil)
   }
 }
 
-fn is_control_char(ch: String) -> Bool {
-  case ch {
-    "\r\n"
-    | "\u{0000}"
-    | "\u{0001}"
-    | "\u{0002}"
-    | "\u{0003}"
-    | "\u{0004}"
-    | "\u{0005}"
-    | "\u{0006}"
-    | "\u{0007}"
-    | "\u{0008}"
-    | "\t"
-    | "\n"
-    | "\u{000B}"
-    | "\u{000C}"
-    | "\r"
-    | "\u{000E}"
-    | "\u{000F}"
-    | "\u{0010}"
-    | "\u{0011}"
-    | "\u{0012}"
-    | "\u{0013}"
-    | "\u{0014}"
-    | "\u{0015}"
-    | "\u{0016}"
-    | "\u{0017}"
-    | "\u{0018}"
-    | "\u{0019}"
-    | "\u{001A}"
-    | "\u{001B}"
-    | "\u{001C}"
-    | "\u{001D}"
-    | "\u{001E}"
-    | "\u{001F}" -> True
-    _ -> False
+fn simple_digits(
+  bytes: BitArray,
+  magnitude: Int,
+  count: Int,
+) -> Result(#(Int, Int), Nil) {
+  case count > 15, bytes {
+    True, _ -> Error(Nil)
+    False, <<>> -> Ok(#(magnitude, count))
+    False, <<digit, rest:bytes>> if digit >= 0x30 && digit <= 0x39 ->
+      simple_digits(rest, magnitude * 10 + digit - 0x30, count + 1)
+    False, _ -> Error(Nil)
   }
 }
 
-fn parse_unicode_escape(
-  state: State,
-  esc_loc: Location,
-) -> Result(#(String, State), ParseError) {
-  case parse_hex4(state) {
-    Error(Nil) -> Error(ParseError(esc_loc, InvalidUnicodeEscape))
-    Ok(#(code1, s1)) ->
-      case code1 >= 0xD800 && code1 <= 0xDBFF {
+/// Count the bytes that may belong to a number token: digits, signs, the
+/// decimal point and exponent markers. `number.parse_number` checks the
+/// token's syntax.
+fn number_span(bytes: BitArray, length: Int) -> #(Int, BitArray) {
+  case bytes {
+    <<byte, rest:bytes>>
+      if byte >= 0x30
+      && byte <= 0x39
+      || byte == 0x2D
+      || byte == 0x2B
+      || byte == 0x2E
+      || byte == 0x65
+      || byte == 0x45
+    -> number_span(rest, length + 1)
+    _ -> #(length, bytes)
+  }
+}
+
+/// Parse string contents that follow the opening quote at `start`.
+fn parse_string(bytes: BitArray, offset: Int, start: Int) -> Parsed(String) {
+  scan_string(bytes, bytes, 0, offset, start, [])
+}
+
+/// `run` holds the bytes from the start of the current unescaped run, of
+/// which `run_length` have been scanned. `chunks` holds earlier pieces in
+/// reverse order.
+fn scan_string(
+  run: BitArray,
+  bytes: BitArray,
+  run_length: Int,
+  offset: Int,
+  start: Int,
+  chunks: List(BitArray),
+) -> Parsed(String) {
+  case bytes {
+    <<>> -> Error(Failure(start, Known(UnterminatedString)))
+    <<0x22, rest:bytes>> -> {
+      let chunks = add_run(chunks, run, run_length)
+      Ok(#(finish_string(chunks), rest, offset + 1))
+    }
+    <<0x5C, rest:bytes>> -> {
+      let chunks = add_run(chunks, run, run_length)
+      case parse_escape(rest, offset, start) {
+        Error(failure) -> Error(failure)
+        Ok(#(decoded, rest, offset)) ->
+          scan_string(rest, rest, 0, offset, start, [decoded, ..chunks])
+      }
+    }
+    <<byte, _:bytes>> if byte < 0x20 -> Error(Failure(offset, Unexpected))
+    <<_, rest:bytes>> ->
+      scan_string(run, rest, run_length + 1, offset + 1, start, chunks)
+    _ -> Error(Failure(start, Known(UnterminatedString)))
+  }
+}
+
+fn add_run(
+  chunks: List(BitArray),
+  run: BitArray,
+  run_length: Int,
+) -> List(BitArray) {
+  case run_length {
+    0 -> chunks
+    _ -> {
+      let assert Ok(piece) = bit_array.slice(run, 0, run_length)
+      [piece, ..chunks]
+    }
+  }
+}
+
+fn finish_string(chunks: List(BitArray)) -> String {
+  // Pieces split the valid UTF-8 input only at ASCII quotes and backslashes,
+  // and decoded escapes are valid scalar values, so the result is UTF-8.
+  let assert Ok(text) =
+    bit_array.to_string(bit_array.concat(list.reverse(chunks)))
+  copy_string(text)
+}
+
+/// Decode the escape whose backslash is at `escape`.
+fn parse_escape(bytes: BitArray, escape: Int, start: Int) -> Parsed(BitArray) {
+  case bytes {
+    <<>> -> Error(Failure(start, Known(UnterminatedString)))
+    <<0x22, rest:bytes>> -> Ok(#(<<0x22>>, rest, escape + 2))
+    <<0x5C, rest:bytes>> -> Ok(#(<<0x5C>>, rest, escape + 2))
+    <<0x2F, rest:bytes>> -> Ok(#(<<0x2F>>, rest, escape + 2))
+    <<0x62, rest:bytes>> -> Ok(#(<<0x08>>, rest, escape + 2))
+    <<0x66, rest:bytes>> -> Ok(#(<<0x0C>>, rest, escape + 2))
+    <<0x6E, rest:bytes>> -> Ok(#(<<0x0A>>, rest, escape + 2))
+    <<0x72, rest:bytes>> -> Ok(#(<<0x0D>>, rest, escape + 2))
+    <<0x74, rest:bytes>> -> Ok(#(<<0x09>>, rest, escape + 2))
+    <<0x75, rest:bytes>> -> parse_unicode_escape(rest, escape)
+    _ -> Error(Failure(escape, Known(InvalidEscapeSequence)))
+  }
+}
+
+fn parse_unicode_escape(bytes: BitArray, escape: Int) -> Parsed(BitArray) {
+  let invalid = Error(Failure(escape, Known(InvalidUnicodeEscape)))
+  case hex4(bytes) {
+    Error(Nil) -> invalid
+    Ok(#(high, rest)) ->
+      case high >= 0xD800 && high <= 0xDBFF {
         False ->
-          case string.utf_codepoint(code1) {
-            Error(Nil) -> Error(ParseError(esc_loc, InvalidUnicodeEscape))
-            Ok(cp) -> Ok(#(string.from_utf_codepoints([cp]), s1))
+          case string.utf_codepoint(high) {
+            Error(Nil) -> invalid
+            Ok(codepoint) ->
+              Ok(#(encode_codepoint(codepoint), rest, escape + 6))
           }
         True ->
-          // High surrogate: expect \uDC00..\uDFFF
-          case s1.chars {
-            ["\\", "u", ..r] -> {
-              let s_esc =
-                advance_char(advance_char(s1, "\\", ["u", ..r]), "u", r)
-              case parse_hex4(s_esc) {
-                Error(Nil) -> Error(ParseError(esc_loc, InvalidUnicodeEscape))
-                Ok(#(code2, s2)) ->
-                  case code2 >= 0xDC00 && code2 <= 0xDFFF {
-                    False -> Error(ParseError(esc_loc, InvalidUnicodeEscape))
-                    True -> {
-                      let full_codepoint =
-                        0x10000 + { code1 - 0xD800 } * 1024 + { code2 - 0xDC00 }
-                      case string.utf_codepoint(full_codepoint) {
-                        Error(Nil) ->
-                          Error(ParseError(esc_loc, InvalidUnicodeEscape))
-                        Ok(cp) -> Ok(#(string.from_utf_codepoints([cp]), s2))
-                      }
-                    }
+          case rest {
+            <<0x5C, 0x75, rest:bytes>> ->
+              case hex4(rest) {
+                Ok(#(low, rest)) if low >= 0xDC00 && low <= 0xDFFF -> {
+                  let combined =
+                    0x10000 + { high - 0xD800 } * 1024 + { low - 0xDC00 }
+                  case string.utf_codepoint(combined) {
+                    Error(Nil) -> invalid
+                    Ok(codepoint) ->
+                      Ok(#(encode_codepoint(codepoint), rest, escape + 12))
                   }
+                }
+                _ -> invalid
               }
-            }
-            _ -> Error(ParseError(esc_loc, InvalidUnicodeEscape))
+            _ -> invalid
           }
       }
   }
 }
 
-fn parse_hex4(state: State) -> Result(#(Int, State), Nil) {
-  case state.chars {
-    [c1, c2, c3, c4, ..rest] ->
-      case hex_val(c1), hex_val(c2), hex_val(c3), hex_val(c4) {
-        Ok(v1), Ok(v2), Ok(v3), Ok(v4) -> {
-          let code = v1 * 4096 + v2 * 256 + v3 * 16 + v4
-          let s1 = advance_char(state, c1, [c2, c3, c4, ..rest])
-          let s2 = advance_char(s1, c2, [c3, c4, ..rest])
-          let s3 = advance_char(s2, c3, [c4, ..rest])
-          let s4 = advance_char(s3, c4, rest)
-          Ok(#(code, s4))
-        }
+fn encode_codepoint(codepoint: UtfCodepoint) -> BitArray {
+  bit_array.from_string(string.from_utf_codepoints([codepoint]))
+}
+
+fn hex4(bytes: BitArray) -> Result(#(Int, BitArray), Nil) {
+  case bytes {
+    <<a, b, c, d, rest:bytes>> ->
+      case hex_value(a), hex_value(b), hex_value(c), hex_value(d) {
+        Ok(a), Ok(b), Ok(c), Ok(d) ->
+          Ok(#(a * 4096 + b * 256 + c * 16 + d, rest))
         _, _, _, _ -> Error(Nil)
       }
     _ -> Error(Nil)
   }
 }
 
-fn hex_val(c: String) -> Result(Int, Nil) {
-  case c {
-    "0" -> Ok(0)
-    "1" -> Ok(1)
-    "2" -> Ok(2)
-    "3" -> Ok(3)
-    "4" -> Ok(4)
-    "5" -> Ok(5)
-    "6" -> Ok(6)
-    "7" -> Ok(7)
-    "8" -> Ok(8)
-    "9" -> Ok(9)
-    "a" | "A" -> Ok(10)
-    "b" | "B" -> Ok(11)
-    "c" | "C" -> Ok(12)
-    "d" | "D" -> Ok(13)
-    "e" | "E" -> Ok(14)
-    "f" | "F" -> Ok(15)
+fn hex_value(byte: Int) -> Result(Int, Nil) {
+  case byte {
+    _ if byte >= 0x30 && byte <= 0x39 -> Ok(byte - 0x30)
+    _ if byte >= 0x61 && byte <= 0x66 -> Ok(byte - 0x61 + 10)
+    _ if byte >= 0x41 && byte <= 0x46 -> Ok(byte - 0x41 + 10)
     _ -> Error(Nil)
   }
 }
 
-fn parse_array_literal(state: State) -> Result(#(Value, State), ParseError) {
-  let loc = current_location(state)
-  let max_depth = parser_limits.max_depth(state.limits)
-  case state.depth + 1 > max_depth {
-    True -> Error(ParseError(loc, DepthLimitExceeded(max_depth)))
-    False ->
-      case state.chars {
-        ["[", ..rest] -> {
-          let state_in_arr =
-            State(..advance_char(state, "[", rest), depth: state.depth + 1)
-          let state_ws = skip_whitespace(state_in_arr)
-          case state_ws.chars {
-            [] ->
-              Error(ParseError(current_location(state_ws), UnexpectedEndOfInput))
-            ["]", ..r] -> {
-              let state_after =
-                State(..advance_char(state_ws, "]", r), depth: state.depth)
-              Ok(#(value.Array([]), state_after))
-            }
-            _ -> parse_array_elements(state_ws, [])
-          }
-        }
-        _ -> Error(ParseError(loc, UnexpectedByte("expected [")))
-      }
-  }
-}
-
-fn parse_array_elements(
-  state: State,
-  acc: List(Value),
-) -> Result(#(Value, State), ParseError) {
-  case parse_any_value(state) {
-    Error(err) -> Error(err)
-    Ok(#(elem, state_after_elem)) -> {
-      let state_ws = skip_whitespace(state_after_elem)
-      case state_ws.chars {
-        [] ->
-          Error(ParseError(current_location(state_ws), UnexpectedEndOfInput))
-        [",", ..rest] -> {
-          let state_after_comma =
-            skip_whitespace(advance_char(state_ws, ",", rest))
-          case state_after_comma.chars {
-            ["]", ..] ->
-              Error(ParseError(
-                current_location(state_after_comma),
-                UnexpectedByte("]"),
-              ))
-            _ -> parse_array_elements(state_after_comma, [elem, ..acc])
-          }
-        }
-        ["]", ..rest] -> {
-          let state_after =
-            State(..advance_char(state_ws, "]", rest), depth: state.depth - 1)
-          Ok(#(value.Array(list.reverse([elem, ..acc])), state_after))
-        }
-        [ch, ..] ->
-          Error(ParseError(current_location(state_ws), UnexpectedByte(ch)))
+/// `bytes` follows the `[` at `open`.
+fn parse_array(
+  limits: ParserLimits,
+  bytes: BitArray,
+  open: Int,
+  depth: Int,
+) -> Parsed(Value) {
+  let max_depth = parser_limits.max_depth(limits)
+  case depth + 1 > max_depth {
+    True -> Error(Failure(open, Known(DepthLimitExceeded(max_depth))))
+    False -> {
+      let #(rest, offset) = skip_whitespace(bytes, open + 1)
+      case rest {
+        <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+        <<0x5D, rest:bytes>> -> Ok(#(value.Array([]), rest, offset + 1))
+        _ -> parse_elements(limits, rest, offset, depth + 1, [])
       }
     }
   }
 }
 
-fn parse_object_literal(state: State) -> Result(#(Value, State), ParseError) {
-  let loc = current_location(state)
-  let max_depth = parser_limits.max_depth(state.limits)
-  case state.depth + 1 > max_depth {
-    True -> Error(ParseError(loc, DepthLimitExceeded(max_depth)))
-    False ->
-      case state.chars {
-        ["{", ..rest] -> {
-          let state_in_obj =
-            State(..advance_char(state, "{", rest), depth: state.depth + 1)
-          let state_ws = skip_whitespace(state_in_obj)
-          case state_ws.chars {
-            [] ->
-              Error(ParseError(current_location(state_ws), UnexpectedEndOfInput))
-            ["}", ..r] -> {
-              let state_after =
-                State(..advance_char(state_ws, "}", r), depth: state.depth)
-              Ok(#(value.Object([]), state_after))
-            }
-            _ -> parse_object_members(state_ws, dict.new(), [])
+fn parse_elements(
+  limits: ParserLimits,
+  bytes: BitArray,
+  offset: Int,
+  depth: Int,
+  elements: List(Value),
+) -> Parsed(Value) {
+  case parse_any(limits, bytes, offset, depth) {
+    Error(failure) -> Error(failure)
+    Ok(#(element, rest, offset)) -> {
+      let #(rest, offset) = skip_whitespace(rest, offset)
+      case rest {
+        <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+        <<0x2C, rest:bytes>> -> {
+          let #(rest, offset) = skip_whitespace(rest, offset + 1)
+          case rest {
+            <<0x5D, _:bytes>> -> Error(Failure(offset, Unexpected))
+            _ ->
+              parse_elements(limits, rest, offset, depth, [element, ..elements])
           }
         }
-        _ -> Error(ParseError(loc, UnexpectedByte("expected {")))
+        <<0x5D, rest:bytes>> ->
+          Ok(#(
+            value.Array(list.reverse([element, ..elements])),
+            rest,
+            offset + 1,
+          ))
+        _ -> Error(Failure(offset, Unexpected))
       }
+    }
   }
 }
 
-fn parse_object_members(
-  state: State,
-  seen_keys: dict.Dict(String, Nil),
-  acc: List(#(String, Value)),
-) -> Result(#(Value, State), ParseError) {
-  let key_loc = current_location(state)
-  case state.chars {
-    ["\"", ..] ->
-      case parse_string_literal(state) {
-        Error(err) -> Error(err)
-        Ok(#(value.String(key), state_after_key)) ->
-          case dict.has_key(seen_keys, key) {
-            True -> Error(ParseError(key_loc, DuplicateObjectKey(key)))
-            False -> {
-              let state_ws = skip_whitespace(state_after_key)
-              case state_ws.chars {
-                [":", ..rest] -> {
-                  let state_after_colon =
-                    skip_whitespace(advance_char(state_ws, ":", rest))
-                  case parse_any_value(state_after_colon) {
-                    Error(err) -> Error(err)
-                    Ok(#(val, state_after_val)) -> {
-                      let state_delim = skip_whitespace(state_after_val)
-                      case state_delim.chars {
-                        [] ->
-                          Error(ParseError(
-                            current_location(state_delim),
-                            UnexpectedEndOfInput,
-                          ))
-                        [",", ..r] -> {
-                          let state_after_comma =
-                            skip_whitespace(advance_char(state_delim, ",", r))
-                          case state_after_comma.chars {
-                            ["}", ..] ->
-                              Error(ParseError(
-                                current_location(state_after_comma),
-                                UnexpectedByte("}"),
-                              ))
-                            _ ->
-                              parse_object_members(
-                                state_after_comma,
-                                dict.insert(seen_keys, key, Nil),
-                                [#(key, val), ..acc],
-                              )
-                          }
-                        }
-                        ["}", ..r] -> {
-                          let state_after =
-                            State(
-                              ..advance_char(state_delim, "}", r),
-                              depth: state.depth - 1,
-                            )
-                          Ok(#(
-                            value.Object(list.reverse([#(key, val), ..acc])),
-                            state_after,
-                          ))
-                        }
-                        [ch, ..] ->
-                          Error(ParseError(
-                            current_location(state_delim),
-                            UnexpectedByte(ch),
-                          ))
-                      }
-                    }
-                  }
-                }
-                [ch, ..] ->
-                  Error(ParseError(
-                    current_location(state_ws),
-                    UnexpectedByte(ch),
-                  ))
-                [] ->
-                  Error(ParseError(
-                    current_location(state_ws),
-                    UnexpectedEndOfInput,
-                  ))
+/// `bytes` follows the `{` at `open`.
+fn parse_object(
+  limits: ParserLimits,
+  bytes: BitArray,
+  open: Int,
+  depth: Int,
+) -> Parsed(Value) {
+  let max_depth = parser_limits.max_depth(limits)
+  case depth + 1 > max_depth {
+    True -> Error(Failure(open, Known(DepthLimitExceeded(max_depth))))
+    False -> {
+      let #(rest, offset) = skip_whitespace(bytes, open + 1)
+      case rest {
+        <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+        <<0x7D, rest:bytes>> -> Ok(#(value.Object([]), rest, offset + 1))
+        _ -> parse_members(limits, rest, offset, depth + 1, dict.new(), [])
+      }
+    }
+  }
+}
+
+type Next {
+  More
+  Last
+}
+
+fn parse_members(
+  limits: ParserLimits,
+  bytes: BitArray,
+  offset: Int,
+  depth: Int,
+  seen: Dict(String, Nil),
+  members: List(#(String, Value)),
+) -> Parsed(Value) {
+  case parse_member(limits, bytes, offset, depth, seen) {
+    Error(failure) -> Error(failure)
+    Ok(#(#(key, member, next), rest, offset)) -> {
+      let members = [#(key, member), ..members]
+      case next {
+        More ->
+          parse_members(
+            limits,
+            rest,
+            offset,
+            depth,
+            dict.insert(seen, key, Nil),
+            members,
+          )
+        Last -> Ok(#(value.Object(list.reverse(members)), rest, offset))
+      }
+    }
+  }
+}
+
+/// Parse one `"key": value` member and the `,` or `}` that follows it.
+fn parse_member(
+  limits: ParserLimits,
+  bytes: BitArray,
+  offset: Int,
+  depth: Int,
+  seen: Dict(String, Nil),
+) -> Parsed(#(String, Value, Next)) {
+  case bytes {
+    <<0x22, rest:bytes>> ->
+      case parse_string(rest, offset + 1, offset) {
+        Error(failure) -> Error(failure)
+        Ok(#(key, rest, after_key)) ->
+          case dict.has_key(seen, key) {
+            True -> Error(Failure(offset, Known(DuplicateObjectKey(key))))
+            False -> parse_member_value(limits, rest, after_key, depth, key)
+          }
+      }
+    <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+    _ -> Error(Failure(offset, Unexpected))
+  }
+}
+
+fn parse_member_value(
+  limits: ParserLimits,
+  bytes: BitArray,
+  offset: Int,
+  depth: Int,
+  key: String,
+) -> Parsed(#(String, Value, Next)) {
+  let #(rest, offset) = skip_whitespace(bytes, offset)
+  case rest {
+    <<0x3A, rest:bytes>> -> {
+      let #(rest, offset) = skip_whitespace(rest, offset + 1)
+      case parse_any(limits, rest, offset, depth) {
+        Error(failure) -> Error(failure)
+        Ok(#(member, rest, offset)) -> {
+          let #(rest, offset) = skip_whitespace(rest, offset)
+          case rest {
+            <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+            <<0x2C, rest:bytes>> -> {
+              let #(rest, offset) = skip_whitespace(rest, offset + 1)
+              case rest {
+                <<0x7D, _:bytes>> -> Error(Failure(offset, Unexpected))
+                _ -> Ok(#(#(key, member, More), rest, offset))
               }
             }
+            <<0x7D, rest:bytes>> ->
+              Ok(#(#(key, member, Last), rest, offset + 1))
+            _ -> Error(Failure(offset, Unexpected))
           }
-        _ -> Error(ParseError(key_loc, UnexpectedByte("expected string key")))
+        }
       }
-    [ch, ..] -> Error(ParseError(key_loc, UnexpectedByte(ch)))
-    [] -> Error(ParseError(key_loc, UnexpectedEndOfInput))
+    }
+    <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+    _ -> Error(Failure(offset, Unexpected))
+  }
+}
+
+/// Compute the line and column of a failure. Lines end at LF, CR or CRLF.
+/// Columns count grapheme clusters from the start of the line, from 1.
+fn locate(source: BitArray, failure: Failure) -> ParseError {
+  let Failure(offset, kind) = failure
+  let #(line, line_start) = find_line(source, 0, offset, 1, 0)
+  let column = case bit_array.slice(source, line_start, offset - line_start) {
+    Ok(segment) ->
+      case bit_array.to_string(segment) {
+        Ok(text) -> string.length(text) + 1
+        Error(Nil) -> offset - line_start + 1
+      }
+    Error(Nil) -> 1
+  }
+  let kind = case kind {
+    Known(kind) -> kind
+    Unexpected -> UnexpectedByte(grapheme_at(source, offset))
+  }
+  ParseError(Location(offset, line, column), kind)
+}
+
+fn find_line(
+  bytes: BitArray,
+  position: Int,
+  stop: Int,
+  line: Int,
+  line_start: Int,
+) -> #(Int, Int) {
+  case position >= stop, bytes {
+    True, _ -> #(line, line_start)
+    False, <<0x0D, 0x0A, rest:bytes>> ->
+      find_line(rest, position + 2, stop, line + 1, position + 2)
+    False, <<0x0D, rest:bytes>> | False, <<0x0A, rest:bytes>> ->
+      find_line(rest, position + 1, stop, line + 1, position + 1)
+    False, <<_, rest:bytes>> ->
+      find_line(rest, position + 1, stop, line, line_start)
+    False, _ -> #(line, line_start)
+  }
+}
+
+fn grapheme_at(source: BitArray, offset: Int) -> String {
+  let size = bit_array.byte_size(source)
+  case bit_array.slice(source, offset, size - offset) {
+    Error(Nil) -> ""
+    Ok(rest) ->
+      case bit_array.to_string(rest) {
+        Error(Nil) -> ""
+        Ok(text) ->
+          case string.pop_grapheme(text) {
+            Ok(#(grapheme, _)) -> grapheme
+            Error(Nil) -> ""
+          }
+      }
   }
 }
 

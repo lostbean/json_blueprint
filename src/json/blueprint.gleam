@@ -1,11 +1,15 @@
+import gleam/bool
 import gleam/dynamic as gleam_dynamic
 import gleam/dynamic/decode
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import json/blueprint/dynamic
+import json/blueprint/internal/parser_core
+import json/blueprint/parser_limits
 import json/blueprint/schema.{type SchemaDefinition, Type} as jsch
 
 type DynamicDecoder(t) =
@@ -138,10 +142,44 @@ pub fn get_dynamic_decoder(decoder: Decoder(t)) -> DynamicDecoder(t) {
   decoder.dyn_decoder
 }
 
+/// Parse JSON text with `gleam/json` and decode it with `decoder`.
+///
+/// Text above 1 MiB (1,048,576 bytes of UTF-8) is rejected before parsing
+/// with `json.UnableToDecode`; its one error has an empty path, `expected`
+/// names the limit and `found` is `"more than <limit> bytes"`. Use
+/// `decode_with_max_bytes` to accept larger text.
 pub fn decode(
   using decoder: Decoder(t),
   from json_string: String,
 ) -> Result(t, json.DecodeError) {
+  decode_with_max_bytes(
+    using: decoder,
+    from: json_string,
+    max_bytes: parser_limits.max_bytes(parser_limits.default()),
+  )
+}
+
+/// Like `decode`, but reject text above `max_bytes` bytes of UTF-8 instead of
+/// the 1 MiB default. A `max_bytes` below 1 rejects every non-empty text.
+pub fn decode_with_max_bytes(
+  using decoder: Decoder(t),
+  from json_string: String,
+  max_bytes max_bytes: Int,
+) -> Result(t, json.DecodeError) {
+  use <- bool.guard(
+    when: parser_core.exceeds_byte_limit(json_string, max_bytes),
+    return: Error(
+      json.UnableToDecode([
+        decode.DecodeError(
+          expected: "JSON text of at most "
+            <> int.to_string(max_bytes)
+            <> " bytes",
+          found: "more than " <> int.to_string(max_bytes) <> " bytes",
+          path: [],
+        ),
+      ]),
+    ),
+  )
   // `gleam_json` 3.0 removed `json.decode` (which accepted an old-style
   // `fn(Dynamic) -> Result(t, _)` decoder) in favour of `json.parse`, which
   // takes a `gleam/dynamic/decode.Decoder`. We parse to a raw `Dynamic` using
