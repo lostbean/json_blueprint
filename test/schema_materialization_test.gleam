@@ -1,4 +1,5 @@
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec
@@ -211,6 +212,76 @@ pub fn unsupported_number_range_schema_located_test() {
       "NumberRangeSchema",
     )),
   )
+
+  // And inside a union variant's payload, located by its tag.
+  let union_schema =
+    codec.UnionSchema([
+      codec.VariantSchema("empty", None),
+      codec.VariantSchema("ranged", Some(codec.ListSchema(s))),
+    ])
+  schema_materialize.materialize("generated/catalog", [
+    SchemaExport("union_range", union_schema),
+  ])
+  |> should.equal(
+    Error(UnsupportedConstructor(
+      ["union_range", "ranged", "*"],
+      "NumberRangeSchema",
+    )),
+  )
+}
+
+pub fn union_schema_expression_keeps_unit_and_payload_variants_test() {
+  schema_materialize.emit_schema_expression(
+    codec.UnionSchema([
+      codec.VariantSchema("defer", None),
+      codec.VariantSchema(
+        "approve \"let\"",
+        Some(codec.IntegerRangeSchema(-1000, 1_000_000)),
+      ),
+    ]),
+    ["decision"],
+  )
+  |> should.equal(Ok(
+    "codec.UnionSchema([codec.VariantSchema(\"defer\", option.None), "
+    <> "codec.VariantSchema(\"approve \\\"let\\\"\", "
+    <> "option.Some(codec.IntegerRangeSchema(-1_000, 1_000_000)))])",
+  ))
+}
+
+pub fn decision_union_schema_materializes_test() {
+  let assert Ok(export) =
+    schema_materialize.from_codec(
+      "decision_schema",
+      materialize_fixtures.build_decision_codec(),
+    )
+  let assert codec.UnionSchema([approve, decline, defer]) = export.schema
+  approve.tag |> should.equal("approve \"let\"")
+  decline.tag |> should.equal("decline \n\r\f\t\\import")
+  defer |> should.equal(codec.VariantSchema("defer", None))
+
+  let assert Ok(module) =
+    schema_materialize.materialize("generated/decision_catalog", [export])
+  module.path |> should.equal("generated/decision_catalog.gleam")
+  module.content
+  |> string.contains("import gleam/option\n")
+  |> should.be_true
+  module.content
+  |> string.contains("codec.VariantSchema(\"defer\", option.None)")
+  |> should.be_true
+  module.content
+  |> string.contains(
+    "codec.VariantSchema(\"decline \\n\\r\\f\\t\\\\import\", option.Some(",
+  )
+  |> should.be_true
+}
+
+pub fn integer_literals_use_digit_separators_test() {
+  schema_materialize.format_int_literal(0) |> should.equal("0")
+  schema_materialize.format_int_literal(999) |> should.equal("999")
+  schema_materialize.format_int_literal(1000) |> should.equal("1_000")
+  schema_materialize.format_int_literal(-999_999) |> should.equal("-999_999")
+  schema_materialize.format_int_literal(1_234_567)
+  |> should.equal("1_234_567")
 }
 
 pub fn string_literal_escaping_test() {

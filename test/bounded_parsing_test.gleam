@@ -1,15 +1,12 @@
-import generated/option_codec
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
-import gleam/option.{None}
+import gleam/order
 import gleam/string
 import gleeunit/should
 import json/blueprint
 import json/blueprint/codec
 import json/blueprint/number
-import json/blueprint/parser
-import json/blueprint/parser_limits
 import json/blueprint/value
 
 const one_mib = 1_048_576
@@ -27,22 +24,75 @@ fn padded(text: String, size: Int) -> String {
   text <> string.repeat(" ", size - string.byte_size(text))
 }
 
-fn byte_limit_failure(max: Int) -> codec.JsonDecodeError {
-  codec.BlueprintParserFailure(codec.BlueprintJsonParseFailure(
-    codec.BlueprintJsonLocation(0, 1, 1),
-    codec.BlueprintByteLimitExceeded(max),
-  ))
+fn byte_limit_failure(max: Int) -> codec.DecodeError {
+  codec.DecodeError(
+    [],
+    codec.InvalidJson(value.ParseError(
+      value.Location(0, 1, 1),
+      value.ByteLimitExceeded(max),
+    )),
+  )
 }
 
 fn nested_arrays(depth: Int) -> String {
   string.repeat("[", depth) <> string.repeat("]", depth)
 }
 
-pub fn default_limits_are_one_mib_and_depth_64_test() {
-  let limits = parser_limits.default()
-  parser_limits.max_bytes(limits) |> should.equal(one_mib)
-  parser_limits.max_depth(limits) |> should.equal(64)
-  parser.default_limits() |> should.equal(limits)
+pub fn default_limits_are_one_mib_depth_64_and_262144_values_test() {
+  let limits = value.default_limits()
+  value.parse(padded("[1]", one_mib), limits) |> should.be_ok
+  let assert Error(value.ParseError(_, value.ByteLimitExceeded(1_048_576))) =
+    value.parse(padded("[1]", one_mib + 1), limits)
+  let assert Error(value.ParseError(_, value.DepthLimitExceeded(64))) =
+    value.parse(nested_arrays(65), limits)
+  let assert Error(value.ParseError(_, value.ElementLimitExceeded(262_144))) =
+    value.parse(ones(262_144), limits)
+}
+
+/// An array of `count` ones: `count + 1` values.
+fn ones(count: Int) -> String {
+  "[" <> string.repeat("1,", count - 1) <> "1]"
+}
+
+pub fn element_limit_counts_every_value_test() {
+  let limits = value.default_limits() |> value.with_max_elements(4)
+  // The array and its three items.
+  value.parse("[1,2,3]", limits) |> should.be_ok
+  let assert Error(value.ParseError(location, value.ElementLimitExceeded(4))) =
+    value.parse("[1,2,3,4]", limits)
+  location.byte_offset |> should.equal(7)
+  // The object and its member values; keys do not count.
+  value.parse("{\"a\":1,\"b\":[]}", limits) |> should.be_ok
+  let assert Error(value.ParseError(_, value.ElementLimitExceeded(4))) =
+    value.parse("{\"a\":1,\"b\":[true,false]}", limits)
+}
+
+pub fn element_limit_admits_the_default_and_bounds_raised_byte_limits_test() {
+  let ints = codec.list(codec.int())
+  let assert Ok(decoded) = codec.decode_json(ints, ones(262_143))
+  list.length(decoded) |> should.equal(262_143)
+  let assert Error(error) = codec.decode_json(ints, ones(262_144))
+  error.reason
+  |> should.equal(
+    codec.InvalidJson(value.ParseError(
+      value.Location(524_287, 1, 524_288),
+      value.ElementLimitExceeded(262_144),
+    )),
+  )
+  codec.is_limit_exceeded(error) |> should.be_true
+  codec.describe_decode_error(error)
+  |> should.equal(
+    "invalid JSON at line 1, column 524288: more than 262144 values (value.with_max_elements)",
+  )
+  // Raising only the byte limit keeps the value bound.
+  let wide = value.default_limits() |> value.with_max_bytes(4 * one_mib)
+  let assert Error(error) =
+    codec.decode_json_with_limits(ints, ones(400_000), wide)
+  codec.is_limit_exceeded(error) |> should.be_true
+  let raised = wide |> value.with_max_elements(500_000)
+  let assert Ok(decoded) =
+    codec.decode_json_with_limits(ints, ones(400_000), raised)
+  list.length(decoded) |> should.equal(400_000)
 }
 
 pub fn strict_decode_admits_one_mib_and_rejects_one_byte_more_test() {
@@ -67,27 +117,26 @@ pub fn strict_decode_counts_utf8_bytes_test() {
 
 pub fn strict_decode_default_depth_is_64_test() {
   let assert Ok(value.Array(_)) =
-    parser.parse_value_from_string(parser.default_limits(), nested_arrays(64))
-  case
-    parser.parse_value_from_string(parser.default_limits(), nested_arrays(65))
-  {
-    Error(parser.ParseError(location, parser.DepthLimitExceeded(64))) ->
+    value.parse(nested_arrays(64), value.default_limits())
+  case value.parse(nested_arrays(65), value.default_limits()) {
+    Error(value.ParseError(location, value.DepthLimitExceeded(64))) ->
       location.byte_offset |> should.equal(64)
     other -> panic as { "expected depth error: " <> string.inspect(other) }
   }
 }
 
 pub fn raised_limits_admit_larger_text_test() {
-  let assert Ok(limits) =
-    parser_limits.with_max_bytes(parser_limits.default(), 2 * one_mib)
-  let assert Ok(limits) = parser_limits.with_max_depth(limits, 100)
+  let limits =
+    value.default_limits()
+    |> value.with_max_bytes(2 * one_mib)
+    |> value.with_max_depth(100)
   codec.decode_json_with_limits(
     codec.list(codec.int()),
-    limits,
     padded("[1]", one_mib + 1),
+    limits,
   )
   |> should.equal(Ok([1]))
-  parser.parse_value_from_string(limits, nested_arrays(100)) |> should.be_ok
+  value.parse(nested_arrays(100), limits) |> should.be_ok
 }
 
 pub fn legacy_decode_rejects_text_above_one_mib_test() {
@@ -116,43 +165,13 @@ pub fn legacy_decode_rejects_text_above_one_mib_test() {
   |> should.be_error
 }
 
-pub fn native_decoders_reject_text_above_one_mib_test() {
-  let fits = padded("{}", one_mib)
-  let over = padded("{}", one_mib + 1)
-  let generated = option_codec.option_codec()
-
-  option_codec.decode_option_json_native(fits) |> should.equal(Ok(None))
-  option_codec.decode_option_json_native(over)
-  |> should.equal(Error(byte_limit_failure(one_mib)))
-  codec.decode_json_native(generated, over)
-  |> should.equal(Error(byte_limit_failure(one_mib)))
-  codec.decode_json_native_with_max_bytes(generated, 2 * one_mib, over)
-  |> should.equal(Ok(None))
-  codec.decode_json_native_with_max_bytes(generated, 1, "{}")
-  |> should.equal(Error(byte_limit_failure(1)))
-}
-
-pub fn custom_native_decoders_get_the_same_check_test() {
-  let custom =
-    codec.from_json_parts(
-      fn(_) { Ok(value.Null) },
-      fn(_) { Ok(Nil) },
-      fn(_) { Ok("null") },
-      fn(_) { Ok(Nil) },
-      codec.IntSchema,
-    )
-  codec.decode_json_native(custom, padded("0", one_mib + 1))
-  |> should.equal(Error(byte_limit_failure(one_mib)))
-}
-
 pub fn parsed_integers_are_compact_test() {
   // On the BEAM, an array element that holds a small integer takes a list
   // cell (2 words), a `value.Number` (3) and a number (3). Each number used
   // to carry its digits as a list, for 12 words per element.
   let count = 10_000
   let text = "[" <> string.repeat("7,", count - 1) <> "7]"
-  let assert Ok(parsed) =
-    parser.parse_value_from_string(parser.default_limits(), text)
+  let assert Ok(parsed) = value.parse(text, value.default_limits())
   case flat_size_words(parsed) {
     -1 -> Nil
     words -> { words <= 8 * count + 8 } |> should.be_true
@@ -167,15 +186,15 @@ pub fn parsed_strings_do_not_share_the_input_test() {
     <> string.repeat("b", 100)
     <> "\"]"
   let assert Ok(value.Array([value.String(first), value.String(second)])) =
-    parser.parse_value_from_string(parser.default_limits(), text)
+    value.parse(text, value.default_limits())
   shares_input(first) |> should.be_false
   shares_input(second) |> should.be_false
 }
 
 pub fn compact_numbers_stay_canonical_test() {
-  let assert Ok(limits) = number.number_limits(1024, 800, 1200)
+  let limits = number.default_limits()
   let parse = fn(token) {
-    let assert Ok(parsed) = number.parse_number(limits, token)
+    let assert Ok(parsed) = number.parse(token, limits)
     parsed
   }
   let assert Ok(hundred) = number.from_int(100)
@@ -189,47 +208,46 @@ pub fn compact_numbers_stay_canonical_test() {
   parse("999999999999999") |> should.equal(largest_small)
   parse("9.99999999999999e14") |> should.equal(largest_small)
   // 16 digits and fractions use the decimal representation.
-  number.number_text(parse("1000000000000000")) |> should.equal("1e15")
-  number.number_text(parse("-1234567890123456"))
+  number.to_string(parse("1000000000000000")) |> should.equal("1e15")
+  number.to_string(parse("-1234567890123456"))
   |> should.equal("-1.234567890123456e15")
-  number.number_text(parse("-12.5")) |> should.equal("-1.25e1")
+  number.to_string(parse("-12.5")) |> should.equal("-1.25e1")
   number.compare(parse("1e15"), largest_small)
-  |> should.equal(number.GreaterThan)
+  |> should.equal(order.Gt)
   number.compare(parse("-1e15"), parse("-999999999999999"))
-  |> should.equal(number.LessThan)
+  |> should.equal(order.Lt)
   number.compare(parse("12.5"), parse("12"))
-  |> should.equal(number.GreaterThan)
+  |> should.equal(order.Gt)
   number.is_integer(parse("1e20")) |> should.be_true
   number.is_integer(parse("1.5")) |> should.be_false
-  let assert Ok(four_digits) = number.integer_projection_limit(4)
-  number.to_int_exact(parse("12345"), four_digits)
+  let four_digits = 4
+  number.to_int(parse("12345"), four_digits)
   |> should.equal(Error(number.IntegerDigitLimitExceeded))
-  number.to_int_exact(parse("-1234"), four_digits) |> should.equal(Ok(-1234))
-  number.to_int_exact(parse("1.5"), four_digits)
+  number.to_int(parse("-1234"), four_digits) |> should.equal(Ok(-1234))
+  number.to_int(parse("1.5"), four_digits)
   |> should.equal(Error(number.FractionalInteger))
 }
 
 pub fn integer_fast_path_respects_number_limits_test() {
   let parse_with = fn(token_bytes, digits, exponent, text) {
-    let assert Ok(numbers) = number.number_limits(token_bytes, digits, exponent)
-    let assert Ok(limits) = parser.parser_limits(one_mib, 64, numbers)
-    parser.parse_value_from_string(limits, text)
+    let limits =
+      value.default_limits()
+      |> value.with_number_limits(number.limits(token_bytes, digits, exponent))
+    value.parse(text, limits)
   }
-  let assert Error(parser.ParseError(
+  let assert Error(value.ParseError(
     _,
-    parser.InvalidNumberToken(number.TooManySignificandDigits),
+    value.InvalidNumber(number.TooManySignificandDigits),
   )) = parse_with(1024, 2, 1200, "123")
-  let assert Error(parser.ParseError(
+  let assert Error(value.ParseError(
     _,
-    parser.InvalidNumberToken(number.ExponentOutOfRange),
+    value.InvalidNumber(number.ExponentOutOfRange),
   )) = parse_with(1024, 800, 1, "100")
-  let assert Error(parser.ParseError(
+  let assert Error(value.ParseError(_, value.InvalidNumber(number.TokenTooLong))) =
+    parse_with(2, 800, 1200, "-12")
+  let assert Error(value.ParseError(
     _,
-    parser.InvalidNumberToken(number.TokenTooLong),
-  )) = parse_with(2, 800, 1200, "-12")
-  let assert Error(parser.ParseError(
-    _,
-    parser.InvalidNumberToken(number.InvalidSyntax),
+    value.InvalidNumber(number.InvalidSyntax),
   )) = parse_with(1024, 800, 1200, "012")
   parse_with(1024, 800, 1200, "-0") |> should.be_ok
 }
@@ -238,7 +256,7 @@ pub fn strings_may_start_with_a_combining_mark_test() {
   // U+0301 forms one grapheme with a preceding quote. JSON is defined over
   // code points, so it is ordinary string content.
   let text = "{\"\u{0301}k\": [\"\u{0301}v\"]}"
-  parser.parse_value_from_string(parser.default_limits(), text)
+  value.parse(text, value.default_limits())
   |> should.equal(
     Ok(value.Object([#("\u{0301}k", value.Array([value.String("\u{0301}v")]))])),
   )
@@ -246,42 +264,46 @@ pub fn strings_may_start_with_a_combining_mark_test() {
 
 pub fn error_columns_count_graphemes_test() {
   // "é" is two bytes and one column; "e\u{0301}" is three bytes and one column.
-  case parser.parse_value_from_string(parser.default_limits(), "{\"é\": ?}") {
-    Error(parser.ParseError(location, parser.UnexpectedByte("?"))) ->
-      location |> should.equal(parser.Location(7, 1, 7))
+  case value.parse("{\"é\": ?}", value.default_limits()) {
+    Error(value.ParseError(location, value.UnexpectedCharacter)) ->
+      location |> should.equal(value.Location(7, 1, 7))
     other -> panic as { "expected unexpected byte: " <> string.inspect(other) }
   }
-  case
-    parser.parse_value_from_string(
-      parser.default_limits(),
-      "[\r\n\"e\u{0301}\", x]",
-    )
-  {
-    Error(parser.ParseError(location, parser.UnexpectedByte("x"))) ->
-      location |> should.equal(parser.Location(10, 2, 6))
+  case value.parse("[\r\n\"e\u{0301}\", x]", value.default_limits()) {
+    Error(value.ParseError(location, value.UnexpectedCharacter)) ->
+      location |> should.equal(value.Location(10, 2, 6))
     other -> panic as { "expected unexpected byte: " <> string.inspect(other) }
   }
-  case parser.parse_value_from_string(parser.default_limits(), "[1, é]") {
-    Error(parser.ParseError(location, parser.UnexpectedByte("é"))) ->
-      location |> should.equal(parser.Location(4, 1, 5))
+  case value.parse("[1, é]", value.default_limits()) {
+    Error(value.ParseError(location, value.UnexpectedCharacter)) ->
+      location |> should.equal(value.Location(4, 1, 5))
     other -> panic as { "expected unexpected byte: " <> string.inspect(other) }
   }
 }
 
 pub fn escapes_decode_as_before_test() {
-  parser.parse_value_from_string(
-    parser.default_limits(),
+  value.parse(
     "\"a\\\"\\\\\\/\\b\\f\\n\\r\\t\\u00e9\\ud83d\\ude00z\"",
+    value.default_limits(),
   )
   |> should.equal(Ok(value.String("a\"\\/\u{8}\u{c}\n\r\té😀z")))
   list.each(
     ["\"\\ud83d\"", "\"\\ude00\"", "\"\\u12\"", "\"\\ud83d\\u0041\""],
     fn(text) {
-      case parser.parse_value_from_string(parser.default_limits(), text) {
-        Error(parser.ParseError(location, parser.InvalidUnicodeEscape)) ->
+      case value.parse(text, value.default_limits()) {
+        Error(value.ParseError(location, value.InvalidUnicodeEscape)) ->
           location.byte_offset |> should.equal(1)
         other -> panic as { "expected escape error: " <> string.inspect(other) }
       }
     },
+  )
+}
+
+pub fn default_limits_admit_integers_on_the_fast_path_test() {
+  // The defaults skip the probe that `with_number_limits` runs, so they must
+  // agree with it.
+  value.default_limits()
+  |> should.equal(
+    value.default_limits() |> value.with_number_limits(number.default_limits()),
   )
 }

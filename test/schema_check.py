@@ -1,5 +1,10 @@
-"""Compare emitted Blueprint schemas with jsonschema Draft202012Validator against frozen 61-case manifest.
-Also proves that missing, extra, duplicate, or replaced fixtures fail closed.
+"""Compare emitted Blueprint schemas with jsonschema Draft202012Validator against the frozen manifest.
+
+Each case also carries the codec decoder outcome ("accepted") and the
+`contract.validate` outcome ("runtime_accepted") for the contract loaded from
+the emitted schema document; both must agree with the manifest and with the
+validator on the emitted and the normalized schema. Also proves that
+missing, extra, duplicate, or replaced fixtures fail closed.
 """
 import copy
 import json
@@ -23,8 +28,9 @@ EXPECTED_FAMILIES = {
     "optional-nullable-record": 6,
     "inclusive-bounds": 6,
     "tagged-decision": 6,
+    "union-unit-variants": 12,
 }
-TOTAL_EXPECTED_CASES = sum(EXPECTED_FAMILIES.values())  # 61
+TOTAL_EXPECTED_CASES = sum(EXPECTED_FAMILIES.values())  # 73
 
 
 def validate_cases(cases, manifest):
@@ -104,7 +110,7 @@ def validate_cases(cases, manifest):
             or normalized_accepted != expected_accepted
         ):
             raise ValueError(
-                f"Runtime/normalized schema disagreement for {case_id}"
+                f"Contract/normalized schema disagreement for {case_id}"
             )
         outcomes.add(accepted)
 
@@ -222,7 +228,7 @@ def main():
     verify_mutation_fail_closed(cases, manifest)
 
     print(
-        f"PASS: all {len(cases)} schema/decoder/runtime cases agree with Draft202012Validator across all 13 frozen families"
+        f"PASS: all {len(cases)} schema/decoder/contract cases agree with Draft202012Validator across all {len(EXPECTED_FAMILIES)} frozen families"
     )
     print(
         "PASS: fail-closed mutation proofs passed (missing, extra, duplicate, replaced fixture detection verified)"
