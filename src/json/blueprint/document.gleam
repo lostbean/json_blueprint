@@ -1,3 +1,18 @@
+//// Loading of Draft 2020-12 JSON Schema documents into runtime contracts.
+////
+//// `load` accepts a parsed `Value` whose `$schema` is the Draft 2020-12 URI
+//// and whose schema stays inside the finite profile that `codec.Schema`
+//// describes: closed objects, pairs, lists, nullable values, bounded
+//// integers and numbers, string enums and two-way tagged unions. Keywords
+//// and shapes outside the profile fail with `UnsupportedDocument`, malformed
+//// ones with `MalformedDocument`, another dialect with `UnsupportedDialect`,
+//// and contradictions such as duplicate enum labels with `SchemaInvariant`.
+//// Each error carries the path within the document.
+////
+//// Use it to accept a schema from outside the program, then validate values
+//// with `json/blueprint/runtime`. `parser.parse_schema_document` parses
+//// bounded text and loads it in one step.
+
 import gleam/list
 import json/blueprint/codec.{type Schema}
 import json/blueprint/number.{type Number}

@@ -1,3 +1,33 @@
+//// Runtime contracts: validation of a parsed `Value` against a codec schema,
+//// and decoding of validated values.
+////
+//// `from_codec` and `from_schema` check a schema for contradictions, such as
+//// a reversed range or a duplicate property, and return a `RuntimeContract`.
+//// `document.load` builds the same contract from a schema document.
+//// `validate` checks a `Value` and returns a `ValidatedValue` or a
+//// `ValidationError` with the path of the first failure. `decode` decodes a
+//// validated value with a codec whose schema has the same shape, and fails
+//// otherwise.
+////
+//// Use this module when a value must be checked against a schema that
+//// arrives at runtime, or before choosing which codec decodes it. To decode
+//// JSON text with a known codec, `codec.decode_json` is enough.
+////
+//// ```gleam
+//// import json/blueprint/codec
+//// import json/blueprint/parser
+//// import json/blueprint/runtime
+////
+//// pub fn example() {
+////   let names = codec.list(codec.string())
+////   let assert Ok(contract) = runtime.from_codec(names)
+////   let assert Ok(parsed) =
+////     parser.parse_value_from_string(parser.default_limits(), "[\"a\"]")
+////   let assert Ok(validated) = runtime.validate(contract, parsed)
+////   let assert Ok(["a"]) = runtime.decode(names, validated)
+//// }
+//// ```
+
 import gleam/list
 import gleam/order
 import gleam/string

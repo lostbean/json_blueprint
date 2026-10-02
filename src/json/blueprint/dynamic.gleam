@@ -1,6 +1,9 @@
-// Subset copied from the original and now deprecated decoder in gleam/dynamic in gleam_stdlib
-// Migration to the new decoder is difficult at moment
-// https://github.com/gleam-lang/stdlib/blob/v0.58.0/src/gleam/dynamic.gleam
+//// Decoders over `Dynamic` values used by the 1.x `json/blueprint.Decoder`.
+////
+//// This is a copy of the decoder subset of `gleam/dynamic` from gleam_stdlib
+//// 0.58, which later stdlib releases removed:
+//// https://github.com/gleam-lang/stdlib/blob/v0.58.0/src/gleam/dynamic.gleam
+//// New code should use `gleam/dynamic/decode`.
 
 import gleam/bit_array as bit_array_mod
 import gleam/dict.{type Dict}

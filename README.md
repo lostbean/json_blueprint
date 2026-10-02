@@ -43,7 +43,7 @@ The CI matrix exercises Gleam 1.17.0, OTP 28, and Node.js 24. The browser target
 
 ### Documented Design-Deferred Families (Retained Future Scope)
 
-These capabilities are explicitly outside the initial release facade (per `PUBLIC-API.md`) rather than hidden behind incomplete todos:
+These capabilities are outside the 2.0 codec schema. They are listed here so that their absence is explicit:
 
 - **Recursive References (`$ref`, `$defs`)**: Deferred pending resource and cycle policies.
 - **Arbitrary Unions**: Untagged unions (`anyOf`, general `oneOf`) deferred pending subtyping policy.

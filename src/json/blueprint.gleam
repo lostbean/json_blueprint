@@ -1,3 +1,42 @@
+//// The 1.x API: one-way `Decoder(t)` values that decode JSON text into Gleam
+//// values and describe that JSON as a schema document labelled Draft-07,
+//// plus encoders for unions, enums, optional fields and tuples.
+////
+//// Use this module for recursive types, which `self_decoder` and
+//// `reuse_decoder` express with `$ref` and `$defs`, and for existing 1.x
+//// code. For other data, `json/blueprint/codec` gives one `Codec(a)` that
+//// encodes, decodes strictly and describes a Draft 2020-12 schema. The schema
+//// types used here live in `json/blueprint/schema`.
+////
+//// `decode` parses with `gleam/json` and rejects text above 1 MiB before
+//// parsing; `decode_with_max_bytes` accepts another bound.
+////
+//// ```gleam
+//// import gleam/json
+//// import json/blueprint
+////
+//// pub type User {
+////   User(name: String, age: Int)
+//// }
+////
+//// pub fn user_decoder() -> blueprint.Decoder(User) {
+////   blueprint.decode2(
+////     User,
+////     blueprint.field("name", blueprint.string()),
+////     blueprint.field("age", blueprint.int()),
+////   )
+//// }
+////
+//// pub fn example() {
+////   let assert Ok(User("Ada", 36)) =
+////     blueprint.decode(
+////       using: user_decoder(),
+////       from: "{\"name\":\"Ada\",\"age\":36}",
+////     )
+////   blueprint.generate_json_schema(user_decoder()) |> json.to_string
+//// }
+//// ```
+
 import gleam/bool
 import gleam/dynamic as gleam_dynamic
 import gleam/dynamic/decode

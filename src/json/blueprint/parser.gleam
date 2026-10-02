@@ -1,3 +1,34 @@
+//// Strict, bounded parsing of JSON text into a `Value` or a schema contract.
+////
+//// `parse_value` reads UTF-8 bytes and `parse_value_from_string` reads a
+//// string. Both reject duplicate object keys, keep numbers exact, and stop
+//// at the limits they are given: input bytes, nesting depth and number size.
+//// `default_limits` is 1 MiB, depth 64 and numbers of up to 1,024 bytes; see
+//// `json/blueprint/parser_limits` for the setters. Errors carry a byte offset,
+//// a line and a column that counts graphemes from 1.
+////
+//// `parse_schema_document` parses text and loads it as a Draft 2020-12
+//// schema with `document.load`. `codec.decode_json` uses the same parser, so
+//// most applications call it directly instead of this module.
+////
+//// ```gleam
+//// import gleam/int
+//// import json/blueprint/parser
+//// import json/blueprint/parser_limits
+//// import json/blueprint/value
+////
+//// pub fn example() {
+////   let assert Ok(limits) =
+////     parser_limits.with_max_bytes(parser.default_limits(), 64 * 1024)
+////   case parser.parse_value_from_string(limits, "{\"tags\": [\"a\"]}") {
+////     Ok(value.Object(members)) -> Ok(members)
+////     Ok(_) -> Error("expected an object")
+////     Error(parser.ParseError(location, _kind)) ->
+////       Error("invalid JSON at byte " <> int.to_string(location.byte_offset))
+////   }
+//// }
+//// ```
+
 import json/blueprint/document.{type DocumentError}
 import json/blueprint/internal/parser_core
 import json/blueprint/number.{type NumberError, type NumberLimits}

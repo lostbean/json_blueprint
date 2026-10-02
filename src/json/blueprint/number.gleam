@@ -1,3 +1,16 @@
+//// Exact JSON numbers and their checked conversions to `Int` and `Float`.
+////
+//// A `Number` keeps the decimal value of a JSON number token exactly, with no
+//// rounding, so `1.10` equals `1.1` and `1e2` equals `100`. `parse_number`
+//// reads a token within `NumberLimits` on token bytes, significant digits and
+//// exponent size. `to_int_exact` and `to_float_exact` return a native value
+//// only when it is exactly equal, and `from_int` and `from_float_exact`
+//// convert back. On JavaScript, integers outside the safe range
+//// (±9,007,199,254,740,991) are refused instead of rounded.
+////
+//// The strict parser in `json/blueprint/parser` and `value.Number` use this
+//// type; `codec.number()` decodes it, and `codec.int()` projects it to `Int`.
+
 /// An exact JSON number.
 ///
 /// The representation is canonical, so two `Number` values are equal exactly
