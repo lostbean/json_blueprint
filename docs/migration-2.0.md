@@ -1,50 +1,88 @@
-# Planned 2.0 source migration
+# Moving from json_blueprint 1.x to 2.0
 
-This guide compares the published 1.7.1 source with the intended 2.0 source. The 1.7.1 tag contains `json/blueprint`, `json/blueprint/dynamic`, and `json/blueprint/schema`; the `codec`, `codegen`, `value`, `number`, `parser`, and `migration` modules were developed later on the implementation branch.
+json_blueprint 2.0 keeps the 1.x API, frozen, in `json/blueprint` and
+`json/blueprint/schema`, and adds `json/blueprint/codec`: one `Codec(a)` that
+encodes, decodes strictly and describes a Draft 2020-12 schema. Code written
+against the unreleased 2.0 branch has [its own guide](migration-wave-2.md).
 
-Blueprint 2.0 keeps the released `json/blueprint.Decoder` and `json/blueprint/schema` implementation for recursive typed decoding and its existing schema output. The legacy renderer labels output as Draft-07 and currently uses `$defs`; this guide does not assert strict dialect interoperability. For ordinary application data, `json/blueprint/codec.Codec(a)` is the canonical bidirectional definition: one codec provides value and JSON-text encoding, decoding, and a known Draft 2020-12 schema. The package manifest remains at 1.7.1 until the 2.0 release decision; this guide describes the intended source changes and does not announce a publication.
+## What 1.x code must change
 
-| 1.x source                                                         | 2.0 source or decision                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `blueprint.decode2` / `decode3` with `blueprint.field`             | `codec.record2` / `record3` with `codec.required`, a constructor, and field accessors. For larger records, use `codec.combine`, `codec.object`, and `codec.imap`.                                                                                            |
-| `blueprint.optional(inner)` for a present `null`                   | `codec.nullable(inner)` yields `codec.Null` or `codec.NonNull(value)`.                                                                                                                                                                                       |
-| `blueprint.optional_field(name, inner)` for absent or `null`       | `codec.optional(name, codec.nullable(inner))` keeps absence (`codec.Missing`) distinct from present `null` (`codec.Present(codec.Null)`). Flatten explicitly only when the application intentionally treats both alike.                                      |
-| `blueprint.union_type_decoder` with `blueprint.union_type_encoder` | `codec.tagged` works for a two-case union but uses `{"tag": ..., "value": ...}`. The released union utilities retain their `{"type": ..., "data": ...}` envelope; retain them or write explicit custom encode/decode when that wire format must stay stable. |
-| `blueprint.self_decoder` and `blueprint.reuse_decoder`             | Keep the released decoder. Modern `codec.Schema` has no recursive `$ref` constructor and cannot represent the same finite recursive schema. The compiled [recursive example](../test/examples/recursive_types_test.gleam) covers nested trees and `$defs`.   |
-| `json/blueprint/schema` legacy AST and constraints                 | Keep this module for refs, `pattern`, `format`, `multipleOf`, and other constraints outside the modern codec's finite Draft 2020-12 profile. Its schema output and behavior remain distinct from `codec.schema_json`.                                        |
+1.x code that only uses the combinators compiles unchanged. Three things
+changed:
 
-The new `json/blueprint/value` module models JSON values without native-number rounding and rejects duplicate object keys when constructed through `value.object(entries, value.RejectDuplicates)`. Its short constructors (`value.null()`, `value.bool(x)`, `value.string(x)`, `value.number(x)`, and `value.array(xs)`) and its variants are all new in 2.0; they are not 1.x compatibility aliases. `json_text.render_value(value)` renders a value to JSON text.
-
-The new codec text path uses Blueprint's bounded strict parser by default, including generated codecs. Duplicate keys are rejected and exact number tokens are retained. `codec.decode_json_native(generated_codec, text)` and generated `decode_<name>_json_native(text)` explicitly opt into the native `gleam/json` parser, which may collapse duplicate keys or normalize numbers. For callers that used the 1.x `blueprint.decode` parser, review inputs that depended on native parsing behavior before switching to `codec.decode_json`. The strict parser's default limits are 1 MiB (1,048,576 bytes), depth 64, 1024 number-token bytes, 800 significant digits, and absolute exponent 1200. The 1.x `blueprint.decode`, `codec.decode_json_native` and generated `decode_<name>_json_native` functions reject text above 1 MiB before `gleam/json` parses it; `blueprint.decode_with_max_bytes` and `codec.decode_json_native_with_max_bytes` accept a larger bound. Use `parser.default_limits()`, `parser_limits.with_max_bytes`, `parser_limits.with_max_depth`, or `parser_limits.with_number_limits` with `codec.decode_json_with_limits` when a tighter policy is needed. JavaScript native integers remain limited to the safe integer range; Erlang bignums are supported by bounded integer codecs when within the declared range.
-
-No `json/blueprint/migration` adapter was published in 1.7.1. Intermediate implementation-branch snapshots had `migration.adapt` and `migration.value_to_json_string`; both were removed before the intended 2.0 release. If an application used those snapshots, replace `migration.adapt` with a direct `Codec` definition (or retain the legacy `Decoder` for recursion) and replace `migration.value_to_json_string` with `json_text.render_value`. The adapter reparsed JSON text through a legacy decoder, discarded located decode errors, and returned `UnknownSchema`; preserving it would imply a schema contract it could not provide. Intermediate generated decoders also changed from native to strict admission; regenerate checked-in source with the current `codegen.compile` implementation.
-
-A migrated two-field record has one codec and a known schema. This is compiled in [test/migration_test.gleam](../test/migration_test.gleam):
+- **`json/blueprint/dynamic` is internal.** Replace its imports with
+  `gleam/dynamic/decode`.
+- **`Decoder` and `FieldDecoder` are opaque.** Build them with the
+  combinators instead of record syntax. `get_dynamic_decoder` now returns
+  `fn(Dynamic) -> Result(t, List(decode.DecodeError))`; the errors have the
+  same `expected`, `found` and `path` fields.
+- **`blueprint.decode` rejects text above 1 MiB** before parsing, with one
+  `json.UnableToDecode` error that names the limit. Use
+  `blueprint.decode_with_max_bytes` to accept larger text.
 
 ```gleam
-pub type Person {
-  Person(name: String, age: Int)
+// before
+import json/blueprint/dynamic
+
+blueprint.Decoder(dyn_decoder: dynamic.string, schema: schema, defs: [])
+
+// after
+blueprint.string()
+```
+
+## Moving a type to `Codec`
+
+A codec gives both directions and a schema from one definition. This record
+is compiled in [test/migration_test.gleam](../test/migration_test.gleam):
+
+```gleam
+// 1.x
+pub fn person_decoder() -> blueprint.Decoder(Person) {
+  blueprint.decode2(
+    Person,
+    blueprint.field("name", blueprint.string()),
+    blueprint.field("age", blueprint.int()),
+  )
 }
 
-pub fn person_codec() -> codec.Codec(Person) {
-  let assert Ok(person) =
-    codec.record2(
-      codec.required("name", codec.string()),
-      codec.required("age", codec.int()),
-      Person,
-      fn(person) { person.name },
-      fn(person) { person.age },
-    )
-  person
+// 2.0
+pub fn person_codec() -> Codec(Person) {
+  use name <- codec.field("name", codec.string(), fn(p: Person) { p.name })
+  use age <- codec.field("age", codec.int(), fn(p: Person) { p.age })
+  codec.success(Person(name:, age:))
 }
 ```
 
-Object acceptance changes during this migration: the released decoder ignored unrelated object fields, while `codec.object` and `codec.record2` reject them. The compiled migration test checks both behaviors on the same JSON text. Review callers that rely on permissive decoding before switching their definitions. `codec.tagged` also changes the union envelope as shown above; changing a decoder does not by itself authorize a wire-format change.
+| 1.x                                               | 2.0                                                         |
+| ------------------------------------------------- | ----------------------------------------------------------- |
+| `decode1` … `decode9` with `field`                | `codec.field` for each field, then `codec.success`          |
+| `optional_field(name, inner)`                     | `codec.optional_field(name, inner, getter)`                 |
+| `optional(inner)` (a present `null`)              | `codec.nullable(inner)`                                     |
+| `union_type_decoder` with `union_type_encoder`    | `codec.union` with `variant` and `unit_variant`             |
+| `enum_type_decoder` with `enum_type_encoder`      | `codec.string_enum`                                         |
+| `tuple2` … `tuple6`                               | `codec.pair`, or a record                                   |
+| `map`                                             | `codec.map(codec, decode:, encode:)`                        |
+| `float()`                                         | `codec.float()`, or `codec.number()` to keep numbers exact |
+| `self_decoder`, `reuse_decoder` (recursive types) | keep the 1.x decoder: codec schemas have no `$ref`          |
+| `generate_json_schema` (Draft-07 label)           | `codec.schema_json` (Draft 2020-12)                         |
+| `blueprint.decode` (gleam/json, 1 MiB check)      | `codec.decode_json` (strict parser, bounded)                |
 
-For code generation, keep one `codegen.Definition(a)` and use it for `codegen.runtime` and `codegen.compile`. Generated modules rely on codec's low-level helper functions; application code normally uses the returned `Codec(a)` instead. Exact `Number` and `Value` semantics, bounded parser admission, and runtime validation contracts remain available as separate advanced capabilities.
+Each item below changes what the wire accepts or produces. Review it against
+stored data before moving a type:
 
-The new `codec.optional_option` and `codegen.optional_option` bridge optional fields directly to standard `Option(a)` without removing `codec.Optional(a)`. For a nullable property, map missing to `None`, JSON `null` to `Some(codec.Null)`, and a value to `Some(codec.NonNull(value))`. `codec.try_imap` supports application-owned validation in both conversion directions while preserving the base schema and located codec errors.
+- **Objects are closed.** An unknown field fails to decode; 1.x ignored it.
+- **`optional_field` rejects `null`.** 1.x treated an absent field and `null`
+  alike. Use `codec.optional_field(name, codec.nullable(inner), ..)` to accept
+  both; absent and `null` then decode as `None` and `Some(None)`.
+- **Unions use `{"tag": ..., "value": ...}`.** 1.x wrote
+  `{"type": ..., "data": ...}`. Data stored in the 1.x form stays readable
+  with the 1.x decoder; there is no codec for that envelope.
+- **Enums encode a bare label.** 1.x `enum_type_encoder` wrote
+  `{"enum": label}`.
+- **Duplicate keys fail, and numbers are exact.** `codec.int()` accepts an
+  exact integer spelling such as `1.0e2` and refuses a fraction.
+- **Limits.** `codec.decode_json` stops at 1 MiB, depth 64 and 262,144
+  values; see the README defaults table.
 
-`codec.describe(inner, text)` adds a Draft 2020-12 `description` annotation to the schema node returned by `inner`, without changing encoding, decoding, or validation. Place it inside `codec.required` or `codec.optional` for a property description, and apply it to the complete record codec for a root description. For a nullable property, describe the completed `codec.nullable(inner)` so the annotation sits beside `anyOf`. `codegen.describe` provides the same operation for generated definitions. The new public `codec.DescribedSchema` variant requires consumers with exhaustive `Schema` matches to add a case; descriptions are ignored when runtime contracts are matched by validation shape.
-
-`codec.render_json_decode_error(error)` renders a `JsonDecodeError` with unambiguous field and index paths. It omits supplied enum labels, tags, actual values, parser bytes, unknown keys, and custom reason text. Paths created by custom decoders can still contain caller-supplied names. Applications remain responsible for deciding what detail to show to a model or another audience. Keep the structured error when code must branch on its cause; rendered wording is diagnostic rather than a persistent identifier.
+Changing a decoder does not by itself authorize a wire-format change: keep
+the 1.x decoder for data that must stay in its format.
