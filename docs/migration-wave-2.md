@@ -441,10 +441,24 @@ worker.codec(version, encode_job, job_decoder())
 // after
 worker.codec(
   version,
-  fn(job) { codec.to_json(job_codec(), job) |> result.unwrap(json.null()) },
+  fn(job) {
+    case codec.to_json(job_codec(), job) {
+      Ok(json) -> json
+      // The consumer's encoder has no failure channel. Fail loudly rather
+      // than store `null` for a value the codec rejects.
+      Error(error) -> panic as codec.describe_encode_error(error)
+    }
+  },
   codec.decoder(job_codec()),
 )
 ```
+
+`to_json` fails only when the value violates the codec (a refinement such as
+`integer_between`, a `try_map` encode check, or a number with no exact JSON
+form). When the consumer's encoder cannot fail, as with Grind's
+`worker.codec`, never fall back to `json.null()`: that stores a value the
+decoder will later reject. Panic with the described error, or validate the
+value before submitting it.
 
 `codec.float()` is a `Codec(Float)` that rounds to the nearest float on
 decode; use `codec.number()` to keep numbers exact.
