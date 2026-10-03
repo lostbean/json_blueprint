@@ -5,29 +5,36 @@ import gleam/json
 import gleam/option
 import json/blueprint/codec
 import json/blueprint/internal/generated
+import json/blueprint/internal/schema_tree
 import json/blueprint/value
 import materialize_fixtures
 
-pub const generated_fingerprint: String = "8D02C438CDAC05F2C70EB9CD0EAA0F29DD7E7C74"
+pub const generated_fingerprint: String = "6AEC872050FE749233BFB01021B48A346BFEBE5C"
 
-const order_schema_value: codec.Schema = codec.ObjectSchema(
+const order_schema_value: schema_tree.Tree = schema_tree.ObjectSchema(
   [
-    codec.PropertySchema("order_id", True, codec.IntegerRangeSchema(1, 999_999)),
-    codec.PropertySchema(
+    schema_tree.PropertySchema(
+      "order_id",
+      True,
+      schema_tree.IntegerRangeSchema(1, 999_999),
+    ),
+    schema_tree.PropertySchema(
       "items_\"list\"",
       True,
-      codec.ListSchema(codec.PairSchema(codec.StringSchema, codec.IntSchema)),
+      schema_tree.ListSchema(
+        schema_tree.PairSchema(schema_tree.StringSchema, schema_tree.IntSchema),
+      ),
     ),
-    codec.PropertySchema(
+    schema_tree.PropertySchema(
       "customer\n\r\f\t\\note",
       False,
-      codec.NullableSchema(codec.StringSchema),
+      schema_tree.NullableSchema(schema_tree.StringSchema),
     ),
-    codec.PropertySchema("type", True, codec.BoolSchema),
-    codec.PropertySchema(
+    schema_tree.PropertySchema("type", True, schema_tree.BoolSchema),
+    schema_tree.PropertySchema(
       "status",
       True,
-      codec.StringEnumSchema(
+      schema_tree.StringEnumSchema(
         ["pending", "processing", "shipped\n\r\f\t\"quoted\"", "delivered 🚀 fn"],
       ),
     ),
@@ -881,7 +888,7 @@ pub fn decode_order_json_native(
 }
 
 pub fn order_schema() -> codec.Schema {
-  order_schema_value
+  generated.schema(order_schema_value)
 }
 
 pub fn order_codec() -> codec.Codec(materialize_fixtures.Order) {

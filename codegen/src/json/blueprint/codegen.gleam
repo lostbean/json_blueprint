@@ -1041,6 +1041,7 @@ fn compile_supported(
         "gleam/option",
         "json/blueprint/codec",
         "json/blueprint/internal/generated",
+        "json/blueprint/internal/schema_tree",
         "json/blueprint/value",
       ],
       lowered.imports,
@@ -1070,7 +1071,7 @@ fn compile_supported(
             <> "\n\n"
             <> "const "
             <> schema_name
-            <> "_value: codec.Schema = "
+            <> "_value: schema_tree.Tree = "
             <> schema_expression
             <> "\n\n"
             <> string.join(declarations, "\n\n")
@@ -1117,9 +1118,9 @@ fn compile_supported(
             <> ")\n}\n\n"
             <> "pub fn "
             <> schema_name
-            <> "() -> codec.Schema {\n  "
+            <> "() -> codec.Schema {\n  generated.schema("
             <> schema_name
-            <> "_value\n}\n\n"
+            <> "_value)\n}\n\n"
             <> "pub fn "
             <> codec_name
             <> "() -> codec.Codec("

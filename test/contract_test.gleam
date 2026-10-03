@@ -5,10 +5,12 @@
 
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{type Codec, Field, Index}
 import json/blueprint/contract
+import json/blueprint/internal/schema_tree as tree
 import json/blueprint/number
 import json/blueprint/value.{type Value}
 
@@ -59,14 +61,23 @@ fn decision_codec() -> Codec(Decision) {
   })
 }
 
-fn approve_schema() -> codec.Schema {
-  codec.ObjectSchema([
-    codec.PropertySchema("qty", True, codec.IntegerRangeSchema(1, 10)),
+/// The contract of a schema tree, as a generated module builds one.
+fn tree_contract(schema: tree.Tree) -> contract.Contract {
+  contract.from_schema(codec.from_tree(schema))
+}
+
+fn contract_tree(found: contract.Contract) -> tree.Tree {
+  codec.to_tree(contract.schema(found))
+}
+
+fn approve_schema() -> tree.Tree {
+  tree.ObjectSchema([
+    tree.PropertySchema("qty", True, tree.IntegerRangeSchema(1, 10)),
   ])
 }
 
-fn decline_schema() -> codec.Schema {
-  codec.ObjectSchema([codec.PropertySchema("reason", True, codec.StringSchema)])
+fn decline_schema() -> tree.Tree {
+  tree.ObjectSchema([tree.PropertySchema("reason", True, tree.StringSchema)])
 }
 
 fn tagged(tag: String, payload: Value) -> Value {
@@ -78,160 +89,159 @@ fn tagged(tag: String, payload: Value) -> Value {
 pub fn contract_normalization_sorting_test() {
   // Object properties normalize in alphabetical order
   let unsorted_schema =
-    codec.ObjectSchema([
-      codec.PropertySchema("zeta", True, codec.StringSchema),
-      codec.PropertySchema("alpha", False, codec.IntSchema),
-      codec.PropertySchema("beta", True, codec.BoolSchema),
+    tree.ObjectSchema([
+      tree.PropertySchema("zeta", True, tree.StringSchema),
+      tree.PropertySchema("alpha", False, tree.IntSchema),
+      tree.PropertySchema("beta", True, tree.BoolSchema),
     ])
 
-  let assert Ok(unsorted) = contract.from_schema(unsorted_schema)
-  contract.schema(unsorted)
+  let unsorted = tree_contract(unsorted_schema)
+  contract_tree(unsorted)
   |> should.equal(
-    codec.ObjectSchema([
-      codec.PropertySchema("alpha", False, codec.IntSchema),
-      codec.PropertySchema("beta", True, codec.BoolSchema),
-      codec.PropertySchema("zeta", True, codec.StringSchema),
+    tree.ObjectSchema([
+      tree.PropertySchema("alpha", False, tree.IntSchema),
+      tree.PropertySchema("beta", True, tree.BoolSchema),
+      tree.PropertySchema("zeta", True, tree.StringSchema),
     ]),
   )
 
   // Enum labels normalize in alphabetical order
-  let unsorted_enum = codec.StringEnumSchema(["urgent", "low", "normal"])
-  let assert Ok(enum_contract) = contract.from_schema(unsorted_enum)
-  contract.schema(enum_contract)
-  |> should.equal(codec.StringEnumSchema(["low", "normal", "urgent"]))
+  let unsorted_enum = tree.StringEnumSchema(["urgent", "low", "normal"])
+  let enum_contract = tree_contract(unsorted_enum)
+  contract_tree(enum_contract)
+  |> should.equal(tree.StringEnumSchema(["low", "normal", "urgent"]))
 
   // Union variants, with and without payloads, normalize by tag, and their
   // payloads normalize too
   let unsorted_union =
-    codec.UnionSchema([
-      codec.VariantSchema("zeta", Some(codec.IntSchema)),
-      codec.VariantSchema("mid", None),
-      codec.VariantSchema("alpha", Some(codec.StringEnumSchema(["b", "a"]))),
+    tree.UnionSchema([
+      tree.VariantSchema("zeta", Some(tree.IntSchema)),
+      tree.VariantSchema("mid", None),
+      tree.VariantSchema("alpha", Some(tree.StringEnumSchema(["b", "a"]))),
     ])
-  let assert Ok(union_contract) = contract.from_schema(unsorted_union)
-  contract.schema(union_contract)
+  let union_contract = tree_contract(unsorted_union)
+  contract_tree(union_contract)
   |> should.equal(
-    codec.UnionSchema([
-      codec.VariantSchema("alpha", Some(codec.StringEnumSchema(["a", "b"]))),
-      codec.VariantSchema("mid", None),
-      codec.VariantSchema("zeta", Some(codec.IntSchema)),
+    tree.UnionSchema([
+      tree.VariantSchema("alpha", Some(tree.StringEnumSchema(["a", "b"]))),
+      tree.VariantSchema("mid", None),
+      tree.VariantSchema("zeta", Some(tree.IntSchema)),
     ]),
   )
 
   // same_schema respects normalization
   let sorted_schema =
-    codec.ObjectSchema([
-      codec.PropertySchema("alpha", False, codec.IntSchema),
-      codec.PropertySchema("beta", True, codec.BoolSchema),
-      codec.PropertySchema("zeta", True, codec.StringSchema),
+    tree.ObjectSchema([
+      tree.PropertySchema("alpha", False, tree.IntSchema),
+      tree.PropertySchema("beta", True, tree.BoolSchema),
+      tree.PropertySchema("zeta", True, tree.StringSchema),
     ])
-  let assert Ok(sorted) = contract.from_schema(sorted_schema)
+  let sorted = tree_contract(sorted_schema)
   contract.same_schema(unsorted, sorted)
   |> should.equal(True)
 
-  let assert Ok(sorted_union) =
-    contract.from_schema(
-      codec.UnionSchema([
-        codec.VariantSchema("alpha", Some(codec.StringEnumSchema(["a", "b"]))),
-        codec.VariantSchema("mid", None),
-        codec.VariantSchema("zeta", Some(codec.IntSchema)),
+  let sorted_union =
+    tree_contract(
+      tree.UnionSchema([
+        tree.VariantSchema("alpha", Some(tree.StringEnumSchema(["a", "b"]))),
+        tree.VariantSchema("mid", None),
+        tree.VariantSchema("zeta", Some(tree.IntSchema)),
       ]),
     )
   contract.same_schema(union_contract, sorted_union)
   |> should.equal(True)
 
   // A unit variant and a variant with a payload are different schemas
-  let assert Ok(with_payload) =
-    contract.from_schema(
-      codec.UnionSchema([
-        codec.VariantSchema("alpha", Some(codec.StringEnumSchema(["a", "b"]))),
-        codec.VariantSchema("mid", Some(codec.StringSchema)),
-        codec.VariantSchema("zeta", Some(codec.IntSchema)),
+  let with_payload =
+    tree_contract(
+      tree.UnionSchema([
+        tree.VariantSchema("alpha", Some(tree.StringEnumSchema(["a", "b"]))),
+        tree.VariantSchema("mid", Some(tree.StringSchema)),
+        tree.VariantSchema("zeta", Some(tree.IntSchema)),
       ]),
     )
   contract.same_schema(union_contract, with_payload)
   |> should.equal(False)
 
   // Descriptions do not affect same_schema
-  let assert Ok(described) =
-    contract.from_schema(codec.DescribedSchema("notes", sorted_schema))
+  let described = tree_contract(tree.DescribedSchema("notes", sorted_schema))
   contract.same_schema(described, sorted)
   |> should.equal(True)
 }
 
 pub fn contract_normalization_invariants_test() {
   // Reversed integer range
-  contract.from_schema(codec.IntegerRangeSchema(10, 5))
+  codec.validate_tree(tree.IntegerRangeSchema(10, 5))
   |> should.equal(Error(codec.ReversedIntegerBounds(10, 5)))
 
   // Reversed number range
   let min = int_num(20)
   let max = int_num(10)
-  contract.from_schema(codec.NumberRangeSchema(min, max))
+  codec.validate_tree(tree.NumberRangeSchema(min, max))
   |> should.equal(Error(codec.ReversedNumberBounds(min, max)))
 
   // Duplicate object properties
-  contract.from_schema(
-    codec.ObjectSchema([
-      codec.PropertySchema("dup", True, codec.StringSchema),
-      codec.PropertySchema("dup", False, codec.IntSchema),
+  codec.validate_tree(
+    tree.ObjectSchema([
+      tree.PropertySchema("dup", True, tree.StringSchema),
+      tree.PropertySchema("dup", False, tree.IntSchema),
     ]),
   )
   |> should.equal(Error(codec.DuplicateFieldName("dup")))
 
   // Duplicate tags, between a payload variant and a unit variant
-  contract.from_schema(
-    codec.UnionSchema([
-      codec.VariantSchema("same", Some(codec.StringSchema)),
-      codec.VariantSchema("other", None),
-      codec.VariantSchema("same", None),
+  codec.validate_tree(
+    tree.UnionSchema([
+      tree.VariantSchema("same", Some(tree.StringSchema)),
+      tree.VariantSchema("other", None),
+      tree.VariantSchema("same", None),
     ]),
   )
   |> should.equal(Error(codec.DuplicateTag("same")))
 
   // A union without variants
-  contract.from_schema(codec.UnionSchema([]))
+  codec.validate_tree(tree.UnionSchema([]))
   |> should.equal(Error(codec.EmptyUnion))
 
   // Empty string enum
-  contract.from_schema(codec.StringEnumSchema([]))
+  codec.validate_tree(tree.StringEnumSchema([]))
   |> should.equal(Error(codec.EmptyEnum))
 
   // Duplicate enum labels
-  contract.from_schema(codec.StringEnumSchema(["a", "b", "a"]))
+  codec.validate_tree(tree.StringEnumSchema(["a", "b", "a"]))
   |> should.equal(Error(codec.DuplicateEnumLabel("a")))
 
   // Mistakes nested in lists, pairs, nullables, descriptions, properties and
   // union payloads are found too
-  contract.from_schema(codec.ListSchema(codec.StringEnumSchema([])))
+  codec.validate_tree(tree.ListSchema(tree.StringEnumSchema([])))
   |> should.equal(Error(codec.EmptyEnum))
-  contract.from_schema(codec.PairSchema(
-    codec.StringSchema,
-    codec.IntegerRangeSchema(3, 1),
+  codec.validate_tree(tree.PairSchema(
+    tree.StringSchema,
+    tree.IntegerRangeSchema(3, 1),
   ))
   |> should.equal(Error(codec.ReversedIntegerBounds(3, 1)))
-  contract.from_schema(codec.DescribedSchema(
+  codec.validate_tree(tree.DescribedSchema(
     "d",
-    codec.NullableSchema(codec.UnionSchema([])),
+    tree.NullableSchema(tree.UnionSchema([])),
   ))
   |> should.equal(Error(codec.EmptyUnion))
-  contract.from_schema(
-    codec.ObjectSchema([
-      codec.PropertySchema(
+  codec.validate_tree(
+    tree.ObjectSchema([
+      tree.PropertySchema(
         "inner",
         True,
-        codec.ObjectSchema([
-          codec.PropertySchema("x", True, codec.IntSchema),
-          codec.PropertySchema("x", True, codec.IntSchema),
+        tree.ObjectSchema([
+          tree.PropertySchema("x", True, tree.IntSchema),
+          tree.PropertySchema("x", True, tree.IntSchema),
         ]),
       ),
     ]),
   )
   |> should.equal(Error(codec.DuplicateFieldName("x")))
-  contract.from_schema(
-    codec.UnionSchema([
-      codec.VariantSchema("unit", None),
-      codec.VariantSchema("payload", Some(codec.StringEnumSchema(["a", "a"]))),
+  codec.validate_tree(
+    tree.UnionSchema([
+      tree.VariantSchema("unit", None),
+      tree.VariantSchema("payload", Some(tree.StringEnumSchema(["a", "a"]))),
     ]),
   )
   |> should.equal(Error(codec.DuplicateEnumLabel("a")))
@@ -239,12 +249,12 @@ pub fn contract_normalization_invariants_test() {
 
 pub fn from_codec_matches_from_schema_test() {
   let assert Ok(from_codec) = contract.from_codec(decision_codec())
-  let assert Ok(from_schema) =
-    contract.from_schema(
-      codec.UnionSchema([
-        codec.VariantSchema("defer", None),
-        codec.VariantSchema("decline", Some(decline_schema())),
-        codec.VariantSchema("approve", Some(approve_schema())),
+  let from_schema =
+    tree_contract(
+      tree.UnionSchema([
+        tree.VariantSchema("defer", None),
+        tree.VariantSchema("decline", Some(decline_schema())),
+        tree.VariantSchema("approve", Some(approve_schema())),
       ]),
     )
   contract.same_schema(from_codec, from_schema) |> should.equal(True)
@@ -265,19 +275,19 @@ pub fn from_codec_matches_from_schema_test() {
 
 pub fn validation_located_errors_test() {
   // Root error
-  let assert Ok(str_contract) = contract.from_schema(codec.StringSchema)
+  let str_contract = tree_contract(tree.StringSchema)
   contract.validate(str_contract, int_value(123))
   |> should.equal(Error(contract.ValidationError([], codec.ExpectedString)))
 
   // Nested object field error
-  let assert Ok(obj_contract) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema(
+  let obj_contract =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema(
           "user",
           True,
-          codec.ObjectSchema([
-            codec.PropertySchema("age", True, codec.IntSchema),
+          tree.ObjectSchema([
+            tree.PropertySchema("age", True, tree.IntSchema),
           ]),
         ),
       ]),
@@ -295,8 +305,7 @@ pub fn validation_located_errors_test() {
   )
 
   // Array index error
-  let assert Ok(list_contract) =
-    contract.from_schema(codec.ListSchema(codec.StringSchema))
+  let list_contract = tree_contract(tree.ListSchema(tree.StringSchema))
   contract.validate(
     list_contract,
     value.Array([value.String("ok"), value.Bool(True)]),
@@ -306,10 +315,10 @@ pub fn validation_located_errors_test() {
   )
 
   // Closed object: unexpected extra field
-  let assert Ok(simple_obj_contract) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema("name", True, codec.StringSchema),
+  let simple_obj_contract =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema("name", True, tree.StringSchema),
       ]),
     )
   contract.validate(
@@ -610,10 +619,10 @@ pub fn validation_accepts_what_decoding_accepts_test() {
   contract.validate(nullable, int_value(2)) |> should.be_ok
 
   // Optional properties may be absent
-  let assert Ok(optional) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema("a", False, codec.StringSchema),
+  let optional =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema("a", False, tree.StringSchema),
       ]),
     )
   contract.validate(optional, object([])) |> should.be_ok
@@ -628,8 +637,7 @@ pub fn validation_accepts_what_decoding_accepts_test() {
   contract.validate(range, decimal_value("12.0")) |> should.be_ok
 
   // Number ranges are inclusive and exact
-  let assert Ok(bounds) =
-    contract.from_schema(codec.NumberRangeSchema(int_num(0), int_num(1)))
+  let bounds = tree_contract(tree.NumberRangeSchema(int_num(0), int_num(1)))
   contract.validate(bounds, decimal_value("0")) |> should.be_ok
   contract.validate(bounds, decimal_value("1.0")) |> should.be_ok
   contract.validate(bounds, decimal_value("0.999999999999999999999"))
@@ -664,8 +672,7 @@ pub fn contract_decode_test() {
 
 pub fn decode_ignores_descriptions_and_order_test() {
   // A contract from a schema with other label order and no descriptions
-  let assert Ok(levels) =
-    contract.from_schema(codec.StringEnumSchema(["low", "high"]))
+  let levels = tree_contract(tree.StringEnumSchema(["low", "high"]))
   let assert Ok(validated) = contract.validate(levels, value.String("high"))
   let level =
     codec.string_enum([#("high", High), #("low", Low)])
@@ -673,14 +680,14 @@ pub fn decode_ignores_descriptions_and_order_test() {
   contract.decode(level, validated) |> should.equal(Ok(High))
 
   // A record codec whose fields are declared in another order
-  let assert Ok(person) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema("age", True, codec.IntSchema),
-        codec.PropertySchema(
+  let person =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema("age", True, tree.IntSchema),
+        tree.PropertySchema(
           "name",
           True,
-          codec.DescribedSchema("Full name", codec.StringSchema),
+          tree.DescribedSchema("Full name", tree.StringSchema),
         ),
       ]),
     )
@@ -742,11 +749,11 @@ pub fn decode_contract_mismatch_test() {
 // --- value_codec -------------------------------------------------------------
 
 fn limit_contract() -> contract.Contract {
-  let assert Ok(found) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema("limit", True, codec.IntegerRangeSchema(1, 10)),
-        codec.PropertySchema("note", False, codec.StringSchema),
+  let found =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema("limit", True, tree.IntegerRangeSchema(1, 10)),
+        tree.PropertySchema("note", False, tree.StringSchema),
       ]),
     )
   found
@@ -798,11 +805,12 @@ pub fn value_codec_has_the_contract_schema_test() {
     codec.success(#(id, body))
   }
   codec.schema(envelope)
+  |> result.map(codec.to_tree)
   |> should.equal(
     Ok(
-      codec.ObjectSchema([
-        codec.PropertySchema("id", True, codec.IntSchema),
-        codec.PropertySchema("body", True, contract.schema(remote)),
+      tree.ObjectSchema([
+        tree.PropertySchema("id", True, tree.IntSchema),
+        tree.PropertySchema("body", True, contract_tree(remote)),
       ]),
     ),
   )
@@ -875,15 +883,15 @@ pub fn describe_validation_error_test() {
 }
 
 pub fn describe_validation_error_omits_input_values_test() {
-  let assert Ok(account) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema(
+  let account =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema(
           "level",
           True,
-          codec.StringEnumSchema(["low", "high"]),
+          tree.StringEnumSchema(["low", "high"]),
         ),
-        codec.PropertySchema("limit", False, codec.IntegerRangeSchema(1, 10)),
+        tree.PropertySchema("limit", False, tree.IntegerRangeSchema(1, 10)),
       ]),
     )
   let assert Ok(decision) = contract.from_codec(decision_codec())

@@ -29,8 +29,10 @@ EXPECTED_FAMILIES = {
     "inclusive-bounds": 6,
     "tagged-decision": 6,
     "union-unit-variants": 12,
+    "any-value": 6,
+    "any-field-record": 6,
 }
-TOTAL_EXPECTED_CASES = sum(EXPECTED_FAMILIES.values())  # 73
+TOTAL_EXPECTED_CASES = sum(EXPECTED_FAMILIES.values())  # 85
 
 
 def validate_cases(cases, manifest):

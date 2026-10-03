@@ -42,3 +42,39 @@ pub fn codec_module_example_test() {
   example()
   |> should.equal(Ok("{\"name\":\"Ada\",\"age\":36,\"role\":\"admin\"}"))
 }
+
+// The schema translation example.
+
+import gleam/list
+
+/// Whether a provider that takes strings, integers, booleans, lists and
+/// closed objects of them can take `schema`.
+pub fn supported(schema: codec.Schema) -> Bool {
+  case codec.view(schema) {
+    codec.StringSchema
+    | codec.StringEnumSchema(_)
+    | codec.IntSchema
+    | codec.IntegerRangeSchema(_, _)
+    | codec.BoolSchema -> True
+    codec.ListSchema(items) -> supported(items)
+    codec.ObjectSchema(properties) ->
+      list.all(properties, fn(property) { supported(property.schema) })
+    codec.NumberSchema
+    | codec.NumberRangeSchema(_, _)
+    | codec.PairSchema(_, _)
+    | codec.NullableSchema(_)
+    | codec.UnionSchema(_)
+    | codec.AnySchema -> False
+    // A kind added in a later 2.x release: reject what is not known.
+    codec.OtherSchema(_) -> False
+  }
+}
+
+pub fn codec_module_schema_view_example_test() {
+  let assert Ok(user) = codec.schema(user_codec())
+  supported(user) |> should.be_true
+  let assert Ok(scores) = codec.schema(codec.list(codec.float()))
+  supported(scores) |> should.be_false
+  let assert Ok(anything) = codec.schema(codec.value())
+  supported(anything) |> should.be_false
+}

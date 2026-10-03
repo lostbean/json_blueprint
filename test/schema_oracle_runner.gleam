@@ -7,9 +7,9 @@ import json/blueprint/codec
 import json/blueprint/contract
 import json/blueprint/value
 import schema_oracle_test.{
-  decision_codec, decorative_codec, empty_object_codec, int_value,
-  priority_codec, priority_request_codec, signal_codec, signal_instances,
-  update_record_codec,
+  any_field_codec, any_field_instances, any_value_instances, decision_codec,
+  decorative_codec, empty_object_codec, int_value, priority_codec,
+  priority_request_codec, signal_codec, signal_instances, update_record_codec,
 }
 
 fn emit_cases(
@@ -259,5 +259,19 @@ pub fn main() -> Nil {
     "union-unit-variants",
     signal_codec(),
     list.map(signal_instances(), fn(item) { #(item.0, item.1) }),
+  )
+
+  // 15. any-value (6 cases): `codec.value()`, the schema `{}`
+  emit_cases(
+    "any-value",
+    codec.value(),
+    list.map(any_value_instances(), fn(item) { #(item.0, item.1) }),
+  )
+
+  // 16. any-field-record (6 cases): a closed record with a `{}` field
+  emit_cases(
+    "any-field-record",
+    any_field_codec(),
+    list.map(any_field_instances(), fn(item) { #(item.0, item.1) }),
   )
 }

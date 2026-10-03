@@ -27,9 +27,10 @@ until a release decision.
   `string_enum`, `integer_between`, `number_between`, `describe`, `map`,
   `try_map` and `custom`. `try_map` and `custom` take an explicit
   placeholder value.
-- `codec.value()` passes any JSON through as a `Value`, with no schema. It
-  replaces a `codec.custom` with `encode: Ok`, `decode: Ok`, `schema: None`
-  and `placeholder: value.Null`. `codec.placeholder(codec)` returns the value
+- `codec.value()` passes any JSON through as a `Value`. Its schema is
+  `AnySchema`, rendered as `{}`, so a record with a `value()` field has a
+  schema. It replaces a `codec.custom` with `encode: Ok`, `decode: Ok`,
+  `schema: None` and `placeholder: value.Null`. `codec.placeholder(codec)` returns the value
   a codec describes itself with, so a generic wrapper can pass it to
   `try_map`, `custom` or `decode.failure`.
 - Use a codec with `encode`, `decode`, `encode_json`, `decode_json`,
@@ -78,10 +79,24 @@ until a release decision.
 
 ### Contracts
 
+- `codec.Schema` is opaque, so the schema model can grow after 2.0 without
+  breaking callers. `codec.view(schema)` returns a `SchemaView`, the kind at
+  the root, with `Schema` children; `codec.description(schema)` reads a
+  description, which `view` looks through. `SchemaView` has a fixed set of
+  variants for 2.x, among them `AnySchema` and the fallback
+  `OtherSchema(document)`, through which a kind added in a minor release
+  reaches older callers; a dedicated variant for it waits for a major
+  release. `PropertySchema` and `VariantSchema` are the records of the view
+  and hold `Schema` children. Schemas come from codecs and contracts; take
+  one for `custom` from another codec with `codec.schema`. Rendered schemas
+  are byte-identical to the earlier transparent model's. See
+  [the round 5 guide](docs/migration-round-5.md).
 - `json/blueprint/contract` accepts schemas at runtime: `from_codec`,
   `from_schema`, `load` and `parse` for Draft 2020-12 documents inside the
   codec profile (closed objects, pairs, lists, nullable values, bounded
-  integers and numbers, string enums and tagged unions with unit variants).
+  integers and numbers, string enums, tagged unions with unit variants, and
+  any value as `{}` or `true`). `from_schema` returns a `Contract` without a
+  `Result`, because every `Schema` is already checked.
   `validate` checks a value, with the codec's `Reason` and path vocabulary;
   `decode` decodes a validated value and fails with `ContractMismatch` when
   the codec's schema differs; `value_codec` is a `Codec(Value)` that
@@ -103,7 +118,9 @@ until a release decision.
   `json_blueprint_codegen`, in `codegen/`. Generated modules call
   `json/blueprint/internal/generated`, whose names stay stable within a major
   version, and their `decode_<name>_json_native` returns `json.DecodeError`
-  after a 1 MiB check.
+  after a 1 MiB check. A generated module declares its schema as a `const`
+  of the internal `schema_tree.Tree` and returns it through
+  `generated.schema`; regenerate modules written by an earlier 2.0 build.
 
 ### Docs and gate
 

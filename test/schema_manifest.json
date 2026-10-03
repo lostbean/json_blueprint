@@ -2353,5 +2353,201 @@
         }
       ]
     }
+  },
+  "any-value/valid-null": {
+    "family": "any-value",
+    "accepted": true,
+    "instance": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "any-value/valid-boolean": {
+    "family": "any-value",
+    "accepted": true,
+    "instance": false,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "any-value/valid-number": {
+    "family": "any-value",
+    "accepted": true,
+    "instance": 7,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "any-value/valid-string": {
+    "family": "any-value",
+    "accepted": true,
+    "instance": "text",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "any-value/valid-array": {
+    "family": "any-value",
+    "accepted": true,
+    "instance": [
+      null,
+      1
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "any-value/valid-object": {
+    "family": "any-value",
+    "accepted": true,
+    "instance": {
+      "nested": []
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "any-field-record/valid-object-payload": {
+    "family": "any-field-record",
+    "accepted": true,
+    "instance": {
+      "kind": "result",
+      "payload": {
+        "ok": true
+      }
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {}
+      },
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "any-field-record/valid-array-payload": {
+    "family": "any-field-record",
+    "accepted": true,
+    "instance": {
+      "kind": "list",
+      "payload": [
+        1,
+        "two"
+      ]
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {}
+      },
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "any-field-record/valid-null-payload": {
+    "family": "any-field-record",
+    "accepted": true,
+    "instance": {
+      "kind": "none",
+      "payload": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {}
+      },
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "any-field-record/rejected-missing-payload": {
+    "family": "any-field-record",
+    "accepted": false,
+    "instance": {
+      "kind": "result"
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {}
+      },
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "any-field-record/rejected-extra-member": {
+    "family": "any-field-record",
+    "accepted": false,
+    "instance": {
+      "kind": "result",
+      "payload": 1,
+      "extra": null
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {}
+      },
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "any-field-record/rejected-kind-not-string": {
+    "family": "any-field-record",
+    "accepted": false,
+    "instance": {
+      "kind": 1,
+      "payload": 1
+    },
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {}
+      },
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
   }
 }

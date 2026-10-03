@@ -4,10 +4,12 @@
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{None}
+import gleam/result
 import gleeunit/should
 import json/blueprint/codec.{DecodeError, EncodeError, Field}
 import json/blueprint/contract
 import json/blueprint/internal/dynamic as legacy_dynamic
+import json/blueprint/internal/schema_tree as tree
 import json/blueprint/number
 import json/blueprint/value
 
@@ -45,7 +47,9 @@ pub fn fallible_mapping_preserves_schema_and_errors_test() {
       },
       placeholder: False,
     )
-  codec.schema(mapped) |> should.equal(Ok(codec.StringSchema))
+  codec.schema(mapped)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.StringSchema))
   codec.decode(mapped, value.String("yes")) |> should.equal(Ok(True))
   codec.decode(mapped, value.String("no"))
   |> should.equal(Error(DecodeError([], codec.Custom("unknown flag"))))

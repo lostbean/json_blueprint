@@ -73,8 +73,42 @@
 //// `DecodeError` and `EncodeError` are `{path, reason}` records, rendered
 //// by `describe_decode_error` and `describe_encode_error`: the library owns
 //// the path, and a `Custom` reason renders the caller's message. `Reason`
-//// and `Schema` may gain variants in minor releases; match them with a `_`
-//// branch, and build errors with `decode_failure` and `encode_failure`.
+//// may gain variants in minor releases; match it with a `_` branch, and
+//// build errors with `decode_failure` and `encode_failure`.
+////
+//// `schema` returns an opaque `Schema`. `schema_value` and
+//// `schema_document` render it as JSON Schema; code that translates a
+//// schema, such as a provider adapter, reads it with `view`, which gives
+//// the kind at the root, and `description`. `view` has a fixed set of
+//// variants for 2.x, and a kind added later reaches it as
+//// `OtherSchema(document)`, so a match like this one keeps compiling:
+////
+//// ```gleam
+//// import gleam/list
+////
+//// /// Whether a provider that takes strings, integers, booleans, lists and
+//// /// closed objects of them can take `schema`.
+//// pub fn supported(schema: codec.Schema) -> Bool {
+////   case codec.view(schema) {
+////     codec.StringSchema
+////     | codec.StringEnumSchema(_)
+////     | codec.IntSchema
+////     | codec.IntegerRangeSchema(_, _)
+////     | codec.BoolSchema -> True
+////     codec.ListSchema(items) -> supported(items)
+////     codec.ObjectSchema(properties) ->
+////       list.all(properties, fn(property) { supported(property.schema) })
+////     codec.NumberSchema
+////     | codec.NumberRangeSchema(_, _)
+////     | codec.PairSchema(_, _)
+////     | codec.NullableSchema(_)
+////     | codec.UnionSchema(_)
+////     | codec.AnySchema -> False
+////     // A kind added in a later 2.x release: reject what is not known.
+////     codec.OtherSchema(_) -> False
+////   }
+//// }
+//// ```
 
 import gleam/dynamic/decode
 import gleam/int
@@ -85,40 +119,147 @@ import gleam/order
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import json/blueprint/internal/schema_tree.{type Tree} as tree
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
 // --- schema ------------------------------------------------------------------
 
 /// The JSON Schema of a codec, within the finite Draft 2020-12 profile that
-/// codecs describe. Render it with `schema_document`.
+/// codecs describe. Get one with `schema`, render it with `schema_value` or
+/// `schema_document`, and read its structure with `view` and `description`.
 ///
-/// May gain variants in a minor release; match with a `_` branch.
-/// Generated modules build it in constants, so it is not opaque.
-pub type Schema {
-  DescribedSchema(description: String, inner: Schema)
-  StringSchema
-  StringEnumSchema(labels: List(String))
-  IntSchema
-  NumberSchema
-  BoolSchema
-  PairSchema(left: Schema, right: Schema)
-  ListSchema(items: Schema)
-  NullableSchema(inner: Schema)
-  ObjectSchema(properties: List(PropertySchema))
-  UnionSchema(variants: List(VariantSchema))
-  IntegerRangeSchema(minimum: Int, maximum: Int)
-  NumberRangeSchema(minimum: Number, maximum: Number)
+/// It is opaque so that the schema model can grow without breaking callers;
+/// see `SchemaView` for the evolution policy. Two schemas are `==` when they
+/// have the same structure and descriptions; `contract.same_schema` ignores
+/// descriptions and member order.
+pub opaque type Schema {
+  Schema(tree: Tree)
 }
 
-/// One property of an `ObjectSchema`.
+/// The kind of a schema at its root, for code that translates schemas, such
+/// as a tool server normalising an input schema or an LLM client converting
+/// one for a provider. Children are `Schema` values: call `view` on them to
+/// walk the tree.
+///
+/// Evolution policy: these variants are fixed for every 2.x release. A schema
+/// kind added in a minor release reaches `view` as `OtherSchema(document)`,
+/// where `document` is that kind's JSON Schema object, as `schema_value`
+/// renders it. A consumer written against 2.0 therefore keeps compiling and
+/// decides in its `OtherSchema` branch whether to forward the document or
+/// reject the schema. A dedicated variant for a new kind is a breaking change
+/// and arrives only in a major release; until then a minor release may add a
+/// function that reads it. No 2.0 schema produces `OtherSchema`.
+///
+/// Descriptions are annotations, not kinds: `view` looks through them and
+/// `description` reads them, so a described string is still a
+/// `StringSchema`.
+pub type SchemaView {
+  /// `string()`: `{"type": "string"}`.
+  StringSchema
+  /// `string_enum`: `{"type": "string", "enum": labels}`.
+  StringEnumSchema(labels: List(String))
+  /// `int()`: `{"type": "integer"}`.
+  IntSchema
+  /// `integer_between`: an integer with inclusive bounds.
+  IntegerRangeSchema(minimum: Int, maximum: Int)
+  /// `float()` and `number()`: `{"type": "number"}`.
+  NumberSchema
+  /// `number_between`: a number with inclusive bounds.
+  NumberRangeSchema(minimum: Number, maximum: Number)
+  /// `bool()`: `{"type": "boolean"}`.
+  BoolSchema
+  /// `pair`: an array of exactly two items.
+  PairSchema(left: Schema, right: Schema)
+  /// `list`: an array whose items all match `items`.
+  ListSchema(items: Schema)
+  /// `nullable`: `null` or `inner`.
+  NullableSchema(inner: Schema)
+  /// A record: a closed object.
+  ObjectSchema(properties: List(PropertySchema))
+  /// `union`: a closed `{"tag": ..., "value": ...}` object, one variant per
+  /// tag.
+  UnionSchema(variants: List(VariantSchema))
+  /// `value()`: any JSON value, `{}` in a document.
+  AnySchema
+  /// A kind added after 2.0, as its JSON Schema object. See the evolution
+  /// policy above.
+  OtherSchema(document: Value)
+}
+
+/// One property of an `ObjectSchema`. May gain fields in a minor release;
+/// read them by label.
 pub type PropertySchema {
   PropertySchema(name: String, required: Bool, schema: Schema)
 }
 
-/// One variant of a `UnionSchema`. A unit variant has no payload.
+/// One variant of a `UnionSchema`. A unit variant has no payload. May gain
+/// fields in a minor release; read them by label.
 pub type VariantSchema {
   VariantSchema(tag: String, payload: Option(Schema))
+}
+
+/// The kind of `schema` at its root, after any description. Children are
+/// `Schema` values; `view` them in turn. The module doc has an example.
+pub fn view(schema: Schema) -> SchemaView {
+  view_tree(schema.tree)
+}
+
+fn view_tree(node: Tree) -> SchemaView {
+  case node {
+    tree.DescribedSchema(_, inner) -> view_tree(inner)
+    tree.StringSchema -> StringSchema
+    tree.StringEnumSchema(labels) -> StringEnumSchema(labels)
+    tree.IntSchema -> IntSchema
+    tree.IntegerRangeSchema(minimum, maximum) ->
+      IntegerRangeSchema(minimum, maximum)
+    tree.NumberSchema -> NumberSchema
+    tree.NumberRangeSchema(minimum, maximum) ->
+      NumberRangeSchema(minimum, maximum)
+    tree.BoolSchema -> BoolSchema
+    tree.PairSchema(left, right) -> PairSchema(Schema(left), Schema(right))
+    tree.ListSchema(items) -> ListSchema(Schema(items))
+    tree.NullableSchema(inner) -> NullableSchema(Schema(inner))
+    tree.ObjectSchema(properties) ->
+      ObjectSchema(
+        list.map(properties, fn(property) {
+          PropertySchema(
+            name: property.name,
+            required: property.required,
+            schema: Schema(property.schema),
+          )
+        }),
+      )
+    tree.UnionSchema(variants) ->
+      UnionSchema(
+        list.map(variants, fn(variant) {
+          VariantSchema(
+            tag: variant.tag,
+            payload: option.map(variant.payload, Schema),
+          )
+        }),
+      )
+    tree.AnySchema -> AnySchema
+  }
+}
+
+/// The description that `describe` gave `schema`, if any. The schema of a
+/// field, an item or a payload has its own description.
+pub fn description(schema: Schema) -> Option(String) {
+  case schema.tree {
+    tree.DescribedSchema(description, _) -> Some(description)
+    _ -> None
+  }
+}
+
+@internal
+pub fn from_tree(node: Tree) -> Schema {
+  Schema(node)
+}
+
+@internal
+pub fn to_tree(schema: Schema) -> Tree {
+  schema.tree
 }
 
 /// A codec built by `custom` without a schema has none to describe.
@@ -224,7 +365,7 @@ pub opaque type Codec(a) {
     decode: fn(Value) -> Result(a, DecodeError),
     // The schema, `None` when unknown, or the first definition mistake.
     // Computed on demand, so record codecs built inside a decode stay cheap.
-    definition: fn() -> Result(Option(Schema), DefinitionError),
+    definition: fn() -> Result(Option(Tree), DefinitionError),
     // A value of `a` for describing records and for failed `decoder` runs.
     placeholder: fn() -> a,
     fields: Option(Fields(a)),
@@ -244,11 +385,11 @@ type Fields(a) {
 }
 
 type Property {
-  Property(name: String, required: Bool, schema: Option(Schema))
+  Property(name: String, required: Bool, schema: Option(Tree))
 }
 
 /// The schema, after panicking on a definition mistake.
-fn defined(codec: Codec(a)) -> Option(Schema) {
+fn defined(codec: Codec(a)) -> Option(Tree) {
   case codec.definition() {
     Ok(schema) -> schema
     Error(error) -> definition_panic(error)
@@ -404,7 +545,7 @@ pub fn placeholder(codec: Codec(a)) -> a {
 /// The codec's schema.
 pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
   case defined(codec) {
-    Some(found) -> Ok(found)
+    Some(found) -> Ok(Schema(found))
     None -> Error(UnknownSchema)
   }
 }
@@ -420,7 +561,7 @@ pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
 fn leaf(
   encode: fn(a) -> Result(Value, EncodeError),
   decode: fn(Value) -> Result(a, DecodeError),
-  schema: Schema,
+  schema: Tree,
   placeholder: a,
 ) -> Codec(a) {
   Codec(encode, decode, fn() { Ok(Some(schema)) }, fn() { placeholder }, None)
@@ -444,7 +585,7 @@ pub fn string() -> Codec(String) {
         _ -> fail(ExpectedString)
       }
     },
-    StringSchema,
+    tree.StringSchema,
     "",
   )
 }
@@ -456,7 +597,7 @@ pub fn string() -> Codec(String) {
 /// JavaScript an integer outside ±9,007,199,254,740,991 fails with
 /// `ExpectedInt`; use `number()` for larger values.
 pub fn int() -> Codec(Int) {
-  leaf(encode_int, decode_int, IntSchema, 0)
+  leaf(encode_int, decode_int, tree.IntSchema, 0)
 }
 
 fn encode_int(item: Int) -> Result(Value, EncodeError) {
@@ -501,7 +642,7 @@ pub fn float() -> Codec(Float) {
         _ -> fail(ExpectedNumber)
       }
     },
-    NumberSchema,
+    tree.NumberSchema,
     0.0,
   )
 }
@@ -516,7 +657,7 @@ pub fn number() -> Codec(Number) {
         _ -> fail(ExpectedNumber)
       }
     },
-    NumberSchema,
+    tree.NumberSchema,
     zero(),
   )
 }
@@ -536,7 +677,7 @@ pub fn bool() -> Codec(Bool) {
         _ -> fail(ExpectedBool)
       }
     },
-    BoolSchema,
+    tree.BoolSchema,
     False,
   )
 }
@@ -546,17 +687,12 @@ pub fn bool() -> Codec(Bool) {
 /// remote peer. Decoding accepts every value and encoding returns it; the
 /// parse limits of `decode_json` still bound it.
 ///
-/// It has no schema, so `schema` returns `UnknownSchema` for it and for any
-/// codec built from it. When a schema for the value is known, use
-/// `contract.value_codec`, which also validates it while decoding.
+/// Its schema is `AnySchema`, which renders as `{}`, the JSON Schema that
+/// accepts every value; a record with a `value()` field describes that field
+/// as `{}`. When a narrower schema for the value is known, use
+/// `contract.value_codec`, which also validates the value while decoding.
 pub fn value() -> Codec(Value) {
-  Codec(
-    encode: Ok,
-    decode: Ok,
-    definition: fn() { Ok(None) },
-    placeholder: fn() { value.Null },
-    fields: None,
-  )
+  leaf(Ok, Ok, tree.AnySchema, value.Null)
 }
 
 // --- refinements -------------------------------------------------------------
@@ -604,7 +740,7 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
     definition: fn() {
       case defect {
         Some(error) -> Error(error)
-        None -> Ok(Some(IntegerRangeSchema(minimum, maximum)))
+        None -> Ok(Some(tree.IntegerRangeSchema(minimum, maximum)))
       }
     },
     placeholder: fn() { minimum },
@@ -650,7 +786,7 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
     definition: fn() {
       case defect {
         Some(error) -> Error(error)
-        None -> Ok(Some(NumberRangeSchema(minimum, maximum)))
+        None -> Ok(Some(tree.NumberRangeSchema(minimum, maximum)))
       }
     },
     placeholder: fn() { minimum },
@@ -690,7 +826,7 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
     definition: fn() {
       case defect {
         Some(error) -> Error(error)
-        None -> Ok(Some(StringEnumSchema(labels)))
+        None -> Ok(Some(tree.StringEnumSchema(labels)))
       }
     },
     placeholder: fn() {
@@ -731,8 +867,9 @@ pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
       use found <- result.map(codec.definition())
       option.map(found, fn(found) {
         case found {
-          DescribedSchema(_, inner) -> DescribedSchema(description, inner)
-          other -> DescribedSchema(description, other)
+          tree.DescribedSchema(_, inner) ->
+            tree.DescribedSchema(description, inner)
+          other -> tree.DescribedSchema(description, other)
         }
       })
     },
@@ -758,7 +895,7 @@ pub fn list(of item: Codec(a)) -> Codec(List(a)) {
         _ -> fail(ExpectedArray)
       }
     },
-    definition: fn() { item.definition() |> map_schema(ListSchema) },
+    definition: fn() { item.definition() |> map_schema(tree.ListSchema) },
     placeholder: fn() { [] },
     fields: None,
   )
@@ -803,7 +940,7 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
       use first <- result.try(left.definition())
       use second <- result.map(right.definition())
       case first, second {
-        Some(first), Some(second) -> Some(PairSchema(first, second))
+        Some(first), Some(second) -> Some(tree.PairSchema(first, second))
         _, _ -> None
       }
     },
@@ -833,16 +970,16 @@ pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
         _ -> inner.decode(raw) |> result.map(Some)
       }
     },
-    definition: fn() { inner.definition() |> map_schema(NullableSchema) },
+    definition: fn() { inner.definition() |> map_schema(tree.NullableSchema) },
     placeholder: fn() { None },
     fields: None,
   )
 }
 
 fn map_schema(
-  found: Result(Option(Schema), DefinitionError),
-  wrap: fn(Schema) -> Schema,
-) -> Result(Option(Schema), DefinitionError) {
+  found: Result(Option(Tree), DefinitionError),
+  wrap: fn(Tree) -> Tree,
+) -> Result(Option(Tree), DefinitionError) {
   result.map(found, option.map(_, wrap))
 }
 
@@ -983,7 +1120,7 @@ pub fn success(value: r) -> Codec(r) {
 fn property(
   name: String,
   required: Bool,
-  found: Option(Schema),
+  found: Option(Tree),
   next_codec: Codec(r),
 ) -> Result(List(Property), DefinitionError) {
   case next_codec.fields {
@@ -1047,11 +1184,11 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
       |> list.try_map(fn(property) {
         case property.schema {
           Some(found) ->
-            Ok(PropertySchema(property.name, property.required, found))
+            Ok(tree.PropertySchema(property.name, property.required, found))
           None -> Error(Nil)
         }
       })
-      |> result.map(ObjectSchema)
+      |> result.map(tree.ObjectSchema)
       |> option.from_result
     },
     placeholder:,
@@ -1091,7 +1228,7 @@ type Variant(t) {
     tag: String,
     has_payload: Bool,
     decode: fn(Value) -> Result(t, DecodeError),
-    definition: fn() -> Result(Option(Schema), DefinitionError),
+    definition: fn() -> Result(Option(Tree), DefinitionError),
     placeholder: fn() -> t,
   )
 }
@@ -1218,17 +1355,20 @@ fn add_variant(rest: Union(t), this: Variant(t)) -> Union(t) {
 
 fn union_schema(
   variants: List(Variant(t)),
-  done: List(VariantSchema),
-) -> Result(Option(Schema), DefinitionError) {
+  done: List(tree.VariantSchema),
+) -> Result(Option(Tree), DefinitionError) {
   case variants {
-    [] -> Ok(Some(UnionSchema(list.reverse(done))))
+    [] -> Ok(Some(tree.UnionSchema(list.reverse(done))))
     [variant, ..rest] -> {
       use found <- result.try(variant.definition())
       case variant.has_payload, found {
         False, _ ->
-          union_schema(rest, [VariantSchema(variant.tag, None), ..done])
+          union_schema(rest, [tree.VariantSchema(variant.tag, None), ..done])
         True, Some(payload) ->
-          union_schema(rest, [VariantSchema(variant.tag, Some(payload)), ..done])
+          union_schema(rest, [
+            tree.VariantSchema(variant.tag, Some(payload)),
+            ..done
+          ])
         // A payload without a schema leaves the union without one, but
         // later variants may still hold a definition mistake.
         True, None -> union_schema(rest, done) |> result.replace(None)
@@ -1333,9 +1473,12 @@ pub fn try_map(
 
 /// A codec from your own functions over `Value`. `schema` is its schema, or
 /// `None` when it has none, in which case `schema` returns `UnknownSchema`
-/// and so does every codec built from this one. Build errors with
-/// `decode_failure` and `encode_failure`, or return those of other codecs.
-/// `placeholder` is any value of `a`.
+/// and so does every codec built from this one. Take the schema from the
+/// codec whose JSON yours matches, such as
+/// `option.from_result(codec.schema(codec.string()))`, or from a contract
+/// with `contract.schema`. Build errors with `decode_failure` and
+/// `encode_failure`, or return those of other codecs. `placeholder` is any
+/// value of `a`.
 pub fn custom(
   encode encode: fn(a) -> Result(Value, EncodeError),
   decode decode: fn(Value) -> Result(a, DecodeError),
@@ -1348,7 +1491,8 @@ pub fn custom(
     definition: fn() {
       case schema {
         None -> Ok(None)
-        Some(found) -> validate_schema(found) |> result.replace(schema)
+        Some(found) ->
+          validate_tree(found.tree) |> result.replace(Some(found.tree))
       }
     },
     placeholder: fn() { placeholder },
@@ -1356,49 +1500,57 @@ pub fn custom(
   )
 }
 
-fn validate_schema(schema: Schema) -> Result(Nil, DefinitionError) {
+/// The first definition mistake in a schema tree. Every `Schema` that this
+/// package hands out passes; `contract.load` checks parsed documents with it.
+@internal
+pub fn validate_tree(schema: Tree) -> Result(Nil, DefinitionError) {
   case schema {
-    DescribedSchema(_, inner) | ListSchema(inner) | NullableSchema(inner) ->
-      validate_schema(inner)
-    StringSchema | IntSchema | NumberSchema | BoolSchema -> Ok(Nil)
-    StringEnumSchema([]) -> Error(EmptyEnum)
-    StringEnumSchema(labels) ->
+    tree.DescribedSchema(_, inner)
+    | tree.ListSchema(inner)
+    | tree.NullableSchema(inner) -> validate_tree(inner)
+    tree.StringSchema
+    | tree.IntSchema
+    | tree.NumberSchema
+    | tree.BoolSchema
+    | tree.AnySchema -> Ok(Nil)
+    tree.StringEnumSchema([]) -> Error(EmptyEnum)
+    tree.StringEnumSchema(labels) ->
       case first_repeated(labels, set.new()) {
         Some(label) -> Error(DuplicateEnumLabel(label))
         None -> Ok(Nil)
       }
-    PairSchema(left, right) -> {
-      use Nil <- result.try(validate_schema(left))
-      validate_schema(right)
+    tree.PairSchema(left, right) -> {
+      use Nil <- result.try(validate_tree(left))
+      validate_tree(right)
     }
-    ObjectSchema(properties) -> {
+    tree.ObjectSchema(properties) -> {
       let names = list.map(properties, fn(property) { property.name })
       case first_repeated(names, set.new()) {
         Some(name) -> Error(DuplicateFieldName(name))
         None ->
           list.try_each(properties, fn(property) {
-            validate_schema(property.schema)
+            validate_tree(property.schema)
           })
       }
     }
-    UnionSchema([]) -> Error(EmptyUnion)
-    UnionSchema(variants) -> {
+    tree.UnionSchema([]) -> Error(EmptyUnion)
+    tree.UnionSchema(variants) -> {
       let tags = list.map(variants, fn(variant) { variant.tag })
       case first_repeated(tags, set.new()) {
         Some(tag) -> Error(DuplicateTag(tag))
         None ->
           list.try_each(variants, fn(variant) {
             case variant.payload {
-              Some(payload) -> validate_schema(payload)
+              Some(payload) -> validate_tree(payload)
               None -> Ok(Nil)
             }
           })
       }
     }
-    IntegerRangeSchema(minimum, maximum) if minimum > maximum ->
+    tree.IntegerRangeSchema(minimum, maximum) if minimum > maximum ->
       Error(ReversedIntegerBounds(minimum, maximum))
-    IntegerRangeSchema(_, _) -> Ok(Nil)
-    NumberRangeSchema(minimum, maximum) ->
+    tree.IntegerRangeSchema(_, _) -> Ok(Nil)
+    tree.NumberRangeSchema(minimum, maximum) ->
       case number.compare(minimum, maximum) {
         order.Gt -> Error(ReversedNumberBounds(minimum, maximum))
         _ -> Ok(Nil)
@@ -1544,36 +1696,41 @@ pub fn is_limit_exceeded(error: DecodeError) -> Bool {
 
 // --- schema documents --------------------------------------------------------
 
-/// The schema as a JSON Schema object, without `$schema`.
+/// The schema as a JSON Schema object, without `$schema`. `AnySchema` is
+/// `{}`.
 pub fn schema_value(schema: Schema) -> Value {
+  tree_value(schema.tree)
+}
+
+fn tree_value(schema: Tree) -> Value {
   case schema {
-    DescribedSchema(description, DescribedSchema(_, inner)) ->
-      schema_value(DescribedSchema(description, inner))
-    DescribedSchema(description, inner) -> {
-      let assert value.Object(members) = schema_value(inner)
+    tree.DescribedSchema(description, tree.DescribedSchema(_, inner)) ->
+      tree_value(tree.DescribedSchema(description, inner))
+    tree.DescribedSchema(description, inner) -> {
+      let assert value.Object(members) = tree_value(inner)
       value.Object([#("description", value.String(description)), ..members])
     }
-    StringSchema -> typed("string", [])
-    StringEnumSchema(labels) ->
+    tree.StringSchema -> typed("string", [])
+    tree.StringEnumSchema(labels) ->
       typed("string", [#("enum", value.Array(list.map(labels, value.String)))])
-    IntSchema -> typed("integer", [])
-    NumberSchema -> typed("number", [])
-    BoolSchema -> typed("boolean", [])
-    PairSchema(left, right) ->
+    tree.IntSchema -> typed("integer", [])
+    tree.NumberSchema -> typed("number", [])
+    tree.BoolSchema -> typed("boolean", [])
+    tree.PairSchema(left, right) ->
       typed("array", [
-        #("prefixItems", value.Array([schema_value(left), schema_value(right)])),
+        #("prefixItems", value.Array([tree_value(left), tree_value(right)])),
         #("minItems", integer(2)),
         #("maxItems", integer(2)),
       ])
-    ListSchema(items) -> typed("array", [#("items", schema_value(items))])
-    NullableSchema(inner) ->
+    tree.ListSchema(items) -> typed("array", [#("items", tree_value(items))])
+    tree.NullableSchema(inner) ->
       value.Object([
-        #("anyOf", value.Array([typed("null", []), schema_value(inner)])),
+        #("anyOf", value.Array([typed("null", []), tree_value(inner)])),
       ])
-    ObjectSchema(properties) ->
+    tree.ObjectSchema(properties) ->
       closed_object(
         list.map(properties, fn(property) {
-          #(property.name, schema_value(property.schema))
+          #(property.name, tree_value(property.schema))
         }),
         list.filter_map(properties, fn(property) {
           case property.required {
@@ -1582,20 +1739,21 @@ pub fn schema_value(schema: Schema) -> Value {
           }
         }),
       )
-    UnionSchema(variants) ->
+    tree.UnionSchema(variants) ->
       typed("object", [
         #("oneOf", value.Array(list.map(variants, variant_schema_value))),
       ])
-    IntegerRangeSchema(minimum, maximum) ->
+    tree.IntegerRangeSchema(minimum, maximum) ->
       typed("integer", [
         #("minimum", integer(minimum)),
         #("maximum", integer(maximum)),
       ])
-    NumberRangeSchema(minimum, maximum) ->
+    tree.NumberRangeSchema(minimum, maximum) ->
       typed("number", [
         #("minimum", value.Number(minimum)),
         #("maximum", value.Number(maximum)),
       ])
+    tree.AnySchema -> value.Object([])
   }
 }
 
@@ -1628,11 +1786,11 @@ fn closed_object(
   ])
 }
 
-fn variant_schema_value(variant: VariantSchema) -> Value {
+fn variant_schema_value(variant: tree.VariantSchema) -> Value {
   let tag = #("tag", value.Object([#("const", value.String(variant.tag))]))
   case variant.payload {
     None -> closed_object([tag], ["tag"])
     Some(payload) ->
-      closed_object([tag, #("value", schema_value(payload))], ["tag", "value"])
+      closed_object([tag, #("value", tree_value(payload))], ["tag", "value"])
   }
 }

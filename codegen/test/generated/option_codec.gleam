@@ -5,16 +5,17 @@ import gleam/json
 import gleam/option
 import json/blueprint/codec
 import json/blueprint/internal/generated
+import json/blueprint/internal/schema_tree
 import json/blueprint/value
 
-pub const generated_fingerprint: String = "FB9C51E0B736BF44805D98C7FA114B1E572764C2"
+pub const generated_fingerprint: String = "EFCBAE4911113C0C3F1E3A6D22C07F4C294F5D63"
 
-const option_schema_value: codec.Schema = codec.ObjectSchema(
+const option_schema_value: schema_tree.Tree = schema_tree.ObjectSchema(
   [
-    codec.PropertySchema(
+    schema_tree.PropertySchema(
       "note",
       False,
-      codec.NullableSchema(codec.StringSchema),
+      schema_tree.NullableSchema(schema_tree.StringSchema),
     ),
   ],
 )
@@ -185,7 +186,7 @@ pub fn decode_option_json_native(
 }
 
 pub fn option_schema() -> codec.Schema {
-  option_schema_value
+  generated.schema(option_schema_value)
 }
 
 pub fn option_codec() -> codec.Codec(option.Option(option.Option(String))) {

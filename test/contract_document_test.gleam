@@ -7,8 +7,14 @@ import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{type Codec, Field, Index}
 import json/blueprint/contract
+import json/blueprint/internal/schema_tree as tree
 import json/blueprint/number
 import json/blueprint/value.{type Value}
+
+fn schema_of(c: Codec(a)) -> codec.Schema {
+  let assert Ok(schema) = codec.schema(c)
+  schema
+}
 
 const draft_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 
@@ -79,12 +85,82 @@ pub fn document_dialect_validation_test() {
     Error(contract.MalformedDocument([], contract.ExpectedObject)),
   )
 
-  // Missing type
-  contract.load(doc(""))
+  // Missing type: a constraint without a type. `{}` alone is the any
+  // schema; see `document_any_schema_test`.
+  contract.load(doc("\"minimum\":1"))
   |> should.equal(
     Error(contract.MalformedDocument(
       [Field("type")],
       contract.MissingKeyword("type"),
+    )),
+  )
+}
+
+pub fn document_any_schema_test() {
+  let any = schema_of(codec.value())
+  // `{}`, `{"description": ...}` and the boolean schema `true` accept any
+  // value, like `codec.value()`.
+  let assert Ok(bare) = contract.load(doc(""))
+  codec.view(contract.schema(bare)) |> should.equal(codec.AnySchema)
+  contract.same_schema(bare, contract.from_schema(any)) |> should.equal(True)
+  let assert Ok(described) = contract.load(doc("\"description\":\"anything\""))
+  codec.description(contract.schema(described))
+  |> should.equal(Some("anything"))
+  contract.same_schema(described, bare) |> should.equal(True)
+  let assert Ok(items) = contract.load(doc("\"type\":\"array\",\"items\":true"))
+  let assert Ok(list_of_values) = contract.from_codec(codec.list(codec.value()))
+  contract.same_schema(items, list_of_values) |> should.equal(True)
+  // A loaded `true` renders as `{}`, as codecs write it.
+  codec.schema_value(contract.schema(items))
+  |> value.to_string
+  |> should.equal("{\"type\":\"array\",\"items\":{}}")
+
+  // Every value validates, and a field of any schema decodes with `value()`.
+  list.each(
+    [
+      value.Null,
+      value.Bool(True),
+      int_value(1),
+      value.String("x"),
+      value.Array([value.Null]),
+      value.Object([#("a", value.Null)]),
+    ],
+    fn(item) {
+      let assert Ok(validated) = contract.validate(bare, item)
+      contract.decode(codec.value(), validated) |> should.equal(Ok(item))
+    },
+  )
+  let assert Ok(envelope) =
+    contract.load(doc(
+      "\"type\":\"object\",\"properties\":{\"body\":{}},"
+      <> "\"required\":[\"body\"],\"additionalProperties\":false",
+    ))
+  let body = {
+    use body <- codec.field("body", codec.value(), get: fn(b) { b })
+    codec.success(body)
+  }
+  let raw = value.Object([#("body", value.Array([int_value(2)]))])
+  let assert Ok(validated) = contract.validate(envelope, raw)
+  contract.decode(body, validated)
+  |> should.equal(Ok(value.Array([int_value(2)])))
+  contract.validate(envelope, value.Object([]))
+  |> should.equal(
+    Error(contract.ValidationError([Field("body")], codec.MissingField)),
+  )
+
+  // `false` stays outside the profile.
+  contract.load(doc("\"type\":\"array\",\"items\":false"))
+  |> should.equal(
+    Error(contract.MalformedDocument([Field("items")], contract.ExpectedObject)),
+  )
+  // A nested `$schema` is still refused inside an otherwise empty schema.
+  contract.load(doc(
+    "\"type\":\"array\",\"items\":{\"$schema\":\"" <> draft_2020_12 <> "\"}",
+  ))
+  |> should.equal(
+    Error(contract.UnsupportedDocument(
+      [Field("items"), Field("$schema")],
+      contract.NestedDialect,
     )),
   )
 }
@@ -332,18 +408,18 @@ fn assert_round_trip(c: Codec(a)) -> Nil {
 
 pub fn document_load_roundtrips_test() {
   // String
-  let str_doc = codec.schema_document(codec.StringSchema)
+  let assert Ok(str_schema) = codec.schema(codec.string())
+  let str_doc = codec.schema_document(str_schema)
   let assert Ok(str_contract) = contract.load(str_doc)
-  let assert Ok(expected_str_contract) =
-    contract.from_schema(codec.StringSchema)
+  let expected_str_contract = contract.from_schema(str_schema)
   contract.same_schema(str_contract, expected_str_contract)
   |> should.equal(True)
 
   // Integer range
-  let int_range_doc = codec.schema_document(codec.IntegerRangeSchema(-10, 10))
+  let assert Ok(range_schema) = codec.schema(codec.integer_between(-10, 10))
+  let int_range_doc = codec.schema_document(range_schema)
   let assert Ok(int_range_contract) = contract.load(int_range_doc)
-  let assert Ok(expected_range_contract) =
-    contract.from_schema(codec.IntegerRangeSchema(-10, 10))
+  let expected_range_contract = contract.from_schema(range_schema)
   contract.same_schema(int_range_contract, expected_range_contract)
   |> should.equal(True)
 
@@ -377,12 +453,12 @@ pub fn document_load_unit_variants_test() {
       <> unit_variant("off")
       <> "]",
     ))
-  contract.schema(loaded)
+  codec.to_tree(contract.schema(loaded))
   |> should.equal(
-    codec.UnionSchema([
-      codec.VariantSchema("level", Some(codec.IntegerRangeSchema(0, 9))),
-      codec.VariantSchema("off", None),
-      codec.VariantSchema("on", None),
+    tree.UnionSchema([
+      tree.VariantSchema("level", Some(tree.IntegerRangeSchema(0, 9))),
+      tree.VariantSchema("off", None),
+      tree.VariantSchema("on", None),
     ]),
   )
 
@@ -578,7 +654,8 @@ pub fn parse_schema_text_test() {
     "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\","
     <> "\"type\":\"array\",\"items\":{\"type\":\"string\"}}"
   let assert Ok(remote) = contract.parse(text, value.default_limits())
-  contract.schema(remote) |> should.equal(codec.ListSchema(codec.StringSchema))
+  codec.view(contract.schema(remote))
+  |> should.equal(codec.ListSchema(schema_of(codec.string())))
   let assert Ok(parsed) = value.parse("[\"a\"]", value.default_limits())
   let assert Ok(validated) = contract.validate(remote, parsed)
   contract.decode(codec.list(codec.string()), validated)

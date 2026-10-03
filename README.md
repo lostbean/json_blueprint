@@ -307,14 +307,52 @@ pub fn check_arguments(
 `contract.value_codec(contract)` is a `Codec(Value)` with the contract's
 schema that validates while decoding, and `contract.decode` decodes a
 validated value with a codec whose schema matches. `codec.value()` passes
-any JSON through as a `Value` without a schema, for a value the application
-forwards as it came, such as a tool result from a remote peer; `schema`
-returns `UnknownSchema` for it and for every codec built from it.
+any JSON through as a `Value`, for a value the application forwards as it
+came, such as a tool result from a remote peer; its schema is `{}`, which
+accepts every value.
 
 The profile covers closed objects with required and optional properties,
-pairs, lists, nullable values, bounded integers and numbers, string enums and
-tagged unions. Recursive references (`$ref`), untagged unions and string
-patterns are outside it.
+pairs, lists, nullable values, bounded integers and numbers, string enums,
+tagged unions and any value (`{}`, or `true` in a loaded document).
+Recursive references (`$ref`), untagged unions and string patterns are
+outside it.
+
+## Reading a schema
+
+`codec.schema` returns an opaque `Schema`. `schema_value` and
+`schema_document` render it; code that translates schemas, such as a tool
+server or an LLM provider adapter, reads it with `codec.view`, which gives
+the kind at the root, and `codec.description`:
+
+```gleam
+/// Whether a tool's input schema has an object root, as MCP requires.
+pub fn object_root(input: Codec(a)) -> Bool {
+  case codec.schema(input) {
+    Error(codec.UnknownSchema) -> False
+    Ok(schema) ->
+      case codec.view(schema) {
+        codec.ObjectSchema(_) | codec.UnionSchema(_) -> True
+        _ -> False
+      }
+  }
+}
+```
+
+The children of a view, such as `ListSchema(items)` or a property's
+`schema`, are `Schema` values to `view` in turn. A description is not a
+kind: `view` looks through it and `description` reads it.
+
+**Evolution policy.** The variants of `SchemaView` are fixed for every 2.x
+release: `StringSchema`, `StringEnumSchema`, `IntSchema`,
+`IntegerRangeSchema`, `NumberSchema`, `NumberRangeSchema`, `BoolSchema`,
+`PairSchema`, `ListSchema`, `NullableSchema`, `ObjectSchema`, `UnionSchema`,
+`AnySchema` and `OtherSchema`. A schema kind added in a minor release reaches
+`view` as `OtherSchema(document)`, with the kind's JSON Schema object, so
+code written against 2.0 keeps compiling and decides in that branch whether
+to forward the document or refuse the schema; a minor release may add a
+function that reads the new kind. A dedicated variant for it is a breaking
+change and waits for a major release. `PropertySchema` and `VariantSchema`
+may gain fields; read them by label.
 
 ## Modules
 

@@ -129,6 +129,71 @@ pub fn empty_object_codec() -> codec.Codec(Nil) {
   codec.success(Nil)
 }
 
+/// A record with a pass-through field, whose schema is `{}`.
+pub fn any_field_codec() -> codec.Codec(#(String, value.Value)) {
+  use kind <- codec.field("kind", codec.string(), get: fn(e) { e.0 })
+  use payload <- codec.field("payload", codec.value(), get: fn(e) { e.1 })
+  codec.success(#(kind, payload))
+}
+
+/// The `any-value` family: name, instance, accepted.
+pub fn any_value_instances() -> List(#(String, value.Value, Bool)) {
+  [
+    #("valid-null", value.Null, True),
+    #("valid-boolean", value.Bool(False), True),
+    #("valid-number", int_value(7), True),
+    #("valid-string", value.String("text"), True),
+    #("valid-array", value.Array([value.Null, int_value(1)]), True),
+    #("valid-object", value.Object([#("nested", value.Array([]))]), True),
+  ]
+}
+
+/// The `any-field-record` family: name, instance, accepted.
+pub fn any_field_instances() -> List(#(String, value.Value, Bool)) {
+  [
+    #(
+      "valid-object-payload",
+      value.Object([
+        #("kind", value.String("result")),
+        #("payload", value.Object([#("ok", value.Bool(True))])),
+      ]),
+      True,
+    ),
+    #(
+      "valid-array-payload",
+      value.Object([
+        #("kind", value.String("list")),
+        #("payload", value.Array([int_value(1), value.String("two")])),
+      ]),
+      True,
+    ),
+    #(
+      "valid-null-payload",
+      value.Object([#("kind", value.String("none")), #("payload", value.Null)]),
+      True,
+    ),
+    #(
+      "rejected-missing-payload",
+      value.Object([#("kind", value.String("result"))]),
+      False,
+    ),
+    #(
+      "rejected-extra-member",
+      value.Object([
+        #("kind", value.String("result")),
+        #("payload", int_value(1)),
+        #("extra", value.Null),
+      ]),
+      False,
+    ),
+    #(
+      "rejected-kind-not-string",
+      value.Object([#("kind", int_value(1)), #("payload", int_value(1))]),
+      False,
+    ),
+  ]
+}
+
 // --- the check ---------------------------------------------------------------
 
 /// Decoding and contract validation agree on every instance, and the schema
@@ -355,6 +420,20 @@ pub fn corpus_tagged_decision_test() {
       False,
     ),
   ])
+}
+
+pub fn corpus_any_value_test() {
+  run_corpus_case(
+    codec.value(),
+    any_value_instances() |> list.map(fn(item) { #(item.1, item.2) }),
+  )
+}
+
+pub fn corpus_any_field_record_test() {
+  run_corpus_case(
+    any_field_codec(),
+    any_field_instances() |> list.map(fn(item) { #(item.1, item.2) }),
+  )
 }
 
 pub fn corpus_union_unit_variants_test() {

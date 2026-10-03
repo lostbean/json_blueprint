@@ -6,6 +6,7 @@ import gleam/result
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{type Codec, DecodeError, EncodeError, Field, Index}
+import json/blueprint/internal/schema_tree as tree
 import json/blueprint/number
 import json/blueprint/value
 
@@ -76,7 +77,9 @@ pub fn string_codec_test() {
   codec.decode(c, value.String("hello")) |> should.equal(Ok("hello"))
   codec.decode(c, value.Bool(True))
   |> should.equal(fail([], codec.ExpectedString))
-  codec.schema(c) |> should.equal(Ok(codec.StringSchema))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.StringSchema))
 }
 
 pub fn int_codec_test() {
@@ -90,7 +93,9 @@ pub fn int_codec_test() {
   |> should.equal(fail([], codec.ExpectedInt))
   codec.decode(c, value.String("42"))
   |> should.equal(fail([], codec.ExpectedInt))
-  codec.schema(c) |> should.equal(Ok(codec.IntSchema))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.IntSchema))
 }
 
 pub fn float_codec_rounds_to_the_nearest_float_test() {
@@ -107,7 +112,9 @@ pub fn float_codec_rounds_to_the_nearest_float_test() {
   codec.encode_json(c, 2.5) |> should.equal(Ok("2.5"))
   codec.decode_json(c, "0.30000000000000004")
   |> should.equal(Ok(0.30000000000000004))
-  codec.schema(c) |> should.equal(Ok(codec.NumberSchema))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.NumberSchema))
 }
 
 pub fn number_codec_test() {
@@ -115,7 +122,9 @@ pub fn number_codec_test() {
   codec.encode(c, int_num(99)) |> should.equal(Ok(value.Number(int_num(99))))
   codec.decode(c, value.Number(num("1.10"))) |> should.equal(Ok(num("1.1")))
   codec.decode(c, value.Null) |> should.equal(fail([], codec.ExpectedNumber))
-  codec.schema(c) |> should.equal(Ok(codec.NumberSchema))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.NumberSchema))
 }
 
 pub fn bool_codec_test() {
@@ -124,7 +133,9 @@ pub fn bool_codec_test() {
   codec.decode(c, value.Bool(False)) |> should.equal(Ok(False))
   codec.decode(c, value.String("true"))
   |> should.equal(fail([], codec.ExpectedBool))
-  codec.schema(c) |> should.equal(Ok(codec.BoolSchema))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.BoolSchema))
 }
 
 // --- collections ---------------------------------------------------------------
@@ -141,7 +152,8 @@ pub fn pair_codec_test() {
   codec.decode(c, value.Array([value.Bool(False), value.Number(int_num(10))]))
   |> should.equal(fail([Index(0)], codec.ExpectedString))
   codec.schema(c)
-  |> should.equal(Ok(codec.PairSchema(codec.StringSchema, codec.IntSchema)))
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.PairSchema(tree.StringSchema, tree.IntSchema)))
 }
 
 pub fn list_codec_test() {
@@ -152,7 +164,9 @@ pub fn list_codec_test() {
   codec.decode(c, value.Array([value.String("a"), value.Bool(True)]))
   |> should.equal(fail([Index(1)], codec.ExpectedString))
   codec.decode(c, value.Null) |> should.equal(fail([], codec.ExpectedArray))
-  codec.schema(c) |> should.equal(Ok(codec.ListSchema(codec.StringSchema)))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.ListSchema(tree.StringSchema)))
 }
 
 pub fn nullable_is_an_option_test() {
@@ -163,7 +177,9 @@ pub fn nullable_is_an_option_test() {
   codec.decode(c, value.String("text")) |> should.equal(Ok(Some("text")))
   codec.decode(c, value.Bool(True))
   |> should.equal(fail([], codec.ExpectedString))
-  codec.schema(c) |> should.equal(Ok(codec.NullableSchema(codec.StringSchema)))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.NullableSchema(tree.StringSchema)))
 }
 
 pub fn nullable_refuses_an_inner_null_test() {
@@ -257,23 +273,23 @@ pub fn optional_nullable_field_keeps_three_states_test() {
   |> should.equal(Ok("{\"name\":null}"))
   codec.encode_json(patch, Patch(Some(Some("x"))))
   |> should.equal(Ok("{\"name\":\"x\"}"))
-  let assert Ok(codec.ObjectSchema([property])) = codec.schema(patch)
-  property
-  |> should.equal(codec.PropertySchema(
-    "name",
-    False,
-    codec.NullableSchema(codec.StringSchema),
-  ))
+  let assert Ok(schema) = codec.schema(patch)
+  let assert codec.ObjectSchema([property]) = codec.view(schema)
+  property.name |> should.equal("name")
+  property.required |> should.equal(False)
+  let assert codec.NullableSchema(inner) = codec.view(property.schema)
+  codec.view(inner) |> should.equal(codec.StringSchema)
 }
 
 pub fn record_schema_lists_required_and_optional_fields_test() {
   codec.schema(note_codec())
+  |> result.map(codec.to_tree)
   |> should.equal(
     Ok(
-      codec.ObjectSchema([
-        codec.PropertySchema("title", True, codec.StringSchema),
-        codec.PropertySchema("count", True, codec.IntSchema),
-        codec.PropertySchema("note", False, codec.StringSchema),
+      tree.ObjectSchema([
+        tree.PropertySchema("title", True, tree.StringSchema),
+        tree.PropertySchema("count", True, tree.IntSchema),
+        tree.PropertySchema("note", False, tree.StringSchema),
       ]),
     ),
   )
@@ -285,7 +301,9 @@ pub fn success_alone_is_the_empty_object_test() {
   codec.decode_json(empty, "{}") |> should.equal(Ok(Nil))
   codec.decode_json(empty, "{\"a\":1}")
   |> should.equal(fail([Field("a")], codec.UnknownField))
-  codec.schema(empty) |> should.equal(Ok(codec.ObjectSchema([])))
+  codec.schema(empty)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.ObjectSchema([])))
 }
 
 // The getters below carry no type annotation: `field` checks the rest of
@@ -419,7 +437,8 @@ pub fn string_enum_test() {
   codec.decode(priority, value.Number(int_num(10)))
   |> should.equal(fail([], codec.ExpectedString))
   codec.schema(priority)
-  |> should.equal(Ok(codec.StringEnumSchema(["low", "normal", "urgent"])))
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.StringEnumSchema(["low", "normal", "urgent"])))
   let partial = codec.string_enum([#("low", Low)])
   codec.encode(partial, Urgent)
   |> should.equal(Error(EncodeError([], codec.UnknownEnumValue)))
@@ -466,12 +485,13 @@ pub fn union_decode_errors_test() {
 
 pub fn union_schema_lists_variants_in_order_test() {
   codec.schema(shape_codec())
+  |> result.map(codec.to_tree)
   |> should.equal(
     Ok(
-      codec.UnionSchema([
-        codec.VariantSchema("circle", Some(codec.IntSchema)),
-        codec.VariantSchema("label", Some(codec.StringSchema)),
-        codec.VariantSchema("empty", None),
+      tree.UnionSchema([
+        tree.VariantSchema("circle", Some(tree.IntSchema)),
+        tree.VariantSchema("label", Some(tree.StringSchema)),
+        tree.VariantSchema("empty", None),
       ]),
     ),
   )
@@ -506,7 +526,9 @@ pub fn integer_between_test() {
   |> should.equal(fail([], codec.IntegerOutsideRange(1, 10)))
   codec.decode(c, value.Number(num("2.5")))
   |> should.equal(fail([], codec.ExpectedInt))
-  codec.schema(c) |> should.equal(Ok(codec.IntegerRangeSchema(1, 10)))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.IntegerRangeSchema(1, 10)))
 }
 
 pub fn number_between_test() {
@@ -519,7 +541,8 @@ pub fn number_between_test() {
     Error(EncodeError([], codec.NumberOutsideRange(int_num(-5), int_num(5)))),
   )
   codec.schema(c)
-  |> should.equal(Ok(codec.NumberRangeSchema(int_num(-5), int_num(5))))
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.NumberRangeSchema(int_num(-5), int_num(5))))
 }
 
 // --- mapping -------------------------------------------------------------------
@@ -533,7 +556,9 @@ pub fn map_converts_both_directions_test() {
     codec.map(codec.string(), decode: Email, encode: fn(e: Email) { e.address })
   codec.decode_json(email, "\"a@b\"") |> should.equal(Ok(Email("a@b")))
   codec.encode_json(email, Email("a@b")) |> should.equal(Ok("\"a@b\""))
-  codec.schema(email) |> should.equal(Ok(codec.StringSchema))
+  codec.schema(email)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.StringSchema))
 }
 
 pub fn try_map_reports_a_custom_reason_at_the_path_test() {
@@ -646,7 +671,7 @@ pub fn custom_codec_test() {
           Error(error) -> Error(error)
         }
       },
-      schema: Some(codec.IntSchema),
+      schema: option.from_result(codec.schema(codec.int())),
       placeholder: 1,
     )
   codec.decode_json(positive, "0")
@@ -658,7 +683,8 @@ pub fn custom_codec_test() {
 pub fn describe_adds_a_description_test() {
   let c = codec.string() |> codec.describe("first") |> codec.describe("second")
   codec.schema(c)
-  |> should.equal(Ok(codec.DescribedSchema("second", codec.StringSchema)))
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.DescribedSchema("second", tree.StringSchema)))
   codec.decode_json(c, "\"x\"") |> should.equal(Ok("x"))
 }
 
@@ -702,11 +728,15 @@ pub fn check_reports_definition_mistakes_test() {
   codec.check(codec.custom(
     encode: Ok,
     decode: Ok,
+    // Only a generated module can build a schema tree; `custom` still
+    // checks the one it is given.
     schema: Some(
-      codec.ObjectSchema([
-        codec.PropertySchema("a", True, codec.IntSchema),
-        codec.PropertySchema("a", False, codec.IntSchema),
-      ]),
+      codec.from_tree(
+        tree.ObjectSchema([
+          tree.PropertySchema("a", True, tree.IntSchema),
+          tree.PropertySchema("a", False, tree.IntSchema),
+        ]),
+      ),
     ),
     placeholder: value.Null,
   ))
@@ -816,15 +846,20 @@ pub fn describe_errors_omit_input_values_test() {
   |> should.equal("union tag \"x\" appears twice")
 }
 
+fn schema_of(c: Codec(a)) -> codec.Schema {
+  let assert Ok(schema) = codec.schema(c)
+  schema
+}
+
 pub fn schema_document_test() {
-  codec.schema_document(codec.StringSchema)
+  codec.schema_document(schema_of(codec.string()))
   |> should.equal(
     value.Object([
       #("$schema", value.String("https://json-schema.org/draft/2020-12/schema")),
       #("type", value.String("string")),
     ]),
   )
-  codec.schema_document(codec.IntegerRangeSchema(-2, 2))
+  codec.schema_document(schema_of(codec.integer_between(-2, 2)))
   |> should.equal(
     value.Object([
       #("$schema", value.String("https://json-schema.org/draft/2020-12/schema")),
@@ -834,10 +869,12 @@ pub fn schema_document_test() {
     ]),
   )
   codec.schema_value(
-    codec.UnionSchema([
-      codec.VariantSchema("a", Some(codec.BoolSchema)),
-      codec.VariantSchema("b", None),
-    ]),
+    codec.from_tree(
+      tree.UnionSchema([
+        tree.VariantSchema("a", Some(tree.BoolSchema)),
+        tree.VariantSchema("b", None),
+      ]),
+    ),
   )
   |> value.to_string
   |> should.equal(
@@ -883,10 +920,33 @@ pub fn value_passes_any_json_through_unchanged_test() {
   codec.is_limit_exceeded(error) |> should.be_true()
 }
 
-pub fn value_inside_a_record_has_no_schema_test() {
-  codec.schema(codec.value()) |> should.equal(Error(codec.UnknownSchema))
+pub fn value_has_the_schema_that_accepts_any_json_test() {
+  let any = schema_of(codec.value())
+  codec.view(any) |> should.equal(codec.AnySchema)
+  codec.description(any) |> should.equal(None)
+  codec.schema_value(any) |> should.equal(value.Object([]))
+  codec.schema_json(codec.value())
+  |> should.equal(Ok(
+    "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\"}",
+  ))
+  // A description is the only member of a described `{}`.
+  codec.value()
+  |> codec.describe("anything")
+  |> schema_of
+  |> codec.schema_value
+  |> should.equal(value.Object([#("description", value.String("anything"))]))
+}
+
+pub fn value_inside_a_record_is_described_as_any_test() {
   let c = envelope_codec()
-  codec.schema(c) |> should.equal(Error(codec.UnknownSchema))
+  codec.schema_json(c)
+  |> should.equal(Ok(
+    "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\"},\"payload\":{}},\"required\":[\"kind\",\"payload\"],\"additionalProperties\":false}",
+  ))
+  codec.schema_json(codec.list(codec.value()))
+  |> should.equal(Ok(
+    "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{}}",
+  ))
   let text = "{\"kind\":\"result\",\"payload\":[{\"ok\":1}]}"
   let assert Ok(envelope) = codec.decode_json(c, text)
   envelope.kind |> should.equal("result")
@@ -952,7 +1012,123 @@ pub fn placeholder_lets_a_generic_wrapper_derive_its_own_test() {
   codec.decode_json(c, "[\"a\"]") |> should.equal(Ok(["a"]))
   codec.decode_json(c, "[]")
   |> should.equal(fail([], codec.Custom("expected at least one item")))
-  codec.schema(c) |> should.equal(Ok(codec.ListSchema(codec.StringSchema)))
+  codec.schema(c)
+  |> result.map(codec.to_tree)
+  |> should.equal(Ok(tree.ListSchema(tree.StringSchema)))
   // A failed `decoder` run returns the placeholder with its error.
   json.parse("[]", codec.decoder(c)) |> should.be_error()
+}
+
+// --- schema view -----------------------------------------------------------------
+
+/// Every stable kind, matched without a catch-all. If 2.x adds or removes a
+/// `SchemaView` variant, this stops compiling, which is the breaking change
+/// the evolution policy forbids outside a major release.
+fn kind(schema: codec.Schema) -> String {
+  case codec.view(schema) {
+    codec.StringSchema -> "string"
+    codec.StringEnumSchema(_) -> "string_enum"
+    codec.IntSchema -> "integer"
+    codec.IntegerRangeSchema(_, _) -> "integer_range"
+    codec.NumberSchema -> "number"
+    codec.NumberRangeSchema(_, _) -> "number_range"
+    codec.BoolSchema -> "boolean"
+    codec.PairSchema(_, _) -> "pair"
+    codec.ListSchema(_) -> "list"
+    codec.NullableSchema(_) -> "nullable"
+    codec.ObjectSchema(_) -> "object"
+    codec.UnionSchema(_) -> "union"
+    codec.AnySchema -> "any"
+    codec.OtherSchema(_) -> "other"
+  }
+}
+
+pub fn view_classifies_every_kind_test() {
+  [
+    #(schema_of(codec.string()), "string"),
+    #(schema_of(codec.string_enum([#("a", 1)])), "string_enum"),
+    #(schema_of(codec.int()), "integer"),
+    #(schema_of(codec.integer_between(1, 2)), "integer_range"),
+    #(schema_of(codec.float()), "number"),
+    #(schema_of(codec.number()), "number"),
+    #(schema_of(codec.number_between(int_num(0), int_num(1))), "number_range"),
+    #(schema_of(codec.bool()), "boolean"),
+    #(schema_of(codec.pair(codec.int(), codec.bool())), "pair"),
+    #(schema_of(codec.list(codec.int())), "list"),
+    #(schema_of(codec.nullable(codec.int())), "nullable"),
+    #(schema_of(note_codec()), "object"),
+    #(schema_of(shape_codec()), "union"),
+    #(schema_of(codec.value()), "any"),
+    #(schema_of(codec.describe(codec.int(), "described")), "integer"),
+  ]
+  |> list.each(fn(item) { kind(item.0) |> should.equal(item.1) })
+}
+
+pub fn view_exposes_children_with_their_descriptions_test() {
+  let point = {
+    use x <- codec.field(
+      "x",
+      codec.int() |> codec.describe("Across"),
+      get: fn(p) { p.0 },
+    )
+    use label <- codec.optional_field(
+      "label",
+      codec.list(codec.string()),
+      get: fn(p) { p.1 },
+    )
+    codec.success(#(x, label))
+  }
+  let schema = schema_of(codec.describe(point, "A point"))
+  codec.description(schema) |> should.equal(Some("A point"))
+  let assert codec.ObjectSchema([x, label]) = codec.view(schema)
+  x.name |> should.equal("x")
+  x.required |> should.equal(True)
+  codec.description(x.schema) |> should.equal(Some("Across"))
+  codec.view(x.schema) |> should.equal(codec.IntSchema)
+  label.name |> should.equal("label")
+  label.required |> should.equal(False)
+  codec.description(label.schema) |> should.equal(None)
+  let assert codec.ListSchema(items) = codec.view(label.schema)
+  codec.view(items) |> should.equal(codec.StringSchema)
+  // A child renders as the part of the parent's document it came from.
+  codec.schema_value(x.schema)
+  |> should.equal(
+    value.Object([
+      #("description", value.String("Across")),
+      #("type", value.String("integer")),
+    ]),
+  )
+
+  let assert codec.UnionSchema([circle, label, empty]) =
+    codec.view(schema_of(shape_codec()))
+  circle.tag |> should.equal("circle")
+  let assert Some(radius) = circle.payload
+  codec.view(radius) |> should.equal(codec.IntSchema)
+  label.tag |> should.equal("label")
+  empty |> should.equal(codec.VariantSchema(tag: "empty", payload: None))
+
+  let assert codec.PairSchema(left, right) =
+    codec.view(schema_of(codec.pair(codec.int(), codec.value())))
+  codec.view(left) |> should.equal(codec.IntSchema)
+  codec.view(right) |> should.equal(codec.AnySchema)
+  let assert codec.NullableSchema(inner) =
+    codec.view(schema_of(codec.nullable(codec.bool())))
+  codec.view(inner) |> should.equal(codec.BoolSchema)
+  codec.view(schema_of(codec.integer_between(-3, 4)))
+  |> should.equal(codec.IntegerRangeSchema(-3, 4))
+  codec.view(schema_of(codec.string_enum([#("b", 1), #("a", 2)])))
+  |> should.equal(codec.StringEnumSchema(["b", "a"]))
+}
+
+pub fn custom_takes_the_schema_of_another_codec_test() {
+  let upper =
+    codec.custom(
+      encode: fn(text: String) { Ok(value.String(string.uppercase(text))) },
+      decode: fn(raw) { codec.decode(codec.string(), raw) },
+      schema: option.from_result(codec.schema(codec.string())),
+      placeholder: "",
+    )
+  codec.schema(upper) |> should.equal(codec.schema(codec.string()))
+  codec.schema_json(upper)
+  |> should.equal(codec.schema_json(codec.string()))
 }
