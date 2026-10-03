@@ -52,7 +52,9 @@
 //// omits the field for `None`; wrap the inner codec in `nullable` to also
 //// accept `null`. `union` with `variant` and `unit_variant` describes a sum
 //// type as `{"tag": ..., "value": ...}`. `map` and `try_map` convert to your
-//// own types, and `custom` builds a codec from functions. A check across
+//// own types, `custom` builds a codec from functions, and `value` passes any
+//// JSON through as a `Value`. `placeholder` gives a generic wrapper the
+//// value a codec describes itself with. A check across
 //// fields reports its path when the dependent field's codec is built from
 //// the fields before it; see `try_map`.
 ////
@@ -371,6 +373,34 @@ pub fn decoder(codec: Codec(a)) -> decode.Decoder(a) {
   })
 }
 
+/// A value of `a` that the codec holds for describing itself, for a generic
+/// wrapper that needs one without input: the `placeholder` of a `try_map`
+/// or `custom` over this codec, or `decode.failure` in a hand-written
+/// `gleam/dynamic/decode` decoder. It is the value the codec was built
+/// with, such as `""` for `string()`, `minimum` for `integer_between`, the
+/// first variant of a union or the record built from its fields'
+/// placeholders. It need not be valid input and is not a default: never
+/// encode it as data.
+///
+/// ```gleam
+/// pub fn non_empty(inner: Codec(List(a))) -> Codec(List(a)) {
+///   codec.try_map(
+///     inner,
+///     decode: fn(items) {
+///       case items {
+///         [] -> Error("expected at least one item")
+///         _ -> Ok(items)
+///       }
+///     },
+///     encode: Ok,
+///     placeholder: codec.placeholder(inner),
+///   )
+/// }
+/// ```
+pub fn placeholder(codec: Codec(a)) -> a {
+  codec.placeholder()
+}
+
 /// The codec's schema.
 pub fn schema(codec: Codec(a)) -> Result(Schema, SchemaError) {
   case defined(codec) {
@@ -508,6 +538,24 @@ pub fn bool() -> Codec(Bool) {
     },
     BoolSchema,
     False,
+  )
+}
+
+/// Any JSON value, passed through unchanged as a `Value`: for JSON that the
+/// application forwards or inspects itself, such as a tool result from a
+/// remote peer. Decoding accepts every value and encoding returns it; the
+/// parse limits of `decode_json` still bound it.
+///
+/// It has no schema, so `schema` returns `UnknownSchema` for it and for any
+/// codec built from it. When a schema for the value is known, use
+/// `contract.value_codec`, which also validates it while decoding.
+pub fn value() -> Codec(Value) {
+  Codec(
+    encode: Ok,
+    decode: Ok,
+    definition: fn() { Ok(None) },
+    placeholder: fn() { value.Null },
+    fields: None,
   )
 }
 

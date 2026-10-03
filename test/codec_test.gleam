@@ -844,3 +844,115 @@ pub fn schema_document_test() {
     "{\"type\":\"object\",\"oneOf\":[{\"type\":\"object\",\"properties\":{\"tag\":{\"const\":\"a\"},\"value\":{\"type\":\"boolean\"}},\"required\":[\"tag\",\"value\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tag\":{\"const\":\"b\"}},\"required\":[\"tag\"],\"additionalProperties\":false}]}",
   )
 }
+
+// --- value and placeholder -------------------------------------------------------
+
+pub type Envelope {
+  Envelope(kind: String, payload: value.Value)
+}
+
+fn envelope_codec() -> Codec(Envelope) {
+  use kind <- codec.field("kind", codec.string(), get: fn(e) { e.kind })
+  use payload <- codec.field("payload", codec.value(), get: fn(e) { e.payload })
+  codec.success(Envelope(kind:, payload:))
+}
+
+pub fn value_passes_any_json_through_unchanged_test() {
+  let c = codec.value()
+  // Big and fractional numbers keep their exact spelling.
+  let text =
+    "{\"a\":[1,2.50,123456789012345678901234567890],\"b\":null,\"c\":{\"d\":true,\"e\":\"x\"}}"
+  let assert Ok(parsed) = value.parse(text, value.default_limits())
+  codec.decode_json(c, text) |> should.equal(Ok(parsed))
+  codec.encode(c, parsed) |> should.equal(Ok(parsed))
+  codec.encode_json(c, parsed) |> should.equal(Ok(value.to_string(parsed)))
+  list.each(
+    [value.Null, value.Bool(False), value.String(""), value.Array([])],
+    fn(raw) {
+      codec.decode(c, raw) |> should.equal(Ok(raw))
+      codec.encode(c, raw) |> should.equal(Ok(raw))
+    },
+  )
+  // The parse limits still bound it.
+  let assert Error(error) =
+    codec.decode_json_with_limits(
+      c,
+      "[[[1]]]",
+      value.default_limits() |> value.with_max_depth(2),
+    )
+  codec.is_limit_exceeded(error) |> should.be_true()
+}
+
+pub fn value_inside_a_record_has_no_schema_test() {
+  codec.schema(codec.value()) |> should.equal(Error(codec.UnknownSchema))
+  let c = envelope_codec()
+  codec.schema(c) |> should.equal(Error(codec.UnknownSchema))
+  let text = "{\"kind\":\"result\",\"payload\":[{\"ok\":1}]}"
+  let assert Ok(envelope) = codec.decode_json(c, text)
+  envelope.kind |> should.equal("result")
+  codec.encode_json(c, envelope) |> should.equal(Ok(text))
+  // A record is still closed around the pass-through field.
+  let assert Error(DecodeError([Field("extra")], codec.UnknownField)) =
+    codec.decode_json(c, "{\"kind\":\"k\",\"payload\":1,\"extra\":0}")
+}
+
+pub fn value_bridges_to_gleam_json_and_decode_test() {
+  let assert Ok(parsed) =
+    value.parse("{\"n\":[1,\"two\"]}", value.default_limits())
+  let assert Ok(encoded) = codec.to_json(codec.value(), parsed)
+  json.to_string(encoded) |> should.equal("{\"n\":[1,\"two\"]}")
+  json.parse("{\"n\":[1,\"two\"]}", codec.decoder(codec.value()))
+  |> should.equal(Ok(parsed))
+}
+
+pub fn placeholder_returns_the_value_a_codec_describes_itself_with_test() {
+  codec.placeholder(codec.string()) |> should.equal("")
+  codec.placeholder(codec.int()) |> should.equal(0)
+  codec.placeholder(codec.bool()) |> should.equal(False)
+  codec.placeholder(codec.integer_between(3, 9)) |> should.equal(3)
+  codec.placeholder(codec.list(codec.int())) |> should.equal([])
+  codec.placeholder(codec.nullable(codec.int())) |> should.equal(None)
+  codec.placeholder(codec.value()) |> should.equal(value.Null)
+  codec.placeholder(codec.pair(codec.int(), codec.string()))
+  |> should.equal(#(0, ""))
+  codec.placeholder(note_codec()) |> should.equal(Note("", 0, None))
+  codec.placeholder(shape_codec()) |> should.equal(Circle(0))
+  codec.placeholder(codec.string_enum([#("low", Low), #("urgent", Urgent)]))
+  |> should.equal(Low)
+  codec.placeholder(
+    codec.map(codec.int(), decode: fn(n) { n + 1 }, encode: fn(n) { n - 1 }),
+  )
+  |> should.equal(1)
+  codec.placeholder(codec.custom(
+    encode: fn(_) { Ok(value.Null) },
+    decode: fn(_) { Ok(Urgent) },
+    schema: None,
+    placeholder: Urgent,
+  ))
+  |> should.equal(Urgent)
+}
+
+/// The generic wrapper from `placeholder`'s docs.
+fn non_empty(inner: Codec(List(a))) -> Codec(List(a)) {
+  codec.try_map(
+    inner,
+    decode: fn(items) {
+      case items {
+        [] -> Error("expected at least one item")
+        _ -> Ok(items)
+      }
+    },
+    encode: Ok,
+    placeholder: codec.placeholder(inner),
+  )
+}
+
+pub fn placeholder_lets_a_generic_wrapper_derive_its_own_test() {
+  let c = non_empty(codec.list(codec.string()))
+  codec.decode_json(c, "[\"a\"]") |> should.equal(Ok(["a"]))
+  codec.decode_json(c, "[]")
+  |> should.equal(fail([], codec.Custom("expected at least one item")))
+  codec.schema(c) |> should.equal(Ok(codec.ListSchema(codec.StringSchema)))
+  // A failed `decoder` run returns the placeholder with its error.
+  json.parse("[]", codec.decoder(c)) |> should.be_error()
+}
