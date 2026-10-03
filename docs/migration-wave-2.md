@@ -500,6 +500,9 @@ codec.UnionSchema(variants) ->
 `schema`, `schema_json`, `schema_value`, `schema_document`, `describe`,
 `PropertySchema` and `SchemaError(UnknownSchema)` are unchanged.
 
+Round 5 makes `Schema` opaque: match `codec.view(schema)` instead; see
+[the round 5 guide](migration-round-5.md).
+
 ### Generator helpers
 
 The functions that generated modules called move to the internal module
@@ -862,7 +865,8 @@ itself. Decoding accepts any value and encoding returns it unchanged; the
 parse limits of `decode_json` still bound it. It has no schema, so `schema`
 returns `UnknownSchema` for it and for any codec built from it, exactly as
 the `custom` it replaces. Use `contract.value_codec(contract)` when the
-value's schema is known.
+value's schema is known. Round 5 gives it the any schema, `{}`; see
+[the round 5 guide](migration-round-5.md#codecvalue-has-a-schema).
 
 ```gleam
 // Before
