@@ -21,12 +21,18 @@ import gleam/result
 import json/blueprint/codec.{
   type DecodeError, type EncodeError, DecodeError, EncodeError, Field, Index,
 }
+import json/blueprint/internal/schema_tree.{type Tree}
 import json/blueprint/internal/text
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
 type Members =
   List(#(String, Value))
+
+/// The schema that a generated module declares as a `const` tree.
+pub fn schema(tree: Tree) -> codec.Schema {
+  codec.from_tree(tree)
+}
 
 type NativeMembers =
   List(#(String, json.Json))

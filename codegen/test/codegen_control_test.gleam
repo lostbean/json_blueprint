@@ -19,16 +19,15 @@ fn read_file_to_string(path: String) -> Result(String, String)
 
 pub fn codegen_description_preserves_runtime_and_generated_schema_test() {
   let definition = codegen.describe(codegen.string(), "A quoted \"name\"")
-  codec.schema(codegen.runtime(definition))
-  |> should.equal(
-    Ok(codec.DescribedSchema("A quoted \"name\"", codec.StringSchema)),
-  )
+  let assert Ok(schema) = codec.schema(codegen.runtime(definition))
+  codec.description(schema) |> should.equal(Some("A quoted \"name\""))
+  codec.view(schema) |> should.equal(codec.StringSchema)
   let assert Ok(compiled) =
     codegen.compile("generated/described_name", "described_name", definition)
   let codegen.GeneratedModule(_, content, _) = compiled
   string.contains(
     content,
-    "codec.DescribedSchema(\"A quoted \\\"name\\\"\", codec.StringSchema)",
+    "schema_tree.DescribedSchema(\"A quoted \\\"name\\\"\", schema_tree.StringSchema)",
   )
   |> should.be_true
 
@@ -36,7 +35,7 @@ pub fn codegen_description_preserves_runtime_and_generated_schema_test() {
   codegen.describe(definition, "Renamed")
   |> codegen.runtime
   |> codec.schema
-  |> should.equal(Ok(codec.DescribedSchema("Renamed", codec.StringSchema)))
+  |> should.equal(codec.schema(codec.describe(codec.string(), "Renamed")))
 }
 
 pub fn option_property_keeps_missing_null_and_value_test() {

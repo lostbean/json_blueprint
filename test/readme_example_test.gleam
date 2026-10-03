@@ -171,11 +171,23 @@ import gleeunit/should
 @external(javascript, "./readme_test_ffi.mjs", "read_file_to_string")
 fn read_file_to_string(path: String) -> Result(String, String)
 
+/// Whether a tool's input schema has an object root, as MCP requires.
+pub fn object_root(input: Codec(a)) -> Bool {
+  case codec.schema(input) {
+    Error(codec.UnknownSchema) -> False
+    Ok(schema) ->
+      case codec.view(schema) {
+        codec.ObjectSchema(_) | codec.UnionSchema(_) -> True
+        _ -> False
+      }
+  }
+}
+
 pub fn readme_snippets_are_in_this_file_verbatim_test() {
   let assert Ok(readme) = read_file_to_string("README.md")
   let assert Ok(source) = read_file_to_string("test/readme_example_test.gleam")
   let snippets = gleam_snippets(string.replace(readme, "\r\n", "\n"), [])
-  list.length(snippets) |> should.equal(9)
+  list.length(snippets) |> should.equal(10)
   snippets
   |> list.filter(fn(snippet) { !string.contains(source, snippet) })
   |> should.equal([])
@@ -285,4 +297,12 @@ pub fn check_arguments_test() {
   check_arguments(schema, "{\"limit\":3}") |> should.be_ok
   check_arguments(schema, "{\"limit\":30}")
   |> should.equal(Error("$[\"limit\"]: integer outside range 1 to 10"))
+}
+
+pub fn object_root_test() {
+  object_root(user_codec()) |> should.be_true
+  object_root(shape_codec()) |> should.be_true
+  object_root(codec.describe(user_codec(), "A user")) |> should.be_true
+  object_root(codec.list(user_codec())) |> should.be_false
+  object_root(codec.value()) |> should.be_false
 }

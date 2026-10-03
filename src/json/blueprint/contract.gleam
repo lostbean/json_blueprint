@@ -5,7 +5,8 @@
 //// (`from_schema`), or from a Draft 2020-12 schema document (`load` for a
 //// parsed `Value`, `parse` for text). A document must stay inside the finite
 //// profile that codecs describe: closed objects, pairs, lists, nullable
-//// values, bounded integers and numbers, string enums and tagged unions.
+//// values, bounded integers and numbers, string enums, tagged unions and
+//// any value (`{}`, or the boolean schema `true`).
 ////
 //// `validate` checks a `Value` and returns a `ValidatedValue` or a
 //// `ValidationError` with the path of the first failure; validation uses the
@@ -45,20 +46,23 @@ import gleam/set.{type Set}
 import gleam/string
 import json/blueprint/codec.{
   type Codec, type DecodeError, type DefinitionError, type PathSegment,
-  type PropertySchema, type Schema, type VariantSchema, Field, Index,
+  type Schema, Field, Index,
 }
+import json/blueprint/internal/schema_tree.{
+  type PropertySchema, type Tree, type VariantSchema,
+} as tree
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
 /// A schema accepted for validation, normalized so that member and label
 /// order does not matter.
 pub opaque type Contract {
-  Contract(schema: Schema)
+  Contract(schema: Tree)
 }
 
 /// A value that passed `validate`, with the schema it passed.
 pub opaque type ValidatedValue {
-  ValidatedValue(value: Value, schema: Schema)
+  ValidatedValue(value: Value, schema: Tree)
 }
 
 /// The first failure of `validate`, at `path`. Read fields by label.
@@ -72,26 +76,19 @@ pub type ValidationError {
 /// other uses of the codec.
 pub fn from_codec(codec: Codec(a)) -> Result(Contract, codec.SchemaError) {
   use found <- result.map(codec.schema(codec))
-  Contract(normalize(found))
+  from_schema(found)
 }
 
-/// The contract of a schema built at runtime, after checking it for
-/// definition mistakes such as a repeated field or reversed bounds.
-pub fn from_schema(schema: Schema) -> Result(Contract, DefinitionError) {
-  let probe =
-    codec.custom(
-      encode: fn(_) { Ok(value.Null) },
-      decode: fn(_) { Ok(Nil) },
-      schema: Some(schema),
-      placeholder: Nil,
-    )
-  use _ <- result.map(codec.check(probe))
-  Contract(normalize(schema))
+/// The contract of a schema, such as one that a tool declaration holds.
+/// Every `Schema` comes from a codec or a contract and is already checked,
+/// so this cannot fail.
+pub fn from_schema(schema: Schema) -> Contract {
+  Contract(normalize(codec.to_tree(schema)))
 }
 
 /// The contract's schema, normalized.
 pub fn schema(contract: Contract) -> Schema {
-  contract.schema
+  codec.from_tree(contract.schema)
 }
 
 /// Whether two contracts accept the same values. Descriptions and the order
@@ -100,56 +97,56 @@ pub fn same_schema(left: Contract, right: Contract) -> Bool {
   shape(left.schema) == shape(right.schema)
 }
 
-fn normalize(schema: Schema) -> Schema {
+fn normalize(schema: Tree) -> Tree {
   case schema {
-    codec.DescribedSchema(description, codec.DescribedSchema(_, inner)) ->
-      normalize(codec.DescribedSchema(description, inner))
-    codec.DescribedSchema(description, inner) ->
-      codec.DescribedSchema(description, normalize(inner))
-    codec.StringEnumSchema(labels) ->
-      codec.StringEnumSchema(list.sort(labels, string.compare))
-    codec.PairSchema(left, right) ->
-      codec.PairSchema(normalize(left), normalize(right))
-    codec.ListSchema(items) -> codec.ListSchema(normalize(items))
-    codec.NullableSchema(inner) -> codec.NullableSchema(normalize(inner))
-    codec.ObjectSchema(properties) ->
+    tree.DescribedSchema(description, tree.DescribedSchema(_, inner)) ->
+      normalize(tree.DescribedSchema(description, inner))
+    tree.DescribedSchema(description, inner) ->
+      tree.DescribedSchema(description, normalize(inner))
+    tree.StringEnumSchema(labels) ->
+      tree.StringEnumSchema(list.sort(labels, string.compare))
+    tree.PairSchema(left, right) ->
+      tree.PairSchema(normalize(left), normalize(right))
+    tree.ListSchema(items) -> tree.ListSchema(normalize(items))
+    tree.NullableSchema(inner) -> tree.NullableSchema(normalize(inner))
+    tree.ObjectSchema(properties) ->
       properties
       |> list.map(fn(property) {
-        codec.PropertySchema(..property, schema: normalize(property.schema))
+        tree.PropertySchema(..property, schema: normalize(property.schema))
       })
       |> list.sort(fn(a, b) { string.compare(a.name, b.name) })
-      |> codec.ObjectSchema
-    codec.UnionSchema(variants) ->
+      |> tree.ObjectSchema
+    tree.UnionSchema(variants) ->
       variants
       |> list.map(fn(variant) {
-        codec.VariantSchema(
+        tree.VariantSchema(
           ..variant,
           payload: option.map(variant.payload, normalize),
         )
       })
       |> list.sort(fn(a, b) { string.compare(a.tag, b.tag) })
-      |> codec.UnionSchema
+      |> tree.UnionSchema
     other -> other
   }
 }
 
 /// The schema without descriptions, which do not affect validation.
-fn shape(schema: Schema) -> Schema {
+fn shape(schema: Tree) -> Tree {
   case schema {
-    codec.DescribedSchema(_, inner) -> shape(inner)
-    codec.PairSchema(left, right) -> codec.PairSchema(shape(left), shape(right))
-    codec.ListSchema(items) -> codec.ListSchema(shape(items))
-    codec.NullableSchema(inner) -> codec.NullableSchema(shape(inner))
-    codec.ObjectSchema(properties) ->
-      codec.ObjectSchema(
+    tree.DescribedSchema(_, inner) -> shape(inner)
+    tree.PairSchema(left, right) -> tree.PairSchema(shape(left), shape(right))
+    tree.ListSchema(items) -> tree.ListSchema(shape(items))
+    tree.NullableSchema(inner) -> tree.NullableSchema(shape(inner))
+    tree.ObjectSchema(properties) ->
+      tree.ObjectSchema(
         list.map(properties, fn(property) {
-          codec.PropertySchema(..property, schema: shape(property.schema))
+          tree.PropertySchema(..property, schema: shape(property.schema))
         }),
       )
-    codec.UnionSchema(variants) ->
-      codec.UnionSchema(
+    tree.UnionSchema(variants) ->
+      tree.UnionSchema(
         list.map(variants, fn(variant) {
-          codec.VariantSchema(
+          tree.VariantSchema(
             ..variant,
             payload: option.map(variant.payload, shape),
           )
@@ -184,7 +181,7 @@ pub fn decode(
 ) -> Result(a, DecodeError) {
   case codec.schema(codec) {
     Ok(found) ->
-      case shape(normalize(found)) == shape(validated.schema) {
+      case shape(normalize(codec.to_tree(found))) == shape(validated.schema) {
         True -> codec.decode(codec, validated.value)
         False -> Error(codec.DecodeError([], codec.ContractMismatch))
       }
@@ -206,7 +203,7 @@ pub fn value_codec(contract: Contract) -> Codec(Value) {
           Error(codec.DecodeError(path, reason))
       }
     },
-    schema: Some(contract.schema),
+    schema: Some(codec.from_tree(contract.schema)),
     placeholder: value.Null,
   )
 }
@@ -226,59 +223,59 @@ fn invalid(
 
 /// `path` is reversed.
 fn validate_at(
-  schema: Schema,
+  schema: Tree,
   item: Value,
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
   case schema, item {
-    codec.DescribedSchema(_, inner), _ -> validate_at(inner, item, path)
-    codec.StringSchema, value.String(_) -> Ok(Nil)
-    codec.StringSchema, _ -> invalid(path, codec.ExpectedString)
+    tree.DescribedSchema(_, inner), _ -> validate_at(inner, item, path)
+    tree.StringSchema, value.String(_) -> Ok(Nil)
+    tree.StringSchema, _ -> invalid(path, codec.ExpectedString)
 
-    codec.StringEnumSchema(labels), value.String(label) ->
+    tree.StringEnumSchema(labels), value.String(label) ->
       case list.contains(labels, label) {
         True -> Ok(Nil)
         False -> invalid(path, codec.UnknownEnumLabel)
       }
-    codec.StringEnumSchema(_), _ -> invalid(path, codec.ExpectedString)
+    tree.StringEnumSchema(_), _ -> invalid(path, codec.ExpectedString)
 
-    codec.IntSchema, value.Number(found) ->
+    tree.IntSchema, value.Number(found) ->
       case number.is_integer(found) {
         True -> Ok(Nil)
         False -> invalid(path, codec.ExpectedInt)
       }
-    codec.IntSchema, _ -> invalid(path, codec.ExpectedInt)
+    tree.IntSchema, _ -> invalid(path, codec.ExpectedInt)
 
-    codec.NumberSchema, value.Number(_) -> Ok(Nil)
-    codec.NumberSchema, _ -> invalid(path, codec.ExpectedNumber)
+    tree.NumberSchema, value.Number(_) -> Ok(Nil)
+    tree.NumberSchema, _ -> invalid(path, codec.ExpectedNumber)
 
-    codec.BoolSchema, value.Bool(_) -> Ok(Nil)
-    codec.BoolSchema, _ -> invalid(path, codec.ExpectedBool)
+    tree.BoolSchema, value.Bool(_) -> Ok(Nil)
+    tree.BoolSchema, _ -> invalid(path, codec.ExpectedBool)
 
-    codec.PairSchema(left, right), value.Array([first, second]) -> {
+    tree.PairSchema(left, right), value.Array([first, second]) -> {
       use Nil <- result.try(validate_at(left, first, [Index(0), ..path]))
       validate_at(right, second, [Index(1), ..path])
     }
-    codec.PairSchema(_, _), value.Array(items) ->
+    tree.PairSchema(_, _), value.Array(items) ->
       invalid(path, codec.WrongLength(2, list.length(items)))
-    codec.PairSchema(_, _), _ -> invalid(path, codec.ExpectedArray)
+    tree.PairSchema(_, _), _ -> invalid(path, codec.ExpectedArray)
 
-    codec.ListSchema(inner), value.Array(items) ->
+    tree.ListSchema(inner), value.Array(items) ->
       validate_items(inner, items, 0, path)
-    codec.ListSchema(_), _ -> invalid(path, codec.ExpectedArray)
+    tree.ListSchema(_), _ -> invalid(path, codec.ExpectedArray)
 
-    codec.NullableSchema(_), value.Null -> Ok(Nil)
-    codec.NullableSchema(inner), _ -> validate_at(inner, item, path)
+    tree.NullableSchema(_), value.Null -> Ok(Nil)
+    tree.NullableSchema(inner), _ -> validate_at(inner, item, path)
 
-    codec.ObjectSchema(properties), value.Object(members) ->
+    tree.ObjectSchema(properties), value.Object(members) ->
       validate_object(properties, members, path)
-    codec.ObjectSchema(_), _ -> invalid(path, codec.ExpectedObject)
+    tree.ObjectSchema(_), _ -> invalid(path, codec.ExpectedObject)
 
-    codec.UnionSchema(variants), value.Object(members) ->
+    tree.UnionSchema(variants), value.Object(members) ->
       validate_union(variants, members, path)
-    codec.UnionSchema(_), _ -> invalid(path, codec.ExpectedObject)
+    tree.UnionSchema(_), _ -> invalid(path, codec.ExpectedObject)
 
-    codec.IntegerRangeSchema(minimum, maximum), value.Number(found) ->
+    tree.IntegerRangeSchema(minimum, maximum), value.Number(found) ->
       case number.is_integer(found) {
         False -> invalid(path, codec.ExpectedInt)
         True ->
@@ -287,14 +284,16 @@ fn validate_at(
             False -> invalid(path, codec.IntegerOutsideRange(minimum, maximum))
           }
       }
-    codec.IntegerRangeSchema(_, _), _ -> invalid(path, codec.ExpectedInt)
+    tree.IntegerRangeSchema(_, _), _ -> invalid(path, codec.ExpectedInt)
 
-    codec.NumberRangeSchema(minimum, maximum), value.Number(found) ->
+    tree.NumberRangeSchema(minimum, maximum), value.Number(found) ->
       case within(found, minimum, maximum) {
         True -> Ok(Nil)
         False -> invalid(path, codec.NumberOutsideRange(minimum, maximum))
       }
-    codec.NumberRangeSchema(_, _), _ -> invalid(path, codec.ExpectedNumber)
+    tree.NumberRangeSchema(_, _), _ -> invalid(path, codec.ExpectedNumber)
+
+    tree.AnySchema, _ -> Ok(Nil)
   }
 }
 
@@ -311,7 +310,7 @@ fn within_integers(found: Number, minimum: Int, maximum: Int) -> Bool {
 }
 
 fn validate_items(
-  schema: Schema,
+  schema: Tree,
   items: List(Value),
   index: Int,
   path: List(PathSegment),
@@ -455,7 +454,8 @@ pub fn parse(
 
 /// Load a Draft 2020-12 schema document. Its `$schema` must be the Draft
 /// 2020-12 URI, and it must stay inside the codec profile; `description`
-/// keywords are kept.
+/// keywords are kept. A schema with no keywords but `description`, or the
+/// boolean schema `true`, accepts any value, like `codec.value()`.
 pub fn load(document: Value) -> Result(Contract, DocumentError) {
   use members <- result.try(object_members(document, []))
   use dialect <- result.try(required_member(members, "$schema", []))
@@ -463,8 +463,8 @@ pub fn load(document: Value) -> Result(Contract, DocumentError) {
     value.String(found) if found == draft_2020_12 -> {
       let schema_members = without_member(members, "$schema")
       use parsed <- result.try(parse_schema(value.Object(schema_members), []))
-      case from_schema(parsed.schema) {
-        Ok(contract) -> Ok(contract)
+      case codec.validate_tree(parsed.schema) {
+        Ok(Nil) -> Ok(Contract(normalize(parsed.schema)))
         Error(error) ->
           Error(InvalidDefinition(
             invariant_path(error, parsed.invariants),
@@ -553,7 +553,7 @@ fn path_text(path: List(PathSegment)) -> String {
 }
 
 type ParsedSchema {
-  ParsedSchema(schema: Schema, invariants: List(InvariantLocation))
+  ParsedSchema(schema: Tree, invariants: List(InvariantLocation))
 }
 
 /// Where a definition mistake found by `from_schema` sits in the document.
@@ -569,6 +569,17 @@ fn parse_schema(
   document: Value,
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
+  case document {
+    // The boolean schema `true` accepts every value, like `{}`.
+    value.Bool(True) -> Ok(ParsedSchema(tree.AnySchema, []))
+    _ -> parse_schema_object(document, path)
+  }
+}
+
+fn parse_schema_object(
+  document: Value,
+  path: List(PathSegment),
+) -> Result(ParsedSchema, DocumentError) {
   use members <- result.try(object_members(document, path))
   let description = list.key_find(members, "description")
   let schema_members = without_member(members, "description")
@@ -577,7 +588,7 @@ fn parse_schema(
     Error(Nil) -> Ok(parsed)
     Ok(value.String(text)) ->
       Ok(ParsedSchema(
-        codec.DescribedSchema(text, parsed.schema),
+        tree.DescribedSchema(text, parsed.schema),
         parsed.invariants,
       ))
     Ok(_) ->
@@ -586,6 +597,17 @@ fn parse_schema(
 }
 
 fn parse_schema_members(
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(ParsedSchema, DocumentError) {
+  case members {
+    // `{}`, or only a description: any value.
+    [] -> Ok(ParsedSchema(tree.AnySchema, []))
+    _ -> parse_constrained(members, path)
+  }
+}
+
+fn parse_constrained(
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
@@ -610,7 +632,7 @@ fn parse_schema_members(
         value.String("integer") -> parse_integer(members, path)
         value.String("number") -> parse_number_schema(members, path)
         value.String("boolean") ->
-          parse_primitive(members, path, codec.BoolSchema)
+          parse_primitive(members, path, tree.BoolSchema)
         value.String("object") -> parse_object_or_union(members, path)
         value.String("array") -> parse_array(members, path)
         value.String(_) ->
@@ -626,7 +648,7 @@ fn parse_string_schema(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   case list.key_find(members, "enum") {
-    Error(Nil) -> parse_primitive(members, path, codec.StringSchema)
+    Error(Nil) -> parse_primitive(members, path, tree.StringSchema)
     Ok(raw) -> {
       use Nil <- result.try(only_members(members, ["type", "enum"], path))
       let enum_path = at(path, Field("enum"))
@@ -644,7 +666,7 @@ fn parse_string_schema(
             ]
           }
       }
-      Ok(ParsedSchema(codec.StringEnumSchema(labels), invariants))
+      Ok(ParsedSchema(tree.StringEnumSchema(labels), invariants))
     }
   }
 }
@@ -686,7 +708,7 @@ fn repeated_at(
 fn parse_primitive(
   members: List(#(String, Value)),
   path: List(PathSegment),
-  schema: Schema,
+  schema: Tree,
 ) -> Result(ParsedSchema, DocumentError) {
   use Nil <- result.try(only_members(members, ["type"], path))
   Ok(ParsedSchema(schema, []))
@@ -702,7 +724,7 @@ fn parse_integer(
     path,
   ))
   case list.key_find(members, "minimum"), list.key_find(members, "maximum") {
-    Error(Nil), Error(Nil) -> Ok(ParsedSchema(codec.IntSchema, []))
+    Error(Nil), Error(Nil) -> Ok(ParsedSchema(tree.IntSchema, []))
     Ok(minimum), Ok(maximum) -> {
       let minimum_path = at(path, Field("minimum"))
       use minimum <- result.try(expect_integer(minimum, minimum_path))
@@ -719,7 +741,7 @@ fn parse_integer(
         ]
         False -> []
       }
-      Ok(ParsedSchema(codec.IntegerRangeSchema(minimum, maximum), invariants))
+      Ok(ParsedSchema(tree.IntegerRangeSchema(minimum, maximum), invariants))
     }
     _, _ -> Error(MalformedDocument(path, IncompleteIntegerRange))
   }
@@ -735,7 +757,7 @@ fn parse_number_schema(
     path,
   ))
   case list.key_find(members, "minimum"), list.key_find(members, "maximum") {
-    Error(Nil), Error(Nil) -> Ok(ParsedSchema(codec.NumberSchema, []))
+    Error(Nil), Error(Nil) -> Ok(ParsedSchema(tree.NumberSchema, []))
     Ok(minimum), Ok(maximum) -> {
       let minimum_path = at(path, Field("minimum"))
       use minimum <- result.try(expect_number(minimum, minimum_path))
@@ -752,7 +774,7 @@ fn parse_number_schema(
         ]
         _ -> []
       }
-      Ok(ParsedSchema(codec.NumberRangeSchema(minimum, maximum), invariants))
+      Ok(ParsedSchema(tree.NumberRangeSchema(minimum, maximum), invariants))
     }
     _, _ -> Error(MalformedDocument(path, IncompleteNumberRange))
   }
@@ -827,13 +849,13 @@ fn parse_object(
         at(at(path, Field("properties")), Field(name)),
       ))
       #(
-        codec.PropertySchema(name, set.contains(required, name), parsed.schema),
+        tree.PropertySchema(name, set.contains(required, name), parsed.schema),
         parsed.invariants,
       )
     }),
   )
   Ok(ParsedSchema(
-    codec.ObjectSchema(list.map(parsed, fn(pair) { pair.0 })),
+    tree.ObjectSchema(list.map(parsed, fn(pair) { pair.0 })),
     list.flat_map(parsed, fn(pair) { pair.1 }),
   ))
 }
@@ -846,7 +868,7 @@ fn parse_array(
     Ok(items), Error(Nil) -> {
       use Nil <- result.try(only_members(members, ["type", "items"], path))
       use parsed <- result.map(parse_schema(items, at(path, Field("items"))))
-      ParsedSchema(codec.ListSchema(parsed.schema), parsed.invariants)
+      ParsedSchema(tree.ListSchema(parsed.schema), parsed.invariants)
     }
     Error(Nil), Ok(prefix_items) -> parse_tuple(members, prefix_items, path)
     Error(Nil), Error(Nil) -> Error(UnsupportedDocument(path, UnboundedArray))
@@ -874,7 +896,7 @@ fn parse_tuple(
       use left <- result.try(parse_schema(first, at(items_path, Index(0))))
       use right <- result.map(parse_schema(second, at(items_path, Index(1))))
       ParsedSchema(
-        codec.PairSchema(left.schema, right.schema),
+        tree.PairSchema(left.schema, right.schema),
         list.append(left.invariants, right.invariants),
       )
     }
@@ -897,11 +919,11 @@ fn parse_nullable(
       case is_null_schema(left_members), is_null_schema(right_members) {
         True, False -> {
           use parsed <- result.map(parse_schema(right, right_path))
-          ParsedSchema(codec.NullableSchema(parsed.schema), parsed.invariants)
+          ParsedSchema(tree.NullableSchema(parsed.schema), parsed.invariants)
         }
         False, True -> {
           use parsed <- result.map(parse_schema(left, left_path))
-          ParsedSchema(codec.NullableSchema(parsed.schema), parsed.invariants)
+          ParsedSchema(tree.NullableSchema(parsed.schema), parsed.invariants)
         }
         _, _ -> Error(UnsupportedDocument(path, ArbitraryUnion))
       }
@@ -945,7 +967,7 @@ fn parse_union(
         ]
       }
       Ok(ParsedSchema(
-        codec.UnionSchema(list.map(parsed, fn(variant) { variant.0 })),
+        tree.UnionSchema(list.map(parsed, fn(variant) { variant.0 })),
         list.append(duplicate, list.flat_map(parsed, fn(variant) { variant.1 })),
       ))
     }
@@ -986,11 +1008,11 @@ fn parse_variant(
         payload,
         at(properties_path, Field("value")),
       ))
-      #(codec.VariantSchema(tag, Some(parsed.schema)), parsed.invariants)
+      #(tree.VariantSchema(tag, Some(parsed.schema)), parsed.invariants)
     }
     Error(Nil), 1 ->
       case required {
-        ["tag"] -> Ok(#(codec.VariantSchema(tag, None), []))
+        ["tag"] -> Ok(#(tree.VariantSchema(tag, None), []))
         _ -> Error(MalformedDocument(required_path, InvalidTaggedAlternatives))
       }
     _, _ -> Error(UnsupportedDocument(path, UnsupportedTaggedShape))

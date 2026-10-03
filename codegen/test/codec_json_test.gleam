@@ -87,7 +87,7 @@ pub fn custom_codec_json_operations_use_its_value_functions_test() {
     codec.custom(
       encode: prefixed_encode,
       decode: prefixed_decode,
-      schema: Some(codec.StringSchema),
+      schema: option.from_result(codec.schema(codec.string())),
       placeholder: "",
     )
 
@@ -101,8 +101,7 @@ pub fn custom_codec_json_operations_use_its_value_functions_test() {
   |> should.equal(Ok("value-decoded:wire"))
   codec.decode_json(custom, "{\"native\":\"Gleam\"}")
   |> should.equal(Error(DecodeError([], codec.ExpectedString)))
-  codec.schema(custom)
-  |> should.equal(Ok(codec.StringSchema))
+  codec.schema(custom) |> should.equal(codec.schema(codec.string()))
   codec.schema_json(custom)
   |> should.equal(Ok(
     "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"string\"}",
@@ -114,7 +113,7 @@ pub fn gleam_json_bridges_use_the_value_functions_test() {
     codec.custom(
       encode: prefixed_encode,
       decode: prefixed_decode,
-      schema: Some(codec.StringSchema),
+      schema: option.from_result(codec.schema(codec.string())),
       placeholder: "",
     )
 
@@ -170,7 +169,7 @@ pub fn custom_codec_creates_runtime_json_operations_test() {
           _ -> Error(DecodeError([], codec.ExpectedString))
         }
       },
-      schema: Some(codec.StringSchema),
+      schema: option.from_result(codec.schema(codec.string())),
       placeholder: "",
     )
 

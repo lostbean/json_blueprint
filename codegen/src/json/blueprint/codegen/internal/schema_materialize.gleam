@@ -4,6 +4,7 @@ import gleam/option
 import gleam/result
 import gleam/string
 import json/blueprint/codec
+import json/blueprint/internal/schema_tree as tree
 
 pub type SchemaExport {
   SchemaExport(name: String, schema: codec.Schema)
@@ -192,69 +193,86 @@ pub fn emit_schema_expression(
   schema: codec.Schema,
   path: List(String),
 ) -> Result(String, MaterializationError) {
+  emit_tree(codec.to_tree(schema), path)
+}
+
+fn emit_tree(
+  schema: tree.Tree,
+  path: List(String),
+) -> Result(String, MaterializationError) {
   case schema {
-    codec.DescribedSchema(description, inner) -> {
-      use expression <- result.try(emit_schema_expression(inner, path))
+    tree.AnySchema -> Ok("schema_tree.AnySchema")
+    tree.DescribedSchema(description, inner) -> {
+      use expression <- result.try(emit_tree(inner, path))
       Ok(
-        "codec.DescribedSchema("
+        "schema_tree.DescribedSchema("
         <> escape_string_literal(description)
         <> ", "
         <> expression
         <> ")",
       )
     }
-    codec.StringSchema -> Ok("codec.StringSchema")
-    codec.StringEnumSchema(labels) -> {
+    tree.StringSchema -> Ok("schema_tree.StringSchema")
+    tree.StringEnumSchema(labels) -> {
       let escaped_labels = list.map(labels, escape_string_literal)
       Ok(
-        "codec.StringEnumSchema([" <> string.join(escaped_labels, ", ") <> "])",
+        "schema_tree.StringEnumSchema(["
+        <> string.join(escaped_labels, ", ")
+        <> "])",
       )
     }
-    codec.IntSchema -> Ok("codec.IntSchema")
-    codec.NumberSchema -> Ok("codec.NumberSchema")
-    codec.BoolSchema -> Ok("codec.BoolSchema")
-    codec.ObjectSchema(properties) -> {
+    tree.IntSchema -> Ok("schema_tree.IntSchema")
+    tree.NumberSchema -> Ok("schema_tree.NumberSchema")
+    tree.BoolSchema -> Ok("schema_tree.BoolSchema")
+    tree.ObjectSchema(properties) -> {
       emit_properties(properties, path, [])
     }
-    codec.ListSchema(inner) -> {
+    tree.ListSchema(inner) -> {
       let next_path = list.append(path, ["*"])
-      case emit_schema_expression(inner, next_path) {
+      case emit_tree(inner, next_path) {
         Error(err) -> Error(err)
-        Ok(inner_str) -> Ok("codec.ListSchema(" <> inner_str <> ")")
+        Ok(inner_str) -> Ok("schema_tree.ListSchema(" <> inner_str <> ")")
       }
     }
-    codec.PairSchema(left, right) -> {
+    tree.PairSchema(left, right) -> {
       let left_path = list.append(path, ["0"])
       let right_path = list.append(path, ["1"])
-      case emit_schema_expression(left, left_path) {
+      case emit_tree(left, left_path) {
         Error(err) -> Error(err)
         Ok(left_str) ->
-          case emit_schema_expression(right, right_path) {
+          case emit_tree(right, right_path) {
             Error(err) -> Error(err)
             Ok(right_str) ->
-              Ok("codec.PairSchema(" <> left_str <> ", " <> right_str <> ")")
+              Ok(
+                "schema_tree.PairSchema("
+                <> left_str
+                <> ", "
+                <> right_str
+                <> ")",
+              )
           }
       }
     }
-    codec.NullableSchema(inner) -> {
+    tree.NullableSchema(inner) -> {
       let next_path = list.append(path, ["non_null"])
-      case emit_schema_expression(inner, next_path) {
+      case emit_tree(inner, next_path) {
         Error(err) -> Error(err)
-        Ok(inner_str) -> Ok("codec.NullableSchema(" <> inner_str <> ")")
+        Ok(inner_str) -> Ok("schema_tree.NullableSchema(" <> inner_str <> ")")
       }
     }
-    codec.UnionSchema(variants) -> {
+    tree.UnionSchema(variants) -> {
       use emitted <- result.try(
         list.try_map(variants, fn(variant) {
           let tag = escape_string_literal(variant.tag)
           case variant.payload {
-            option.None -> Ok("codec.VariantSchema(" <> tag <> ", option.None)")
+            option.None ->
+              Ok("schema_tree.VariantSchema(" <> tag <> ", option.None)")
             option.Some(payload) -> {
-              use payload_str <- result.map(emit_schema_expression(
+              use payload_str <- result.map(emit_tree(
                 payload,
                 list.append(path, [variant.tag]),
               ))
-              "codec.VariantSchema("
+              "schema_tree.VariantSchema("
               <> tag
               <> ", option.Some("
               <> payload_str
@@ -263,34 +281,34 @@ pub fn emit_schema_expression(
           }
         }),
       )
-      Ok("codec.UnionSchema([" <> string.join(emitted, ", ") <> "])")
+      Ok("schema_tree.UnionSchema([" <> string.join(emitted, ", ") <> "])")
     }
-    codec.IntegerRangeSchema(min, max) ->
+    tree.IntegerRangeSchema(min, max) ->
       Ok(
-        "codec.IntegerRangeSchema("
+        "schema_tree.IntegerRangeSchema("
         <> format_int_literal(min)
         <> ", "
         <> format_int_literal(max)
         <> ")",
       )
-    codec.NumberRangeSchema(_, _) ->
+    tree.NumberRangeSchema(_, _) ->
       Error(UnsupportedConstructor(path, "NumberRangeSchema"))
   }
 }
 
 fn emit_properties(
-  properties: List(codec.PropertySchema),
+  properties: List(tree.PropertySchema),
   path: List(String),
   acc: List(String),
 ) -> Result(String, MaterializationError) {
   case properties {
     [] -> {
       let props_str = string.join(list.reverse(acc), ", ")
-      Ok("codec.ObjectSchema([" <> props_str <> "])")
+      Ok("schema_tree.ObjectSchema([" <> props_str <> "])")
     }
-    [codec.PropertySchema(name, required, schema), ..rest] -> {
+    [tree.PropertySchema(name, required, schema), ..rest] -> {
       let next_path = list.append(path, [name])
-      case emit_schema_expression(schema, next_path) {
+      case emit_tree(schema, next_path) {
         Error(err) -> Error(err)
         Ok(schema_str) -> {
           let req_str = case required {
@@ -298,7 +316,7 @@ fn emit_properties(
             False -> "False"
           }
           let prop_str =
-            "codec.PropertySchema("
+            "schema_tree.PropertySchema("
             <> escape_string_literal(name)
             <> ", "
             <> req_str
@@ -332,7 +350,9 @@ pub fn materialize(
               Ok(fn_bodies) -> {
                 let content =
                   "// @generated by json_blueprint schema materialization\n"
-                  <> "import gleam/option\nimport json/blueprint/codec\n\n"
+                  <> "import gleam/option\nimport json/blueprint/codec\n"
+                  <> "import json/blueprint/internal/generated\n"
+                  <> "import json/blueprint/internal/schema_tree\n\n"
                   <> string.join(fn_bodies, "\n\n")
                   <> "\n"
                 Ok(GeneratedModule(
@@ -377,7 +397,11 @@ fn emit_functions(
         Error(err) -> Error(err)
         Ok(expr_str) -> {
           let fn_code =
-            "pub fn " <> name <> "() -> codec.Schema {\n  " <> expr_str <> "\n}"
+            "pub fn "
+            <> name
+            <> "() -> codec.Schema {\n  generated.schema("
+            <> expr_str
+            <> ")\n}"
           emit_functions(rest, [fn_code, ..acc])
         }
       }

@@ -12,6 +12,7 @@ import json/blueprint/codec.{DecodeError, EncodeError, Field, Index}
 import json/blueprint/codegen
 import json/blueprint/contract
 import json/blueprint/internal/generated
+import json/blueprint/internal/schema_tree as tree
 import json/blueprint/number
 import json/blueprint/value
 import materialize_fixtures
@@ -32,7 +33,7 @@ pub fn custom_codec_retains_the_known_schema_test() {
     codec.custom(
       encode: fn(_) { Ok(value.Null) },
       decode: fn(_) { Ok(7) },
-      schema: Some(codec.IntSchema),
+      schema: option.from_result(codec.schema(codec.int())),
       placeholder: 0,
     )
 
@@ -40,8 +41,7 @@ pub fn custom_codec_retains_the_known_schema_test() {
   |> should.equal(Ok(value.Null))
   codec.decode(constructed, value.Null)
   |> should.equal(Ok(7))
-  codec.schema(constructed)
-  |> should.equal(Ok(codec.IntSchema))
+  codec.schema(constructed) |> should.equal(codec.schema(codec.int()))
 
   let unknown =
     codec.custom(
@@ -802,10 +802,9 @@ pub fn optional_definitions_decode_absent_as_none_test() {
   codec.encode_json(runtime, None) |> should.equal(Ok("{}"))
   codec.encode_json(runtime, Some(3)) |> should.equal(Ok("{\"count\":3}"))
   codec.schema(runtime)
+  |> result.map(codec.to_tree)
   |> should.equal(
-    Ok(
-      codec.ObjectSchema([codec.PropertySchema("count", False, codec.IntSchema)]),
-    ),
+    Ok(tree.ObjectSchema([tree.PropertySchema("count", False, tree.IntSchema)])),
   )
 
   let assert Ok(codegen.GeneratedModule(_, content, _)) =
@@ -847,7 +846,7 @@ pub fn nullable_definitions_are_options_test() {
   codec.decode_json(runtime, "4") |> should.equal(Ok(Some(4)))
   codec.encode_json(runtime, None) |> should.equal(Ok("null"))
   codec.schema(runtime)
-  |> should.equal(Ok(codec.NullableSchema(codec.IntSchema)))
+  |> should.equal(codec.schema(codec.nullable(codec.int())))
 
   let assert Ok(codegen.GeneratedModule(_, content, _)) =
     codegen.compile("generated/maybe", "maybe", definition)

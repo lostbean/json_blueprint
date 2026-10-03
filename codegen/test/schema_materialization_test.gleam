@@ -7,6 +7,7 @@ import json/blueprint/codegen/internal/schema_materialize.{
   DuplicateAccessor, InvalidAccessorName, SchemaExport, UnknownSchema,
   UnsupportedConstructor,
 }
+import json/blueprint/internal/schema_tree as tree
 import materialize_fixtures
 import schema_materialization_runner
 
@@ -182,11 +183,11 @@ pub fn unknown_schema_from_codec_test() {
 
 pub fn described_schema_expression_preserves_escaped_text_test() {
   schema_materialize.emit_schema_expression(
-    codec.DescribedSchema("owner's \"name\"", codec.StringSchema),
+    codec.from_tree(tree.DescribedSchema("owner's \"name\"", tree.StringSchema)),
     ["name"],
   )
   |> should.equal(Ok(
-    "codec.DescribedSchema(\"owner's \\\"name\\\"\", codec.StringSchema)",
+    "schema_tree.DescribedSchema(\"owner's \\\"name\\\"\", schema_tree.StringSchema)",
   ))
 }
 
@@ -202,7 +203,9 @@ pub fn unsupported_number_range_schema_located_test() {
   // Also test nested inside an object property
   let assert Ok(s) = codec.schema(range_c)
   let nested_schema =
-    codec.ObjectSchema([codec.PropertySchema("amount", True, s)])
+    codec.from_tree(
+      tree.ObjectSchema([tree.PropertySchema("amount", True, codec.to_tree(s))]),
+    )
   let nested_export = SchemaExport("nested_range", nested_schema)
 
   schema_materialize.materialize("generated/catalog", [nested_export])
@@ -215,10 +218,12 @@ pub fn unsupported_number_range_schema_located_test() {
 
   // And inside a union variant's payload, located by its tag.
   let union_schema =
-    codec.UnionSchema([
-      codec.VariantSchema("empty", None),
-      codec.VariantSchema("ranged", Some(codec.ListSchema(s))),
-    ])
+    codec.from_tree(
+      tree.UnionSchema([
+        tree.VariantSchema("empty", None),
+        tree.VariantSchema("ranged", Some(tree.ListSchema(codec.to_tree(s)))),
+      ]),
+    )
   schema_materialize.materialize("generated/catalog", [
     SchemaExport("union_range", union_schema),
   ])
@@ -232,19 +237,21 @@ pub fn unsupported_number_range_schema_located_test() {
 
 pub fn union_schema_expression_keeps_unit_and_payload_variants_test() {
   schema_materialize.emit_schema_expression(
-    codec.UnionSchema([
-      codec.VariantSchema("defer", None),
-      codec.VariantSchema(
-        "approve \"let\"",
-        Some(codec.IntegerRangeSchema(-1000, 1_000_000)),
-      ),
-    ]),
+    codec.from_tree(
+      tree.UnionSchema([
+        tree.VariantSchema("defer", None),
+        tree.VariantSchema(
+          "approve \"let\"",
+          Some(tree.IntegerRangeSchema(-1000, 1_000_000)),
+        ),
+      ]),
+    ),
     ["decision"],
   )
   |> should.equal(Ok(
-    "codec.UnionSchema([codec.VariantSchema(\"defer\", option.None), "
-    <> "codec.VariantSchema(\"approve \\\"let\\\"\", "
-    <> "option.Some(codec.IntegerRangeSchema(-1_000, 1_000_000)))])",
+    "schema_tree.UnionSchema([schema_tree.VariantSchema(\"defer\", option.None), "
+    <> "schema_tree.VariantSchema(\"approve \\\"let\\\"\", "
+    <> "option.Some(schema_tree.IntegerRangeSchema(-1_000, 1_000_000)))])",
   ))
 }
 
@@ -254,7 +261,8 @@ pub fn decision_union_schema_materializes_test() {
       "decision_schema",
       materialize_fixtures.build_decision_codec(),
     )
-  let assert codec.UnionSchema([approve, decline, defer]) = export.schema
+  let assert codec.UnionSchema([approve, decline, defer]) =
+    codec.view(export.schema)
   approve.tag |> should.equal("approve \"let\"")
   decline.tag |> should.equal("decline \n\r\f\t\\import")
   defer |> should.equal(codec.VariantSchema("defer", None))
@@ -266,11 +274,11 @@ pub fn decision_union_schema_materializes_test() {
   |> string.contains("import gleam/option\n")
   |> should.be_true
   module.content
-  |> string.contains("codec.VariantSchema(\"defer\", option.None)")
+  |> string.contains("schema_tree.VariantSchema(\"defer\", option.None)")
   |> should.be_true
   module.content
   |> string.contains(
-    "codec.VariantSchema(\"decline \\n\\r\\f\\t\\\\import\", option.Some(",
+    "schema_tree.VariantSchema(\"decline \\n\\r\\f\\t\\\\import\", option.Some(",
   )
   |> should.be_true
 }
@@ -368,4 +376,19 @@ fn string_contains(haystack: String, needle: String) -> Bool {
 pub fn end_to_end_fixture_generation_test() {
   let res = schema_materialization_runner.generate_fixture()
   res |> should.equal(Ok("build/schema-materialization/fixture"))
+}
+
+pub fn any_schema_materializes_test() {
+  let assert Ok(any) = codec.schema(codec.list(codec.value()))
+  schema_materialize.emit_schema_expression(any, ["items"])
+  |> should.equal(Ok("schema_tree.ListSchema(schema_tree.AnySchema)"))
+  let assert Ok(module) =
+    schema_materialize.materialize("generated/any_catalog", [
+      SchemaExport("items", any),
+    ])
+  module.content
+  |> string.contains(
+    "pub fn items() -> codec.Schema {\n  generated.schema(schema_tree.ListSchema(schema_tree.AnySchema))\n}",
+  )
+  |> should.be_true
 }

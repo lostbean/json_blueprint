@@ -51,6 +51,11 @@ fn person_codec() -> codec.Codec(Person) {
   codec.success(Person(name:, age:, nickname:))
 }
 
+fn bare_schema() -> codec.Schema {
+  let assert Ok(schema) = codec.schema(bare_person_codec())
+  schema
+}
+
 pub fn described_schema_reaches_fields_and_preserves_behavior_test() {
   let described = codec.describe(described_person_codec(), "A person")
   let assert Ok(schema) = codec.schema(described)
@@ -60,18 +65,7 @@ pub fn described_schema_reaches_fields_and_preserves_behavior_test() {
   contract.same_schema(described_contract, loaded) |> should.equal(True)
   let assert Ok(bare_contract) = contract.from_codec(described_person_codec())
   contract.same_schema(described_contract, bare_contract) |> should.equal(True)
-  let assert Ok(unannotated) =
-    contract.from_schema(
-      codec.ObjectSchema([
-        codec.PropertySchema("name", True, codec.StringSchema),
-        codec.PropertySchema("age", True, codec.IntSchema),
-        codec.PropertySchema(
-          "nickname",
-          False,
-          codec.NullableSchema(codec.StringSchema),
-        ),
-      ]),
-    )
+  let unannotated = contract.from_schema(bare_schema())
   contract.same_schema(described_contract, unannotated) |> should.equal(True)
   let assert Ok(age) = number.from_int(37)
   let raw =
@@ -109,8 +103,16 @@ pub fn description_replacement_and_unknown_schema_test() {
     codec.string()
     |> codec.describe("first")
     |> codec.describe("second")
-  codec.schema(described)
-  |> should.equal(Ok(codec.DescribedSchema("second", codec.StringSchema)))
+  let assert Ok(schema) = codec.schema(described)
+  codec.description(schema) |> should.equal(Some("second"))
+  codec.view(schema) |> should.equal(codec.StringSchema)
+  codec.schema_value(schema)
+  |> should.equal(
+    value.Object([
+      #("description", value.String("second")),
+      #("type", value.String("string")),
+    ]),
+  )
   let custom =
     codec.custom(
       encode: fn(item: String) { Ok(value.String(item)) },

@@ -132,13 +132,17 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
     })
 
   // 3. Runtime contract validation benchmark
-  let user_schema =
-    codec.ObjectSchema([
-      codec.PropertySchema("name", True, codec.StringSchema),
-      codec.PropertySchema("age", True, codec.IntegerRangeSchema(0, 120)),
-      codec.PropertySchema("tags", True, codec.ListSchema(codec.StringSchema)),
-    ])
-  let assert Ok(user_contract) = contract.from_schema(user_schema)
+  let user_codec = {
+    use name <- codec.field("name", codec.string(), get: fn(u) { u.0 })
+    use age <- codec.field("age", codec.integer_between(0, 120), get: fn(u) {
+      u.1
+    })
+    use tags <- codec.field("tags", codec.list(codec.string()), get: fn(u) {
+      u.2
+    })
+    codec.success(#(name, age, tags))
+  }
+  let assert Ok(user_contract) = contract.from_codec(user_codec)
   let assert Ok(num36) = number.from_int(36)
   let sample_user_val =
     value.Object([
