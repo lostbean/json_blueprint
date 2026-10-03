@@ -843,3 +843,78 @@ Dependents (every site fails to compile until migrated):
 | relay          | 6     | `src/relay/tool.gleam` (module doc), `src/relay_conformance_server.gleam`, `test/relay/client_test.gleam`, `test/relay/test_codec.gleam`, `fixtures/negative/wrong_handler_codec.gleam`                                                                                                                           |
 | llm_wire       | 2     | `test/llm_wire_api_test.gleam`, `test/tool_fixtures.gleam`                                                                                                                                                                                                                                                        |
 | oversight apps | 88    | extractor (`invoice`, `jobs`, test), research_agent (`domain`, `publish`), secure_mcp (`reports`), support_desk (`domain`), tool_hub (`inventory`, `assistant`)                                                                                                                                                   |
+
+## Wave 3 additions
+
+Wave 3 adds two functions to `json/blueprint/codec`. Both are additive:
+nothing that compiled stops compiling, and no schema, wire output or error
+changes. Commit: `60c0dfb`.
+
+| Item                                | Replaces                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| `codec.value() -> Codec(Value)`     | `codec.custom(encode: Ok, decode: Ok, schema: None, placeholder: value.Null)` |
+| `codec.placeholder(Codec(a)) -> a`  | a placeholder written by hand for a type the wrapper did not build           |
+
+### `codec.value`
+
+A pass-through codec for JSON that the application forwards or inspects
+itself. Decoding accepts any value and encoding returns it unchanged; the
+parse limits of `decode_json` still bound it. It has no schema, so `schema`
+returns `UnknownSchema` for it and for any codec built from it, exactly as
+the `custom` it replaces. Use `contract.value_codec(contract)` when the
+value's schema is known.
+
+```gleam
+// Before
+codec.custom(encode: Ok, decode: Ok, schema: None, placeholder: Null)
+
+// After
+codec.value()
+```
+
+Dependents that can adopt it:
+`oversight/apps/tool_hub/src/tool_hub/remote_tools.gleam:120` (a peer's
+tool output, forwarded as sent).
+
+### `codec.placeholder`
+
+Returns the value a codec describes itself with: `""` for `string()`, `0`
+for `int()`, `minimum` for `integer_between`, `[]` for `list`, `None` for
+`nullable`, `value.Null` for `value()`, the first variant of a union or
+enum, and the record built from its fields' placeholders. A generic wrapper
+passes it to `try_map`, `custom` or `decode.failure` instead of asking its
+caller for one. It need not be valid input and is not a default value: never
+encode it as data.
+
+```gleam
+// Before: the wrapper invents a value of a type it does not own, or takes
+// one from its caller.
+pub fn receipt_codec(output: Codec(o)) -> Codec(Receipt(o)) {
+  codec.custom(.., placeholder: Receipt("", Refusal(""), None))
+}
+
+// After: derive it from the codec being wrapped.
+pub fn non_empty(inner: Codec(List(a))) -> Codec(List(a)) {
+  codec.try_map(
+    inner,
+    decode: fn(items) {
+      case items {
+        [] -> Error("expected at least one item")
+        _ -> Ok(items)
+      }
+    },
+    encode: Ok,
+    placeholder: codec.placeholder(inner),
+  )
+}
+```
+
+Dependents that can adopt it: `fabric/src/fabric/graph/llm.gleam` lines 141,
+164, 207 and 294, which build a `Receipt` or `Refusal` placeholder by hand
+around the application's output codec.
+
+### Version
+
+`gleam.toml` still says `1.7.1`. The CHANGELOG convention keeps the manifest
+version until a release decision (`## Unreleased — intended 2.0`), so wave 3
+does not bump it; bump it to `2.0.0` when publishing.
