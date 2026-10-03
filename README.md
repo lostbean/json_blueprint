@@ -162,6 +162,11 @@ pub fn email_codec() -> Codec(Email) {
 A failed conversion is the reason `Custom(message)` at the codec's path, and
 `describe_decode_error` renders it as `$: an email address needs an @`.
 
+A generic wrapper over a codec it did not build takes the placeholder from
+it: `codec.placeholder(inner)` returns the value `inner` describes itself
+with, such as `""` for `codec.string()` or the first variant of a union. It
+need not be valid input, so never encode it as data.
+
 A `try_map` over a whole record fails at the record's own path, `[]` at the
 root. To report a check across fields at the field it concerns, build that
 field's codec inside the record from the fields decoded before it:
@@ -301,7 +306,10 @@ pub fn check_arguments(
 
 `contract.value_codec(contract)` is a `Codec(Value)` with the contract's
 schema that validates while decoding, and `contract.decode` decodes a
-validated value with a codec whose schema matches.
+validated value with a codec whose schema matches. `codec.value()` passes
+any JSON through as a `Value` without a schema, for a value the application
+forwards as it came, such as a tool result from a remote peer; `schema`
+returns `UnknownSchema` for it and for every codec built from it.
 
 The profile covers closed objects with required and optional properties,
 pairs, lists, nullable values, bounded integers and numbers, string enums and

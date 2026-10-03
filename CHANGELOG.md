@@ -27,6 +27,11 @@ until a release decision.
   `string_enum`, `integer_between`, `number_between`, `describe`, `map`,
   `try_map` and `custom`. `try_map` and `custom` take an explicit
   placeholder value.
+- `codec.value()` passes any JSON through as a `Value`, with no schema. It
+  replaces a `codec.custom` with `encode: Ok`, `decode: Ok`, `schema: None`
+  and `placeholder: value.Null`. `codec.placeholder(codec)` returns the value
+  a codec describes itself with, so a generic wrapper can pass it to
+  `try_map`, `custom` or `decode.failure`.
 - Use a codec with `encode`, `decode`, `encode_json`, `decode_json`,
   `decode_json_with_limits`, `schema`, `schema_json`, `schema_value` and
   `schema_document`, and with `gleam/json` through `codec.to_json` (exact; a
