@@ -2,7 +2,8 @@
 # The repository gate: formatting, compiler warnings and the tests on both
 # targets, for json_blueprint and for the json_blueprint_codegen package in
 # codegen/. Each package's own build output is removed first, so a stale
-# module cannot hide a missing one.
+# module cannot hide a missing one. The Python schema oracle then compares
+# emitted schemas, decoders and contracts against Draft 2020-12.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -33,3 +34,5 @@ for package in . codegen; do
     run gleam test --target=javascript
   )
 done
+
+python3 test/schema_check.py

@@ -402,9 +402,11 @@ builder.
 ## Development
 
 ```sh
-nix develop          # Gleam 1.17, Erlang/OTP 28, Node.js 24
-sh scripts/gate.sh   # format, warnings and tests on both targets, for both packages
+nix develop          # Gleam 1.18.1, Erlang/OTP 28, Node.js 24, Python + jsonschema
+sh scripts/gate.sh   # format, warnings, both-target tests and the schema oracle
 ```
 
 `test/schema_check.py` compares the emitted schemas with the Python
-`jsonschema` Draft 2020-12 validator; it needs `jsonschema` 4.26 or later.
+`jsonschema` Draft 2020-12 validator; it needs `jsonschema` 4.26 or later,
+provided by the dev shell and installed by CI. The gate runs it after both
+packages pass their Erlang and JavaScript checks.

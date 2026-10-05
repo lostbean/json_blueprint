@@ -23,8 +23,9 @@
           buildInputs = with pkgs; [
             gleam
             rebar3
-            erlang_28
-            nodejs
+            beam28Packages.erlang
+            nodejs_24
+            (python3.withPackages (pythonPackages: [ pythonPackages.jsonschema ]))
           ];
 
           shellHook = ''
