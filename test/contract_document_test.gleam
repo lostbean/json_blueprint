@@ -686,8 +686,7 @@ pub fn parse_schema_text_errors_test() {
   {
     Error(contract.InvalidJson(value.ParseError(_, value.DuplicateObjectKey))) ->
       Nil
-    other ->
-      panic as { "expected duplicate key, got " <> string.inspect(other) }
+    other -> panic as { "expected duplicate key, got " <> string.inspect(other) }
   }
 
   // A well-formed document outside the profile

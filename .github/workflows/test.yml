@@ -11,14 +11,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "28"
-          gleam-version: "1.17.0"
-          rebar3-version: "3"
-          # elixir-version: "1.15.4"
-      - uses: actions/setup-node@v4
+          gleam-version: "1.18.1"
+          rebar3-version: "3.27.1"
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: python -m pip install jsonschema==4.26.0
       - run: sh scripts/gate.sh
