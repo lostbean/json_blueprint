@@ -26,8 +26,9 @@ validate_native_int(Value, _OnNonFinite, _OnFractional, _OnUnsupported) when is_
     {ok, integer_to_binary(Value)};
 validate_native_int(Value, _OnNonFinite, OnFractional, _OnUnsupported) when is_float(Value) ->
     {error, OnFractional};
-validate_native_int(Value, OnNonFinite, _OnFractional, _OnUnsupported)
-  when Value =:= nan; Value =:= infinity; Value =:= neg_infinity ->
+validate_native_int(Value, OnNonFinite, _OnFractional, _OnUnsupported) when
+    Value =:= nan; Value =:= infinity; Value =:= neg_infinity
+->
     {error, OnNonFinite};
 validate_native_int(_Value, _OnNonFinite, OnFractional, _OnUnsupported) ->
     {error, OnFractional}.
@@ -35,7 +36,9 @@ validate_native_int(_Value, _OnNonFinite, OnFractional, _OnUnsupported) ->
 integer_divide(Dividend, Divisor) when is_integer(Dividend), is_integer(Divisor), Divisor =/= 0 ->
     Dividend div Divisor.
 
-integer_remainder(Dividend, Divisor) when is_integer(Dividend), is_integer(Divisor), Divisor =/= 0 ->
+integer_remainder(Dividend, Divisor) when
+    is_integer(Dividend), is_integer(Divisor), Divisor =/= 0
+->
     Dividend rem Divisor.
 
 float_parts(Value) when is_float(Value) ->
@@ -48,12 +51,15 @@ float_parts(Value) when is_float(Value) ->
     end.
 
 parse_float_candidate(Token, OnValue, OnOverflow, OnInvalid) when is_binary(Token) ->
-    case re:run(
-        Token,
-        <<"^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$">>,
-        [{capture, none}]
-    ) of
-        nomatch -> OnInvalid;
+    case
+        re:run(
+            Token,
+            <<"^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$">>,
+            [{capture, none}]
+        )
+    of
+        nomatch ->
+            OnInvalid;
         match ->
             FloatToken = ensure_float_lexeme(Token),
             try list_to_float(binary_to_list(FloatToken)) of
@@ -76,7 +82,8 @@ ensure_float_lexeme(Token) ->
 
 insert_decimal_point(Token) ->
     case binary:match(Token, <<"e">>) of
-        {Position, 1} -> insert_before(Token, Position, <<".0">>);
+        {Position, 1} ->
+            insert_before(Token, Position, <<".0">>);
         nomatch ->
             case binary:match(Token, <<"E">>) of
                 {Position, 1} -> insert_before(Token, Position, <<".0">>);
@@ -89,12 +96,13 @@ insert_before(Token, Position, Inserted) ->
     <<Mantissa/binary, Inserted/binary, Exponent/binary>>.
 
 float_to_decimal(Significand, Exponent2) ->
-    {Coeff, Exp10} = if
-        Exponent2 >= 0 ->
-            {Significand * integer_power(2, Exponent2), 0};
-        true ->
-            {Significand * integer_power(5, -Exponent2), Exponent2}
-    end,
+    {Coeff, Exp10} =
+        if
+            Exponent2 >= 0 ->
+                {Significand * integer_power(2, Exponent2), 0};
+            true ->
+                {Significand * integer_power(5, -Exponent2), Exponent2}
+        end,
     Digits = binary_to_list(integer_to_binary(Coeff)),
     {Digits, Exp10}.
 
@@ -104,9 +112,12 @@ decimal_equals_binary(DecDigits, DecExp, BinSig, BinExp) ->
     {NormBinSig, NormBinExp} = remove_binary_trailing_zeroes(BinSig, BinExp),
     case {DecExp >= 0, NormBinExp >= 0} of
         {true, true} ->
-            DecSignificand * integer_power(10, DecExp) =:= NormBinSig * integer_power(2, NormBinExp);
-        {true, false} -> false;
-        {false, true} -> false;
+            DecSignificand * integer_power(10, DecExp) =:=
+                NormBinSig * integer_power(2, NormBinExp);
+        {true, false} ->
+            false;
+        {false, true} ->
+            false;
         {false, false} ->
             DecDenomExp = -DecExp,
             BinDenomExp = -NormBinExp,
@@ -136,8 +147,9 @@ project_native_int(Negative, Digits, Exponent10) ->
     DecStr = list_to_binary(Digits),
     Coeff = binary_to_integer(DecStr),
     Val = Coeff * integer_power(10, Exponent10),
-    SignedVal = case Negative of
-        true -> -Val;
-        false -> Val
-    end,
+    SignedVal =
+        case Negative of
+            true -> -Val;
+            false -> Val
+        end,
     {ok, SignedVal}.

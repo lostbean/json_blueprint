@@ -73,6 +73,13 @@ send their result to an observable sink. Parsing, construction, and Value-only
 cases measure different work, so compare matching cases with the same parser
 policy.
 
+Weekly and manual runs of the `Benchmark observations` workflow execute this
+current harness on both targets. `scripts/benchmark.sh` creates a fresh evidence
+directory and retains both raw logs, the source revision and dirty status,
+lockfile hashes, runtime versions, and OS/architecture. Timing remains an
+observation without a speed ceiling or a published performance claim. The
+ordinary CI gate retains the benchmark fixtures' semantic tests.
+
 ## Historical memory observations
 
 The [retained README at commit `94438b9`](https://github.com/lostbean/json_blueprint/blob/94438b93b638a2ecf2e4443bd9c2c3cbf97b7713/README.md#defaults)

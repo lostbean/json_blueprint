@@ -1,0 +1,38 @@
+name: Benchmark observations
+
+on:
+  schedule:
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Record current Erlang and Node timing
+        env:
+          BLUEPRINT_BENCH_OUTPUT: ${{ runner.temp }}/json-blueprint-benchmarks
+        run: nix develop --command sh scripts/benchmark.sh
+      - name: Retain observations and toolchain provenance
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: json-blueprint-benchmarks
+          path: ${{ runner.temp }}/json-blueprint-benchmarks/
+          retention-days: 14
+          include-hidden-files: true
+          if-no-files-found: error

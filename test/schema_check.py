@@ -6,6 +6,7 @@ the emitted schema document; both must agree with the manifest and with the
 validator on the emitted and the normalized schema. Also proves that
 missing, extra, duplicate, or replaced fixtures fail closed.
 """
+
 import copy
 import json
 import subprocess
@@ -40,9 +41,7 @@ def validate_cases(cases, manifest):
     Raises ValueError on any deviation.
     """
     if len(cases) != TOTAL_EXPECTED_CASES:
-        raise ValueError(
-            f"Expected {TOTAL_EXPECTED_CASES} cases, got {len(cases)}"
-        )
+        raise ValueError(f"Expected {TOTAL_EXPECTED_CASES} cases, got {len(cases)}")
 
     seen_ids = set()
     seen_family_instances = set()
@@ -73,9 +72,7 @@ def validate_cases(cases, manifest):
             json.dumps(case["instance"], sort_keys=True),
         )
         if family_instance_key in seen_family_instances:
-            raise ValueError(
-                f"Duplicate instance payload in family {label}: {case_id}"
-            )
+            raise ValueError(f"Duplicate instance payload in family {label}: {case_id}")
         seen_family_instances.add(family_instance_key)
 
         # Exact schema and instance match with frozen manifest
@@ -84,9 +81,7 @@ def validate_cases(cases, manifest):
                 f"Instance payload replaced/tampered for {case_id}: expected {manifest_entry['instance']}, got {case['instance']}"
             )
         if case["schema"] != manifest_entry["schema"]:
-            raise ValueError(
-                f"Schema payload replaced/tampered for {case_id}"
-            )
+            raise ValueError(f"Schema payload replaced/tampered for {case_id}")
 
         # Outcome match with frozen manifest
         expected_accepted = manifest_entry["accepted"]
@@ -104,16 +99,14 @@ def validate_cases(cases, manifest):
             )
 
         Draft202012Validator.check_schema(case["normalized_schema"])
-        normalized_accepted = Draft202012Validator(
-            case["normalized_schema"]
-        ).is_valid(case["instance"])
+        normalized_accepted = Draft202012Validator(case["normalized_schema"]).is_valid(
+            case["instance"]
+        )
         if (
             case["runtime_accepted"] != expected_accepted
             or normalized_accepted != expected_accepted
         ):
-            raise ValueError(
-                f"Contract/normalized schema disagreement for {case_id}"
-            )
+            raise ValueError(f"Contract/normalized schema disagreement for {case_id}")
         outcomes.add(accepted)
 
     if seen_ids != set(manifest.keys()):

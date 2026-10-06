@@ -24,7 +24,7 @@ export function validate_native_int(
   value,
   onNonFinite,
   onFractional,
-  onUnsupported
+  onUnsupported,
 ) {
   if (typeof value !== "number" && typeof value !== "bigint") {
     return new Error(onFractional);
@@ -96,10 +96,10 @@ export function float_to_decimal(significand, exponent2) {
   const sig = BigInt(significand);
   const exp2 = BigInt(exponent2);
   if (exponent2 >= 0) {
-    coeff = sig * (2n ** exp2);
+    coeff = sig * 2n ** exp2;
     exp10 = 0;
   } else {
-    coeff = sig * (5n ** (-exp2));
+    coeff = sig * 5n ** -exp2;
     exp10 = exponent2;
   }
   const digits = Array.from(new TextEncoder().encode(coeff.toString()));
@@ -115,15 +115,15 @@ export function decimal_equals_binary(decDigits, decExp, binSig, binExp) {
   let binSignificand = BigInt(binSig);
   let binExponent = binExp;
 
-  while (binSignificand > 0n && (binSignificand % 2n) === 0n) {
+  while (binSignificand > 0n && binSignificand % 2n === 0n) {
     binSignificand = binSignificand / 2n;
     binExponent += 1;
   }
 
   if (decExp >= 0 && binExponent >= 0) {
     return (
-      decSignificand * (10n ** BigInt(decExp)) ===
-      binSignificand * (2n ** BigInt(binExponent))
+      decSignificand * 10n ** BigInt(decExp) ===
+      binSignificand * 2n ** BigInt(binExponent)
     );
   } else if (decExp >= 0 || binExponent >= 0) {
     return false;
@@ -131,8 +131,8 @@ export function decimal_equals_binary(decDigits, decExp, binSig, binExp) {
     const decDenomExp = BigInt(-decExp);
     const binDenomExp = BigInt(-binExponent);
     return (
-      decSignificand * (2n ** binDenomExp) ===
-      binSignificand * (2n ** decDenomExp) * (5n ** decDenomExp)
+      decSignificand * 2n ** binDenomExp ===
+      binSignificand * 2n ** decDenomExp * 5n ** decDenomExp
     );
   }
 }
@@ -143,7 +143,7 @@ export function project_native_int(negative, digits, exponent10) {
     str += String.fromCharCode(code);
   }
   if (exponent10 < 0) return new Error(undefined);
-  let val = BigInt(str) * (10n ** BigInt(exponent10));
+  let val = BigInt(str) * 10n ** BigInt(exponent10);
   if (negative) val = -val;
   if (val < -9007199254740991n || val > 9007199254740991n) {
     return new Error(undefined);

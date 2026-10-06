@@ -1,39 +1,66 @@
-name: test
+name: CI
 
 on:
   push:
-    branches:
-      - master
-      - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: Both runtimes and schema oracle
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          otp-version: "28"
-          gleam-version: "1.18.1"
-          rebar3-version: "3.27.1"
-      - uses: actions/setup-node@v7
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
-          node-version: "24"
-      - uses: actions/setup-python@v7
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Full repository gate
+        run: |
+          set -o pipefail
+          mkdir "$RUNNER_TEMP/json-blueprint-ci"
+          nix develop --command sh scripts/gate.sh 2>&1 | tee "$RUNNER_TEMP/json-blueprint-ci/gate.log"
+      - name: Retain gate receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          python-version: "3.14"
-      - run: python -m pip install jsonschema==4.26.0
-      - run: sh scripts/gate.sh
+          name: json-blueprint-ci
+          path: ${{ runner.temp }}/json-blueprint-ci/
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
 
   design:
     name: Design layer
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
       - run: nix run .#design-gate-check -- docs/design .
+
+  ci:
+    name: CI
+    if: always()
+    needs: [test, design]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every mandatory job to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          DESIGN_RESULT: ${{ needs.design.result }}
+        run: test "$TEST_RESULT" = success && test "$DESIGN_RESULT" = success

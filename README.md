@@ -136,13 +136,20 @@ aggregation, and missing machine provenance.
 
 ```sh
 nix develop          # Gleam 1.18.1, Erlang/OTP 28, Node.js 24, Python + jsonschema
-sh scripts/gate.sh   # format, warnings, both-target tests and the schema oracle
+sh scripts/gate.sh   # formatting, tooling lint, warnings, both-target tests and schema oracle
+nix fmt -- PATH...   # format named authored files
 ```
 
 `test/schema_check.py` compares the emitted schemas with the Python
 `jsonschema` Draft 2020-12 validator; it needs `jsonschema` 4.26 or later,
-provided by the dev shell and installed by CI. The gate runs it after both
-packages pass their Erlang and JavaScript checks.
+provided by the locked Nix shell used locally and in CI. The gate runs it after both
+packages pass their Erlang and JavaScript checks. The gate validates the tree
+without formatting it, checks workflow/shell/Python tooling, and compiles authored
+Erlang FFI independently with `erlc -Werror`. A warning counterexample and a
+positive control exercise the native compiler gate. Runtime reports do not
+substitute for compiler diagnostics. Frozen oracle bytes, generated fixtures,
+and rendered design evidence are excluded from automatic formatting; Gleam
+fixture drift tests still compare regenerated source and execute both targets.
 
 ## Design
 
