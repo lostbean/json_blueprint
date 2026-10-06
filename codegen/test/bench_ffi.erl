@@ -9,10 +9,11 @@ target_runtime() ->
     <<"Erlang/OTP ", Otp/binary>>.
 
 consume(Value) ->
-    Count = case get(blueprint_benchmark_sink) of
-        {_, PreviousCount} -> PreviousCount + 1;
-        undefined -> 1
-    end,
+    Count =
+        case get(blueprint_benchmark_sink) of
+            {_, PreviousCount} -> PreviousCount + 1;
+            undefined -> 1
+        end,
     put(blueprint_benchmark_sink, {Value, Count}),
     nil.
 

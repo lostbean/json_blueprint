@@ -13,13 +13,17 @@ run() {
     echo "gate: failed: $*" >&2
     exit 1
   }
-  if echo "$output" | grep -q "^warning"; then
-    echo "$output"
-    echo "gate: warnings: $*" >&2
-    exit 1
-  fi
   echo "$output" | grep -E "passed|failures" || true
 }
+
+# Nix checks a copied source tree, so formatting validation never repairs the
+# working tree. Compiler flags own warning rejection; runtime logs are evidence.
+nix flake check
+actionlint
+shellcheck scripts/*.sh
+ruff check scripts test/schema_check.py
+python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
+sh scripts/check-native.sh
 
 for package in . codegen; do
   echo "== $package"

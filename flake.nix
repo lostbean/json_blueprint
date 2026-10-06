@@ -5,6 +5,7 @@
     design-layer.url = "github:lostbean/design-layer";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    treefmt-nix.follows = "design-layer/treefmt-nix";
   };
   outputs =
     {
@@ -12,6 +13,7 @@
       self,
       nixpkgs,
       flake-utils,
+      treefmt-nix,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -20,6 +22,33 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ ];
+        };
+
+        treefmtEval = treefmt-nix.lib.evalModule pkgs {
+          projectRootFile = "flake.nix";
+          programs.gleam.enable = true;
+          programs.nixfmt.enable = true;
+          programs.shfmt.enable = true;
+          programs.ruff-format.enable = true;
+          programs.erlfmt.enable = true;
+          programs.prettier = {
+            enable = true;
+            includes = [
+              "*.mjs"
+              "*.yml"
+              "*.yaml"
+            ];
+          };
+          # Preserve oracle bytes, generated fixtures and rendered evidence.
+          settings.global.excludes = [
+            "test/oracle/*"
+            "test/schema_manifest.json"
+            "codegen/test/generated/*"
+            "docs/design/*"
+            "build/*"
+            "codegen/build/*"
+            ".ci-results/*"
+          ];
         };
 
         # The upstream apps pin the renderer; authored imports also need its
@@ -54,12 +83,19 @@
         apps.design-gate-render = designApp "render";
         apps.design-gate-context = designApp "context";
 
+        formatter = treefmtEval.config.build.wrapper;
+        checks.formatting = treefmtEval.config.build.check ./.;
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gleam
             rebar3
             beam28Packages.erlang
             nodejs_24
+            actionlint
+            shellcheck
+            ruff
+            findutils
             (python3.withPackages (pythonPackages: [ pythonPackages.jsonschema ]))
           ];
 
