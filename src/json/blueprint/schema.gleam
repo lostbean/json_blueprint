@@ -15,11 +15,11 @@ import gleam/option.{type Option, None}
 
 pub const json_schema_version = "http://json-schema.org/draft-07/schema#"
 
-/// Represents a complete JSON Schema document
+/// A legacy schema definition and optional document annotations.
 pub type Schema {
   Schema(
     schema: SchemaDefinition,
-    // Optional fields from draft 2020-12
+    // The renderer emits these when present, including later-draft keywords.
     vocabulary: Option(List(String)),
     id: Option(String),
     comment: Option(String),
@@ -27,18 +27,15 @@ pub type Schema {
   )
 }
 
-// [... keep all previous type definitions ...]
-/// Core schema definition that can be used recursively
+/// A legacy schema description; nested definitions may contain references.
 pub type SchemaDefinition {
   // Type constraints
   Type(type_: SchemaType)
   Enum(values: List(json.Json), type_: Option(SchemaType))
   Const(value: json.Json)
 
-  // Not required
   Nullable(schema: SchemaDefinition)
 
-  // Not required
   Optional(schema: SchemaDefinition)
 
   // Numeric constraints
@@ -61,7 +58,6 @@ pub type SchemaDefinition {
   // Array constraints
   Array(items: Option(SchemaDefinition))
 
-  // Array constraints
   DetailedArray(
     items: Option(SchemaDefinition),
     prefix_items: Option(List(SchemaDefinition)),
@@ -80,7 +76,6 @@ pub type SchemaDefinition {
     required: Option(List(String)),
   )
 
-  // Object constraints
   DetailedObject(
     properties: Option(List(#(String, SchemaDefinition))),
     pattern_properties: Option(List(#(String, SchemaDefinition))),
@@ -105,7 +100,7 @@ pub type SchemaDefinition {
   FalseValue
 }
 
-/// Represents the allowed basic JSON Schema types
+/// JSON types used by the legacy renderer.
 pub type SchemaType {
   Null
   BooleanType
@@ -119,7 +114,7 @@ pub type SchemaType {
   Multiple(List(SchemaType))
 }
 
-/// Common string formats defined in the spec
+/// String format labels emitted by the legacy renderer.
 pub type StringFormat {
   DateTime
   Date
@@ -141,7 +136,7 @@ pub type StringFormat {
   Regex
 }
 
-/// Helper function to create a new schema with default values
+/// Build a schema document with optional named definitions.
 pub fn new_schema(
   definition: SchemaDefinition,
   references: Option(List(#(String, SchemaDefinition))),
@@ -155,12 +150,12 @@ pub fn new_schema(
   )
 }
 
-/// Helper to create a basic type constraint
+/// Describe a JSON type.
 pub fn type_constraint(type_: SchemaType) -> SchemaDefinition {
   Type(type_)
 }
 
-/// Helper to create a string constraint
+/// Describe optional string length, pattern, and format constraints.
 pub fn string_constraint(
   min_length min_length: Option(Int),
   max_length max_length: Option(Int),
@@ -175,7 +170,7 @@ pub fn string_constraint(
   )
 }
 
-/// Helper to create a number constraint
+/// Describe optional bounds and a multiple constraint for numbers.
 pub fn number_constraint(
   minimum minimum: Option(Float),
   maximum maximum: Option(Float),
@@ -201,7 +196,6 @@ pub fn to_json_string(schema: Schema) -> String {
 
 /// Convert a Schema to JSON value
 pub fn to_json(schema: Schema) -> json.Json {
-  // Add optional top-level fields
   let fields =
     [#("$schema", json.string(json_schema_version))]
     |> prepend_option(schema.vocabulary, "$vocabulary", fn(vocab) {
@@ -215,7 +209,6 @@ pub fn to_json(schema: Schema) -> json.Json {
       )
     })
 
-  // Add the main schema definition
   let schema_fields = schema_definition_to_json_fields(schema.schema, False)
   let fields = list.append(fields, schema_fields)
 

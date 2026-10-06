@@ -17,8 +17,9 @@
 ////
 //// Use this module when a schema arrives at runtime, such as a tool schema
 //// from a remote server. To decode JSON text with a known codec,
-//// `codec.decode_json` is enough. Validation walks an already parsed value,
-//// so its cost is bounded by the parse limits.
+//// `codec.decode_json` is enough. Validation walks the supplied value and
+//// imposes no independent resource limits. Parse with explicit limits before
+//// validating untrusted input; manually constructed values have no parse bound.
 ////
 //// ```gleam
 //// import json/blueprint/codec
@@ -91,8 +92,8 @@ pub fn schema(contract: Contract) -> Schema {
   codec.from_tree(contract.schema)
 }
 
-/// Whether two contracts accept the same values. Descriptions and the order
-/// of properties, labels and variants do not matter.
+/// Whether two contracts have the same normalized schema structure.
+/// Descriptions and property, label, and variant order do not affect matching.
 pub fn same_schema(left: Contract, right: Contract) -> Bool {
   shape(left.schema) == shape(right.schema)
 }
@@ -172,8 +173,8 @@ pub fn value(validated: ValidatedValue) -> Value {
   validated.value
 }
 
-/// Decode a validated value with a codec whose schema accepts the same values
-/// as the contract that validated it. A codec with another schema, or none,
+/// Decode a validated value with a codec whose normalized schema structure
+/// matches the validating contract. A codec with another schema, or none,
 /// fails with `DecodeError([], ContractMismatch)`.
 pub fn decode(
   codec: Codec(a),
@@ -454,8 +455,9 @@ pub fn parse(
 
 /// Load a Draft 2020-12 schema document. Its `$schema` must be the Draft
 /// 2020-12 URI, and it must stay inside the codec profile; `description`
-/// keywords are kept. A schema with no keywords but `description`, or the
-/// boolean schema `true`, accepts any value, like `codec.value()`.
+/// keywords are kept. The root must be an object with that dialect declaration.
+/// An otherwise empty object schema, or nested boolean `true`, accepts any
+/// value, like `codec.value()`.
 pub fn load(document: Value) -> Result(Contract, DocumentError) {
   use members <- result.try(object_members(document, []))
   use dialect <- result.try(required_member(members, "$schema", []))
@@ -688,8 +690,8 @@ fn text_items(
   }
 }
 
-/// The first item that repeats an earlier one, with its index. A set keeps
-/// this linear in the size of a hostile document.
+/// The first repeated item and its index. A set avoids scanning all earlier
+/// labels for each item.
 fn repeated_at(
   items: List(String),
   seen: Set(String),
@@ -1084,7 +1086,7 @@ fn expect_integer(
 ) -> Result(Int, DocumentError) {
   case raw {
     value.Number(found) ->
-      // The parse limits bound a number to 800 digits and exponent 1,200.
+      // A 2,000-digit projection covers the default numeric parse bounds.
       number.to_int(found, 2000)
       |> result.replace_error(MalformedDocument(path, ExpectedInteger))
     _ -> Error(MalformedDocument(path, ExpectedInteger))

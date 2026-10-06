@@ -82,13 +82,9 @@ pub fn generate_json_schema(decoder: Decoder(t)) -> json.Json {
   jsch.to_json(jsch.new_schema(decoder.schema, refs))
 }
 
-/// Creates a reusable version of a decoder that can be used multiple times in a schema
-/// without duplicating the schema definition.
-///
-/// The function:
-/// 1. Creates a unique reference name based on the schema's hash
-/// 2. Moves the original schema into the `$defs` section
-/// 3. Returns a new decoder that references the schema via `$ref`
+/// Put the decoder's schema in `$defs` and return a decoder whose schema
+/// points to it with `$ref`. The name derives from the rendered schema's
+/// SHA-1 hash; it is a deterministic definition key, not a collision guarantee.
 ///
 /// ## Example
 /// ```gleam
@@ -118,7 +114,7 @@ pub fn generate_json_schema(decoder: Decoder(t)) -> json.Json {
 /// ```
 ///
 pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
-  // can we do this in a collision free and deterministic way?
+  // Rebase root self-references to this definition before nesting it.
   let def_name = "ref_" <> jsch.hash_schema_definition(decoder.schema)
   let ref_name = "#/$defs/" <> def_name
 
@@ -136,18 +132,11 @@ pub fn reuse_decoder(decoder: Decoder(t)) -> Decoder(t) {
   )
 }
 
-/// Creates a decoder for recursive data types by allowing self-referential definitions.
-/// This is useful when you have types that contain themselves, like trees or linked lists.
+/// Decode a recursive type through a function that returns its decoder.
+/// The schema uses `$ref: "#"` for a root self-reference.
 ///
-/// The function takes a lazy decoder (a function that returns a decoder) to break the
-/// recursive dependency cycle. The returned decoder uses a JSON Schema reference "#"
-/// to point to the root schema definition.
-///
-/// > ❗ _**IMPORTANT**_
-/// > Add the reuse_decoder when there are nested recursive types so
-/// > the schema references (`#`) get rewritten correctly and self-references from the
-/// > different types don't get mixed up. As a recommendation, always add it when
-/// > decoding recursive types.
+/// Wrap recursive decoders in `reuse_decoder`. Nested recursive types need
+/// their root references rebased to distinct definitions.
 ///
 /// ## Example
 /// ```gleam
@@ -235,10 +224,8 @@ pub fn decode_with_max_bytes(
       ]),
     ),
   )
-  // `gleam_json` 3.0 removed `json.decode` (which accepted an old-style
-  // `fn(Dynamic) -> Result(t, _)` decoder) in favour of `json.parse`, which
-  // takes a `gleam/dynamic/decode.Decoder`. We parse to a raw `Dynamic` using
-  // the identity decoder and then run this library's vendored decoder on it.
+  // Parse to raw Dynamic so the legacy decoder retains its own acceptance
+  // rules and error paths.
   use dyn <- result.try(json.parse(from: json_string, using: decode.dynamic))
   get_dynamic_decoder(decoder)(dyn)
   |> result.map_error(json.UnableToDecode)
@@ -276,10 +263,8 @@ pub fn field(named name: String, of inner_type: Decoder(t)) -> FieldDecoder(t) {
   )
 }
 
-/// Creates a decoder that can handle `null` values by wrapping the result in an `Option` type.
-/// When the value is `null`, it returns `None`. Otherwise, it uses the provided decoder
-/// to decode the value and wraps the result in `Some`. If you need the decoder to handle a possible missing field
-/// (i.e., the field is absent from the JSON), use the `optional_field` function instead.
+/// Decode `null` as `None` and another value with the inner decoder as
+/// `Some`. A missing field still fails; use `optional_field` for absence.
 ///
 /// ## Example
 /// ```gleam
@@ -310,11 +295,9 @@ pub fn optional(of decode: Decoder(inner)) -> Decoder(Option(inner)) {
 @external(javascript, "../json_blueprint_ffi.mjs", "do_null")
 fn native_null() -> gleam_dynamic.Dynamic
 
-/// Decode a field that can be missing or have a `null` value into an `Option` type.
-/// This function is useful when you want to handle both cases where a field is absent from the JSON
-/// or when it's explicitly set to `null`.
-///
-/// If you only need to handle fields that are present but might be `null`, use the `optional` function instead.
+/// Decode an absent or `null` field as `None`, and a present value with
+/// the inner decoder as `Some`. Use `field` with `optional` when the field
+/// must be present but may be `null`.
 ///
 /// ## Example
 /// ```gleam
@@ -353,8 +336,8 @@ pub fn optional_field(
   )
 }
 
-/// Adds an optional field to a list of key-value pairs that will be used to create a JSON object.
-/// This is particularly useful when defining JSON encoder to pair up to the `optional_field` decoder.
+/// Prepend an encoded field for `Some`, or omit it for `None`.
+/// Pair this encoder with `optional_field` when absence represents `None`.
 ///
 /// ## Example
 /// ```gleam
@@ -408,11 +391,9 @@ pub fn encode_optional_field(
   }
 }
 
-/// Function to encode a union type into a JSON object.
-/// The function takes a value and an encoder function that returns a tuple of the type name and the JSON value.
-///
-///> [!IMPORTANT]
-///> Make sure to update the decoder function accordingly.
+/// Encode a union as an object with `type` and `data` fields. The callback
+/// returns the variant label and its encoded payload.
+/// Keep the labels and payloads aligned with `union_type_decoder`.
 ///
 /// ## Example
 /// ```gleam
@@ -444,11 +425,8 @@ pub fn union_type_encoder(
   json.object([#("type", json.string(field_name)), #("data", json_value)])
 }
 
-/// Function to defined a decoder for a union types.
-/// The function takes a list of decoders for each possible type of the union.
-///
-///> [!IMPORTANT]
-///> Make sure to add tests for every possible type of the union because it is not possible to check for exhaustiveness in the case.
+/// Decode a `type`/`data` union using the payload decoder for its label.
+/// Test every variant; the compiler cannot check that this list is exhaustive.
 ///
 /// ## Example
 /// ```gleam
@@ -539,11 +517,8 @@ pub fn union_type_decoder(
   Decoder(enum_decoder, schema, defs)
 }
 
-/// Function to encode an enum type (unions where constructors have no arguments) into a JSON object.
-/// The function takes a value and an encoder function that returns the string representation of the enum value.
-///
-///> [!IMPORTANT]
-///> Make sure to update the decoder function accordingly.
+/// Encode a constructor with no arguments as `{"enum": label}`.
+/// The callback selects its label; keep labels aligned with `enum_type_decoder`.
 ///
 /// ## Example
 /// ```gleam
@@ -570,11 +545,8 @@ pub fn enum_type_encoder(
   json.object([#("enum", json.string(field_name))])
 }
 
-/// Function to define a decoder for enum types (unions where constructors have no arguments).
-/// The function takes a list of tuples containing the string representation and the corresponding enum value.
-///
-///> [!IMPORTANT]
-///> Make sure to add tests for every possible enum value because it is not possible to check for exhaustiveness.
+/// Decode `{"enum": label}` using the listed label/value pairs.
+/// Test every enum value; the compiler cannot check that this list is exhaustive.
 ///
 /// ## Example
 /// ```gleam
@@ -817,27 +789,14 @@ fn create_object_schema(
   )
 }
 
+/// Return the constructor for any input, including a non-object value.
+/// The legacy schema describes an empty closed object, but this decoder
+/// does not enforce that description.
 pub fn decode0(constructor: t) -> Decoder(t) {
-  // TODO: Disabled for now. For so reason the when running in the JS target the check fails with the following error:
-  // > DecodeError(expected: "{}", found: "//js({})", ...)
-  //
-  // let check = dynamic.from(dict.from_list([]))
   Decoder(
     fn(_value) {
+      // Keep permissive legacy acceptance for existing callers.
       Ok(constructor)
-      // case value {
-      //   x if x == check -> {
-      //     Ok(constructor)
-      //   }
-      //   x ->
-      //     Error([
-      //       dynamic.DecodeError(
-      //         expected: "{}",
-      //         found: string.inspect(x),
-      //         path: [],
-      //       ),
-      //     ])
-      // }
     },
     jsch.Object([], Some(False), None),
     [],

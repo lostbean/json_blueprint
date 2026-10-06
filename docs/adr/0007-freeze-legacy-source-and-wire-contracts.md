@@ -1,0 +1,9 @@
+# Keep the published decoder surface separate from modern codecs
+
+<a id="adr-0007"></a>
+
+- **Decision.** The root module and legacy schema module retain the frozen 1.x combinator surface. New schema-aware work uses Codec. Existing legacy envelopes and recursive decoder paths remain accessible without silently converting stored data.
+- **Rationale.** Legacy decoders are one-way and can be permissive where generated descriptions are closed. Their union/enum formats and null/absence semantics differ from the strict codec language. Recursive 1.x references are not implemented by the finite modern profile.
+- **Alternatives.** Removing legacy access forces stored data migration without a proved contract. Claiming a complete automatic adapter masks schema/decoder disagreements. Merely relabeling the legacy dialect cannot fix descriptions using later keywords under a Draft-07 label.
+- **Consequences.** Source compatibility, wire compatibility, error-path parity, numeric behavior, and deliberate acceptance corrections require separate evidence. Opaque decoder construction and internal dynamic imports have explicit source migration. Legacy parsing gains a byte bound while retaining native parser ownership.
+- **Evidence.** [Legacy adapter retirement](https://github.com/lostbean/json_blueprint/commit/ca50b5a915aaa5e38ef68ff70b102f2dd3f2fe67) and [current API redesign](https://github.com/lostbean/json_blueprint/commit/94438b93b638a2ecf2e4443bd9c2c3cbf97b7713) identify the transition. [Published 1.x guidance](../v1.md), [migration guide](../migration-2.0.md), and [migration tests](../../test/migration_test.gleam) remain operational evidence. Oversight's pinned 1.1.0/1.7.1 comparator research is partial; release archives without tests do not establish full migration acceptance. Historical approval timing for each old behavior is unknown.

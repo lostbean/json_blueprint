@@ -1,0 +1,9 @@
+# Match witnesses structurally and keep callback laws with their owner
+
+<a id="adr-0006"></a>
+
+- **Decision.** Runtime validation returns an immutable value/schema witness. Native decoding requires normalized finite shape equality, ignoring descriptions and unordered-member order. The package does not infer native types or certify custom callbacks from a schema.
+- **Rationale.** Reconstructed equal schemas should match without process-local identity. A schema document cannot create the missing compiled native type. Schema acceptance can exceed native representability or caller business predicates.
+- **Alternatives.** Identity tokens prevent equal reconstructed contracts from matching. General semantic equivalence would require a broader solver and does not establish callback correctness. Treating a schema annotation as a callback certificate overstates the available evidence.
+- **Consequences.** Bounds, requiredness, tuple positions, and tag/payload association remain significant. Native conversion can fail after validation. Current `contract.value_codec` validates decoding but passes encoding through; full bidirectional schema laws for that adapter remain an open ruling.
+- **Evidence.** [Finite implementation](https://github.com/lostbean/json_blueprint/commit/cf378926647ed83dc0669f49d4bb8591b5e1381f), dated 2026-09-20, establishes normalized validation. [API redesign](https://github.com/lostbean/json_blueprint/commit/94438b93b638a2ecf2e4443bd9c2c3cbf97b7713), dated 2026-10-02, establishes the current contract API. [contract.gleam](../../src/json/blueprint/contract.gleam) and [contract tests](../../test/contract_test.gleam) establish actual directionality. The historical rationale for passthrough encoding is not established by these sources; this record does not retrospectively approve it as a schema law.

@@ -1,0 +1,17 @@
+# Preserve exact wire numbers and name native conversion policies
+
+<a id="adr-0002"></a>
+
+- **Decision.** Number stores normalized mathematical JSON values. Native Int and Float conversion is explicit and checked. Rounded Float conversion and exact Float conversion remain separate operations.
+- **Rationale.** Binary64 cannot preserve arbitrary JSON decimals, and JavaScript native integers cannot preserve arbitrary integral values. Comparing schemas through Float would change accepted values and numeric bounds.
+- **Alternatives.** Treating every number as Float silently rounds decimals and large integers. Making native decoding success identical to schema acceptance misclassifies mathematically valid numbers outside a native representation. Omitting a rounded path prevents ordinary Float use.
+- **Consequences.** Default number limits admit exact finite binary64 expansions. Exact decimal 0.1 fails exact projection, while its shortest roundtrip printed form is supported by the explicitly rounded path. Standard-JSON bridges check exact printed JSON value separately from exact binary64 equality.
+- **Evidence.** [Exact number core](https://github.com/lostbean/json_blueprint/commit/25d554b0bdde421bd2037f68253315ebc0ab3090) is dated 2026-09-20. [API redesign](https://github.com/lostbean/json_blueprint/commit/94438b93b638a2ecf2e4443bd9c2c3cbf97b7713) is dated 2026-10-02 and establishes current conversion names. [number.gleam](../../src/json/blueprint/number.gleam), [cross-target cases](../../test/number_test.gleam), and [oracle provenance](../../test/oracle/README.md) identify the executable contracts. The source scope differs from early oversight prose that described only exact Float policy.
+
+## Oracle provenance and its limits
+
+- The initial exact-number and finite-schema work adapted Oversight's interface-laboratory probes at `bd0b83743533313eb9b4eee2bf7f99ed68a26750`. The source ledger recorded no declared Oversight license; it did not establish an upstream third-party license grant. The package's own source baseline `0e379c6491d34aca49795f716e87b9003df0130e` (1.7.1) is MIT-licensed.
+- The [original test-to-source attribution table](https://github.com/lostbean/json_blueprint/blob/4ed1d2efac5166a1feffde891285852926445dc1/test/oracle/schema-aware-core.md) retains exact test identities, input families, normalization and source revisions. It identifies parser, value, codec, runtime-contract, schema-loading, admission and legacy tests as well as the numerical kernel.
+- That ledger's implementation snapshot used a 61-case, 13-family schema corpus and intermediate API names. Later fixtures expanded the corpus and the migration adapter was retired. Its old all-green status is historical execution evidence; it cannot certify current coverage or full JSON Schema conformance.
+- The numerical comparison separates mathematical acceptance from native projection. Erlang bignums, JavaScript safe integers and binary64 rounding have different native contracts even when exact JSON values compare equal. Preserving this distinction matters more than claiming identical host representations.
+- During the 6 October 2026 documentation consolidation, the source-attribution reference moved here and the construction-status tables were retired. [Oracle instructions](../../test/oracle/README.md) now point to the executable manifest, checker and current design instead of repeating test counts as permanent guarantees.

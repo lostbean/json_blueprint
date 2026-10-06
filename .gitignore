@@ -5,3 +5,5 @@
 /build
 /codegen/build
 erl_crash.dump
+.render/
+**/.render/

@@ -1,14 +1,29 @@
 # json_blueprint
 
-Describe a JSON shape once in Gleam, and get an encoder, a strict decoder and
-a JSON Schema (Draft 2020-12) from the same definition.
+Define a JSON codec in Gleam to encode native values, decode JSON strictly, and
+publish a Draft 2020-12 schema from the same definition.
 
 [![Package Version](https://img.shields.io/hexpm/v/json_blueprint)](https://hex.pm/packages/json_blueprint)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
 
-```sh
-gleam add json_blueprint
+## Installation
+
+The codec API shown below is unreleased work toward 2.0. To use it from a
+sibling application, add this checkout to the application's `gleam.toml`:
+
+```toml
+[dependencies]
+json_blueprint = { path = "../json_blueprint" }
 ```
+
+The published package is 1.7.1 and provides the [1.x API](docs/v1.md):
+
+```sh
+gleam add json_blueprint@1.7.1
+```
+
+The [migration guide](docs/migration-2.0.md) explains the source and wire-format
+changes in the current checkout.
 
 ## A record, both ways
 
@@ -61,40 +76,91 @@ pub fn round_trip() -> Result(User, String) {
 - `schema_json` renders the Draft 2020-12 schema: closed objects, the
   `required` list, the enum labels and the integer bounds.
 
-Every function here is pure: none blocks, waits, retries or starts a process.
+These built-in operations are synchronous and keep no process or connection
+to close. Custom callbacks own their effects.
 
 ## Defaults
 
-| Operation                                                           | Default                                                                     | Change it with                                                                   |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Text size: `codec.decode_json`, `value.parse`, `contract.parse`     | 1 MiB (1,048,576 bytes of UTF-8)                                            | `value.with_max_bytes`, passed to `codec.decode_json_with_limits` or the parsers |
-| Array and object nesting                                            | depth 64                                                                    | `value.with_max_depth`                                                           |
-| Values in one document (every scalar, array and object counts once) | 262,144: one per 4 bytes of the byte limit                                  | `value.with_max_elements`                                                        |
-| Number tokens: bytes, significant digits, exponent magnitude        | 1,024, 800, 1,200                                                           | `value.with_number_limits(number.limits(..))`                                    |
-| `codec.int()` decoding                                              | at most 24 digits; on JavaScript also within ±9,007,199,254,740,991         | fixed; use `codec.number()` for larger values                                    |
-| `codec.decoder` (for `gleam/json`)                                  | none of its own: the parser that produced the data sets the limits          | that parser                                                                      |
-| 1.x `blueprint.decode`, generated `decode_<name>_json_native`       | 1 MiB, checked before `gleam/json` parses; no depth, value or number limits | `blueprint.decode_with_max_bytes`                                                |
-| `contract.validate`, `contract.load`                                | no separate limit: they walk a value that a bounded parse produced          | the parse limits                                                                 |
-| Duplicate object keys and unknown object fields                     | rejected                                                                    | not configurable                                                                 |
+| Operation                                                           | Default                                                             | Change it with                                                                             |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Text size: `codec.decode_json`, `value.parse`, `contract.parse`     | 1 MiB (1,048,576 bytes of UTF-8)                                    | `value.with_max_bytes`, passed to `codec.decode_json_with_limits` or the parsers           |
+| Array and object nesting                                            | depth 64                                                            | `value.with_max_depth`                                                                     |
+| Values in one document (each scalar, array, and object counts once) | 262,144                                                             | `value.with_max_elements`                                                                  |
+| Number token bytes, significant digits, exponent magnitude          | 1,024, 800, 1,200                                                   | `value.with_number_limits(number.limits(..))`                                              |
+| `codec.int()` decoding                                              | at most 24 digits; on JavaScript also within ±9,007,199,254,740,991 | fixed; use `codec.number()` for larger values                                              |
+| `codec.decoder` (for `gleam/json`)                                  | supplied by the parser that produced the data                       | that parser                                                                                |
+| 1.x `blueprint.decode` in this checkout                             | 1 MiB before `gleam/json` parses; no depth, value, or number limit  | `blueprint.decode_with_max_bytes`                                                          |
+| Generated `decode_<name>_json_native`                               | 1 MiB before `gleam/json` parses; no depth, value, or number limit  | fixed                                                                                      |
+| `contract.validate`, `contract.load`                                | no independent resource limit                                       | parse with explicit limits before calling; manually constructed values have no parse bound |
+| Duplicate object keys in strict text parsing                        | rejected                                                            | not configurable                                                                           |
+| Undeclared record fields                                            | rejected by built-in record codecs and closed contracts             | declare the field in the definition                                                        |
 
 A parse error names the setter of the limit it hit, and
 `codec.is_limit_exceeded` tells a too-large input from an invalid one.
 
-Parsed values take more memory than their text. The table lists the peak
-process heap during `value.parse` at the defaults on Erlang/OTP 28, measured
-from garbage-collection events with the old and new heap counted together,
-and the heap growth on Node.js 24:
+Raising the byte limit does not raise the value limit. Parsed values can use
+much more memory than their input text; [historical memory observations](docs/benchmarks.md#historical-memory-observations)
+record the measured costs and their limits.
 
-| Input at the defaults                          | Text    | Peak heap, OTP 28 | Parsed value, OTP 28 | Heap growth, Node.js 24 |
-| ---------------------------------------------- | ------- | ----------------- | -------------------- | ----------------------- |
-| `[1,1,...]`: 262,143 integers, the value limit | 512 KiB | 42 MB             | 16 MB                | about 120 MB            |
-| `["a","a",...]`: 262,143 strings               | 1 MiB   | 40 MB             | 16 MB                | about 75 MB             |
-| `[{"k":1},...]`: 87,001 objects                | 680 KiB | 32 MB             | 13 MB                | about 75 MB             |
-| 61,001 fifteen-digit decimals                  | 1 MiB   | 16 MB             | 6 MB                 | about 80 MB             |
+## Modules
 
-The value limit bounds the densest input: with it raised, 1 MiB of
-`[1,1,...]` (524,288 integers) peaks at 80 MB by the same measure. Raise the
-byte limit with these figures in mind.
+| Module                                    | Use it for                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `json/blueprint/codec`                    | codecs: the common path                                                     |
+| `json/blueprint/value`                    | the JSON `Value`, the strict bounded parser, `Limits`, `gleam/json` bridges |
+| `json/blueprint/number`                   | exact JSON numbers and checked `Int` and `Float` conversions                |
+| `json/blueprint/contract`                 | schemas that arrive at runtime, and validation                              |
+| `json/blueprint`, `json/blueprint/schema` | the frozen 1.x API; see [the 1.x guide](docs/v1.md)                         |
+
+[Code generation](codegen/README.md) is a separate, unpublished development
+dependency. The [1.x guide](docs/v1.md) covers recursive decoders and existing
+wire formats; the [migration guide](docs/migration-2.0.md) explains moving to
+the codec API.
+
+## Targets
+
+CI tests Erlang/OTP 28 and JavaScript on Node.js 24. On
+JavaScript, native integers are limited to the safe range: `codec.int()`
+refuses larger ones instead of rounding them, and `codec.number()` keeps them
+exact. Browser JavaScript is not tested.
+
+## Benchmarks
+
+The retained 2026-09-20 run measured document parsing at 9,847 ns/op on
+Erlang/OTP 28 and 41,057 ns/op on Node.js 24.15.0, with 200 warmup calls and
+1,000 timed calls per workload. These are historical measurements. See the
+[benchmark results and commands](docs/benchmarks.md) for workloads, evidence,
+aggregation, and missing machine provenance.
+
+## Development
+
+```sh
+nix develop          # Gleam 1.18.1, Erlang/OTP 28, Node.js 24, Python + jsonschema
+sh scripts/gate.sh   # format, warnings, both-target tests and the schema oracle
+```
+
+`test/schema_check.py` compares the emitted schemas with the Python
+`jsonschema` Draft 2020-12 validator; it needs `jsonschema` 4.26 or later,
+provided by the dev shell and installed by CI. The gate runs it after both
+packages pass their Erlang and JavaScript checks.
+
+## Design
+
+The [design layer](docs/design/design.typ) records ownership, behavior, limits,
+legacy compatibility, and retained capability scope. The [rendered design](docs/design/design-layer.pdf)
+includes its [canonical vocabulary](docs/design/CONTEXT.typ).
+[Decision records](docs/adr/) explain the material choices, and
+[coverage](docs/COVERAGE.md) maps source and verification to the design.
+
+## More examples
+
+Expand the examples below for [unions](#unions),
+[application types and dependent fields](#your-own-types), [errors](#errors),
+[gleam/json bridges](#gleamjson-and-other-libraries), [larger inputs](#larger-inputs),
+[runtime schemas](#schemas-that-arrive-at-runtime), and [schema inspection](#reading-a-schema).
+
+<details>
+<summary>Optional, nullable and absent</summary>
 
 ## Optional, nullable and absent
 
@@ -103,6 +169,11 @@ byte limit with these figures in mind.
 `optional_field(name, codec.nullable(c), ..)`, an absent field, `null` and a
 value decode as `None`, `Some(None)` and `Some(Some(x))`, and encode back the
 same way.
+
+</details>
+
+<details>
+<summary>Tagged unions</summary>
 
 ## Unions
 
@@ -131,6 +202,11 @@ pub fn shape_codec() -> Codec(Shape) {
 
 The JSON is `{"tag": "circle", "value": 2}`, and `{"tag": "empty"}` for a
 unit variant. Gleam checks that the `case` covers every constructor.
+
+</details>
+
+<details>
+<summary>Application types and dependent fields</summary>
 
 ## Your own types
 
@@ -211,6 +287,11 @@ The other building blocks are `string`, `int`, `float`, `number` (exact), `bool`
 `list`, `pair`, `string_enum`, `integer_between`, `number_between` and
 `describe`, which adds a schema description.
 
+</details>
+
+<details>
+<summary>Error handling and definition checks</summary>
+
 ## Errors
 
 `DecodeError` and `EncodeError` are `{path, reason}` records. Branch on the
@@ -249,6 +330,11 @@ pub fn status_codec(
 }
 ```
 
+</details>
+
+<details>
+<summary>gleam/json bridges</summary>
+
 ## gleam/json and other libraries
 
 `codec.to_json` returns a `json.Json` and `codec.decoder` a
@@ -266,6 +352,11 @@ pub fn with_gleam_json(user: User) -> Result(User, json.DecodeError) {
 `decoder`, the parser that produced the data owns duplicate keys, number
 precision and size limits.
 
+</details>
+
+<details>
+<summary>Larger inputs</summary>
+
 ## Larger inputs
 
 ```gleam
@@ -277,6 +368,11 @@ pub fn decode_many(text: String) -> Result(List(User), codec.DecodeError) {
   codec.decode_json_with_limits(codec.list(user_codec()), text, limits)
 }
 ```
+
+</details>
+
+<details>
+<summary>Runtime schema documents</summary>
 
 ## Schemas that arrive at runtime
 
@@ -317,6 +413,11 @@ tagged unions and any value (`{}`, or `true` in a loaded document).
 Recursive references (`$ref`), untagged unions and string patterns are
 outside it.
 
+</details>
+
+<details>
+<summary>Schema inspection and evolution</summary>
+
 ## Reading a schema
 
 `codec.schema` returns an opaque `Schema`. `schema_value` and
@@ -354,59 +455,4 @@ function that reads the new kind. A dedicated variant for it is a breaking
 change and waits for a major release. `PropertySchema` and `VariantSchema`
 may gain fields; read them by label.
 
-## Modules
-
-| Module                                    | Use it for                                                                  |
-| ----------------------------------------- | --------------------------------------------------------------------------- |
-| `json/blueprint/codec`                    | codecs: the common path                                                     |
-| `json/blueprint/value`                    | the JSON `Value`, the strict bounded parser, `Limits`, `gleam/json` bridges |
-| `json/blueprint/number`                   | exact JSON numbers and checked `Int` and `Float` conversions                |
-| `json/blueprint/contract`                 | schemas that arrive at runtime, and validation                              |
-| `json/blueprint`, `json/blueprint/schema` | the frozen 1.x API; see [the 1.x guide](docs/v1.md)                         |
-
-Code generation is a separate dev-only package in
-[`codegen/`](codegen/README.md). Moving from 1.x is described in
-[the 2.0 migration guide](docs/migration-2.0.md).
-
-## Targets
-
-Erlang/OTP 28 and JavaScript on Node.js 24 are tested on every change. On
-JavaScript, native integers are limited to the safe range: `codec.int()`
-refuses larger ones instead of rounding them, and `codec.number()` keeps them
-exact. Browser JavaScript is not tested.
-
-## Design notes
-
-**Record builder.** `field` binds each decoded value by name in a `use`
-block and takes the getter last, as `get:`. Gleam checks arguments in
-parameter order, so the rest of the block, which ends in `success`, fixes
-the record type before the getter is checked, and getters need no
-annotation. A pipe builder in the style of `sinal/fields` (`record` with
-`parameter`, then `|> field(...)` and `build`) was measured against it on
-three application records, formatted by `gleam format` (Gleam 1.17 and
-1.18):
-
-| Record (fields)                    | `use`, annotated getters | `use`, `get:`  | pipe           | pipe, record type first |
-| ---------------------------------- | ------------------------ | -------------- | -------------- | ----------------------- |
-| 1 required                         | 4 / 155 / 1              | 4 / 148 / 0    | 8 / 188 / 1    | 8 / 191 / 0             |
-| 6 with a nested list of 3, an enum | 50 / 1,076 / 9           | 40 / 1,020 / 0 | 33 / 1,161 / 2 | 38 / 1,170 / 0          |
-| 3 with an optional field           | 14 / 359 / 3             | 8 / 335 / 0    | 12 / 405 / 1   | 12 / 406 / 0            |
-
-Each cell is lines / characters without indentation / getter annotations.
-The pipe forms also bind fields by constructor position, so two fields of
-one type listed out of order swap silently, and a field's codec cannot be
-built from the fields decoded before it, which locates a check across
-fields at its field. The `use` form keeps both, so it stays the one record
-builder.
-
-## Development
-
-```sh
-nix develop          # Gleam 1.18.1, Erlang/OTP 28, Node.js 24, Python + jsonschema
-sh scripts/gate.sh   # format, warnings, both-target tests and the schema oracle
-```
-
-`test/schema_check.py` compares the emitted schemas with the Python
-`jsonschema` Draft 2020-12 validator; it needs `jsonschema` 4.26 or later,
-provided by the dev shell and installed by CI. The gate runs it after both
-packages pass their Erlang and JavaScript checks.
+</details>
