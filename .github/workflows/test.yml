@@ -25,3 +25,15 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install jsonschema==4.26.0
       - run: sh scripts/gate.sh
+
+  design:
+    name: Design layer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - run: nix run .#design-gate-check -- docs/design .

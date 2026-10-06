@@ -1,11 +1,17 @@
 # json_blueprint_codegen
 
-Compile [json_blueprint](../README.md) codec definitions to Gleam source, so a
-codec can exist as generated code that is checked in and reviewed. This is a
-dev-only package inside the json_blueprint repository; it is not published.
-Add it as a dev dependency by path:
+Generate Gleam encoder, decoder, and schema functions from a typed
+[JSON Blueprint](../README.md) definition. Your build task writes and compiles
+the returned source.
+
+This package and the codec API are unpublished. For an application beside this
+checkout, use the runtime package by path and keep the generator in development
+dependencies:
 
 ```toml
+[dependencies]
+json_blueprint = { path = "../json_blueprint" }
+
 [dev-dependencies]
 json_blueprint_codegen = { path = "../json_blueprint/codegen" }
 ```
@@ -32,17 +38,23 @@ pub fn example() {
   `bool`, `integer_between`, `pair`, `list`, `nullable`, `string_enum`,
   `required` and `optional` properties joined with `combine` and closed with
   `object`, and `imap` with a `named_mapping`.
-- `runtime(definition)` is the same codec at run time.
+- `runtime(definition)` returns its codec for interpreted use. Applications
+  using only generated functions need the runtime package and generated source.
 - `compile(module_path, name, definition)` returns the module source. Write
   it under `src/`, run `gleam format` on it, and add a test that compiles it
-  again and compares, as `test/compiled_codec_test.gleam` does here.
+  again and compares, as the [compiled fixture test](test/compiled_codec_test.gleam)
+  does here. Generation does not write files or start a process.
 - A generated module exports `encode_<name>`, `decode_<name>`,
   `encode_<name>_json`, `decode_<name>_json` (strict parser),
   `decode_<name>_json_native` (`gleam/json`, 1 MiB pre-check),
   `<name>_schema()` and `<name>_codec()`.
 
-Regenerate the fixtures of this package with:
+From `codegen/` in the repository Nix shell, regenerate its fixtures with:
 
 ```sh
 gleam run -m compiled_codec_runner && gleam format test/generated
 ```
+
+The [benchmark guide](../docs/benchmarks.md) explains the timing workloads,
+retained results, and commands for both targets. [ADR 0008](../docs/adr/0008-development-time-source-generation.md)
+records generation ownership and the remaining scope.

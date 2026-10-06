@@ -2,8 +2,8 @@
 
 json_blueprint 2.0 keeps the 1.x API, frozen, in `json/blueprint` and
 `json/blueprint/schema`, and adds `json/blueprint/codec`: one `Codec(a)` that
-encodes, decodes strictly and describes a Draft 2020-12 schema. Code written
-against the unreleased 2.0 branch has [its own guide](migration-wave-2.md).
+encodes, decodes strictly and describes a Draft 2020-12 schema. The [design layer](design/design.typ) records the current API contract and
+[decision records](adr/) explain its material changes.
 
 ## What 1.x code must change
 
@@ -53,19 +53,19 @@ pub fn person_codec() -> Codec(Person) {
 }
 ```
 
-| 1.x                                               | 2.0                                                         |
-| ------------------------------------------------- | ----------------------------------------------------------- |
-| `decode1` … `decode9` with `field`                | `codec.field` for each field, then `codec.success`          |
-| `optional_field(name, inner)`                     | `codec.optional_field(name, inner, get: getter)`            |
-| `optional(inner)` (a present `null`)              | `codec.nullable(inner)`                                     |
-| `union_type_decoder` with `union_type_encoder`    | `codec.union` with `variant` and `unit_variant`             |
-| `enum_type_decoder` with `enum_type_encoder`      | `codec.string_enum`                                         |
-| `tuple2` … `tuple6`                               | `codec.pair`, or a record                                   |
-| `map`                                             | `codec.map(codec, decode:, encode:)`                        |
+| 1.x                                               | 2.0                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------- |
+| `decode1` … `decode9` with `field`                | `codec.field` for each field, then `codec.success`         |
+| `optional_field(name, inner)`                     | `codec.optional_field(name, inner, get: getter)`           |
+| `optional(inner)` (a present `null`)              | `codec.nullable(inner)`                                    |
+| `union_type_decoder` with `union_type_encoder`    | `codec.union` with `variant` and `unit_variant`            |
+| `enum_type_decoder` with `enum_type_encoder`      | `codec.string_enum`                                        |
+| `tuple2` … `tuple6`                               | `codec.pair`, or a record                                  |
+| `map`                                             | `codec.map(codec, decode:, encode:)`                       |
 | `float()`                                         | `codec.float()`, or `codec.number()` to keep numbers exact |
-| `self_decoder`, `reuse_decoder` (recursive types) | keep the 1.x decoder: codec schemas have no `$ref`          |
-| `generate_json_schema` (Draft-07 label)           | `codec.schema_json` (Draft 2020-12)                         |
-| `blueprint.decode` (gleam/json, 1 MiB check)      | `codec.decode_json` (strict parser, bounded)                |
+| `self_decoder`, `reuse_decoder` (recursive types) | keep the 1.x decoder: codec schemas have no `$ref`         |
+| `generate_json_schema` (Draft-07 label)           | `codec.schema_json` (Draft 2020-12)                        |
+| `blueprint.decode` (gleam/json, 1 MiB check)      | `codec.decode_json` (strict parser, bounded)               |
 
 Each item below changes what the wire accepts or produces. Review it against
 stored data before moving a type:
