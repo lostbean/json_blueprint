@@ -44,6 +44,7 @@
 //// }
 //// ```
 
+import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -346,6 +347,33 @@ fn validate_items(
   }
 }
 
+// String-specific recursion avoids generic equality on JavaScript and
+// predicate callbacks on BEAM. Keep these searches private to validation.
+fn contains_name(names: List(String), wanted: String) -> Bool {
+  case names {
+    [] -> False
+    [name, ..rest] ->
+      case name == wanted {
+        True -> True
+        False -> contains_name(rest, wanted)
+      }
+  }
+}
+
+fn find_member(
+  members: List(#(String, Value)),
+  wanted: String,
+) -> Result(Value, Nil) {
+  case members {
+    [] -> Error(Nil)
+    [#(name, found), ..rest] ->
+      case name == wanted {
+        True -> Ok(found)
+        False -> find_member(rest, wanted)
+      }
+  }
+}
+
 fn check_members(
   members: List(#(String, Value)),
   allowed: List(String),
@@ -355,10 +383,64 @@ fn check_members(
   case members {
     [] -> Ok(Nil)
     [#(name, _), ..rest] ->
-      case list.contains(seen, name), list.contains(allowed, name) {
+      case contains_name(seen, name), contains_name(allowed, name) {
         True, _ -> invalid([Field(name), ..path], codec.DuplicateField)
         _, False -> invalid([Field(name), ..path], codec.UnknownField)
         False, True -> check_members(rest, allowed, [name, ..seen], path)
+      }
+  }
+}
+
+fn index_members(
+  members: List(#(String, Value)),
+  index: Dict(String, Option(Value)),
+  path: List(PathSegment),
+) -> Result(Dict(String, Option(Value)), ValidationError) {
+  case members {
+    [] -> Ok(index)
+    [#(name, found), ..rest] ->
+      case dict.get(index, name) {
+        Error(Nil) ->
+          Error(ValidationError(
+            list.reverse([Field(name), ..path]),
+            codec.UnknownField,
+          ))
+        Ok(Some(_)) ->
+          Error(ValidationError(
+            list.reverse([Field(name), ..path]),
+            codec.DuplicateField,
+          ))
+        Ok(None) ->
+          index_members(rest, dict.insert(index, name, Some(found)), path)
+      }
+  }
+}
+
+fn check_members_prefix(
+  members: List(#(String, Value)),
+  remaining: Int,
+  allowed: List(String),
+  seen: List(String),
+  path: List(PathSegment),
+) -> Result(Nil, ValidationError) {
+  case remaining <= 0 {
+    True -> Ok(Nil)
+    False ->
+      case members {
+        [] -> Ok(Nil)
+        [#(name, _), ..rest] ->
+          case contains_name(seen, name), contains_name(allowed, name) {
+            True, _ -> invalid([Field(name), ..path], codec.DuplicateField)
+            _, False -> invalid([Field(name), ..path], codec.UnknownField)
+            False, True ->
+              check_members_prefix(
+                rest,
+                remaining - 1,
+                allowed,
+                [name, ..seen],
+                path,
+              )
+          }
       }
   }
 }
@@ -368,14 +450,57 @@ fn validate_object(
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
+  // Small objects avoid an index. The 40-member cutoff balances CPU and
+  // temporary allocation on BEAM and JavaScript; it is not an input limit.
+  // Probe at most 40 list cells; do not count an arbitrarily large input.
+  case list.drop(members, 40) {
+    [] -> validate_object_linear(properties, members, path)
+    _ -> {
+      let names = list.map(properties, fn(property) { property.name })
+      // Reject common early name errors before allocating the dictionary.
+      // Traverse the prefix directly; copying it adds per-call allocation.
+      use Nil <- result.try(check_members_prefix(members, 32, names, [], path))
+      validate_object_indexed(properties, members, path)
+    }
+  }
+}
+
+fn validate_object_linear(
+  properties: List(PropertySchema),
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(Nil, ValidationError) {
   let names = list.map(properties, fn(property) { property.name })
   use Nil <- result.try(check_members(members, names, [], path))
   list.try_each(properties, fn(property) {
     let at = [Field(property.name), ..path]
-    case list.key_find(members, property.name), property.required {
+    case find_member(members, property.name), property.required {
       Ok(found), _ -> validate_at(property.schema, found, at)
       Error(Nil), True -> invalid(at, codec.MissingField)
       Error(Nil), False -> Ok(Nil)
+    }
+  })
+}
+
+fn validate_object_indexed(
+  properties: List(PropertySchema),
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(Nil, ValidationError) {
+  // None is a declared but absent member; Some(Null) is a present value.
+  // This dictionary is local to the call and never replaces the input.
+  let empty =
+    properties
+    |> list.map(fn(property) { #(property.name, None) })
+    |> dict.from_list
+  // Check names in input order, then values in normalized schema order.
+  use index <- result.try(index_members(members, empty, path))
+  list.try_each(properties, fn(property) {
+    let at = [Field(property.name), ..path]
+    case dict.get(index, property.name), property.required {
+      Ok(Some(found)), _ -> validate_at(property.schema, found, at)
+      _, True -> invalid(at, codec.MissingField)
+      _, False -> Ok(Nil)
     }
   })
 }
