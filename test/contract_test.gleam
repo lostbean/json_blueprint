@@ -780,7 +780,7 @@ pub fn value_codec_validates_on_decode_test() {
   codec.decode(payload, value.Array([]))
   |> should.equal(Error(codec.DecodeError([], codec.ExpectedObject)))
 
-  // Encoding passes the value through
+  // Encoding preserves a valid value.
   codec.encode(payload, good) |> should.equal(Ok(good))
   codec.encode_json(payload, good) |> should.equal(Ok("{\"limit\":3}"))
 }

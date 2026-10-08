@@ -18,7 +18,8 @@
 //// same `codec.Reason` vocabulary as decoding. `decode` decodes a validated
 //// value with a codec whose schema matches the contract, and fails with
 //// `ContractMismatch` otherwise. `value_codec` is a `Codec(Value)` that
-//// validates while decoding, for passing schema-checked JSON through.
+//// validates while encoding and decoding, for passing schema-checked JSON
+//// through without changing its representation.
 ////
 //// Use this module when a schema arrives at runtime, such as a tool schema
 //// from a remote server. To decode JSON text with a known codec,
@@ -196,12 +197,24 @@ pub fn decode(
   }
 }
 
-/// A `Codec(Value)` with the contract's schema. Decoding validates against
-/// the contract and fails with the validation error's path and reason;
-/// encoding passes the value through unchanged.
+/// A `Codec(Value)` with the contract's schema. Encoding and decoding validate
+/// against that contract. Successful conversion returns the value unchanged;
+/// failure retains the first validation path and reason in `EncodeError` or
+/// `DecodeError`. Enclosing fields and lists prepend their paths as usual.
+///
+/// Validation checks structure and supported value constraints on each call,
+/// including exact numbers beyond native Int/Float representation. It adds
+/// no independent resource limits. Typed and generated codecs keep their own
+/// encoding checks; this adapter does not add a validation pass to them.
 pub fn value_codec(contract: Contract) -> Codec(Value) {
   codec.custom(
-    encode: Ok,
+    encode: fn(raw) {
+      case validate(contract, raw) {
+        Ok(validated) -> Ok(validated.value)
+        Error(ValidationError(path, reason)) ->
+          Error(codec.EncodeError(path, reason))
+      }
+    },
     decode: fn(raw) {
       case validate(contract, raw) {
         Ok(validated) -> Ok(validated.value)

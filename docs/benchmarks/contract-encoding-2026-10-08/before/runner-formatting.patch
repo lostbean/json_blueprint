@@ -1,0 +1,11 @@
+--- a/scripts/contract_encoding_benchmark.py
++++ b/scripts/contract_encoding_benchmark.py
+@@ -147,7 +147,5 @@
+     if source_hashes() != hashes:
+         raise RuntimeError("Measured source changed during benchmark; discard this run")
+     (output / "samples.json").write_text(json.dumps(samples, indent=2) + "\n")
+-    (output / "summary.json").write_text(
+-        json.dumps(summarize(samples), indent=2) + "\n"
+-    )
++    (output / "summary.json").write_text(json.dumps(summarize(samples), indent=2) + "\n")
+     print(f"Saved {len(samples)} timed batches to {output}")

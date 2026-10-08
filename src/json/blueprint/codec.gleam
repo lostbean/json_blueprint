@@ -294,10 +294,12 @@ pub type PathSegment {
   Index(index: Int)
 }
 
-/// Why a value failed to decode or encode. Decoding produces the reasons
-/// from `InvalidJson` to `ContractMismatch`, encoding those from
-/// `UnknownEnumValue` on; both produce `IntegerOutsideRange`,
-/// `NumberOutsideRange` and `Custom`.
+/// Why a value failed to decode or encode. Typed decoding can report JSON,
+/// structure, native conversion and contract-matching failures. Typed encoding
+/// can report enum values, native numeric safety and nullable failures.
+/// `contract.value_codec` can also report structure and label failures while
+/// encoding. Both directions can report numeric bounds and `Custom` failures;
+/// `to_json` can additionally report `UnrepresentableNumber`.
 ///
 /// May gain variants in a minor release; match with a `_` branch.
 pub type Reason {
@@ -690,7 +692,7 @@ pub fn bool() -> Codec(Bool) {
 /// Its schema is `AnySchema`, which renders as `{}`, the JSON Schema that
 /// accepts every value; a record with a `value()` field describes that field
 /// as `{}`. When a narrower schema for the value is known, use
-/// `contract.value_codec`, which also validates the value while decoding.
+/// `contract.value_codec`, which validates the value on encoding and decoding.
 pub fn value() -> Codec(Value) {
   leaf(Ok, Ok, tree.AnySchema, value.Null)
 }
