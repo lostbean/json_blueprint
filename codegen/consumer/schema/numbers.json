@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "integer": {
+      "type": "integer"
+    },
+    "decimal": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "integer",
+    "decimal"
+  ],
+  "additionalProperties": false
+}

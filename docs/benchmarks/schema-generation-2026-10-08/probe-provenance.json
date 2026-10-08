@@ -1,0 +1,7 @@
+{
+  "origin": "project-owned 2026-10-08 retained allocation experiment",
+  "sha256": {
+    "allocation_probe.erl": "33d730ab3daecf1ebff15b21049e723d821424311113cbdd34e87b591fe9a35f",
+    "allocation_probe.mjs": "33d7a59b39b9b1f420cf06d30ab7a1e1b01281201be8924565ba37f01757da38"
+  }
+}

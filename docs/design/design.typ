@@ -22,7 +22,7 @@
   #pagebreak(weak: true)
   #pending-ledger(
       pending-entry(title: "Broader schema families need concrete contracts", kind: "build", adr: [#adr(1)])[String constraints, broader numeric and collection constraints, arbitrary alternatives, numeric enums, aliases, and recursive references remain intended. Their concrete limits, annotation policies, and validation rules are unresolved; see Schema extension families.],
-      pending-entry(title: "Runtime-schema native generation remains incomplete", kind: "build", adr: [#adr(8)])[Retain schema-driven native type and codec generation, stable selected names, shared definitions, nested and recursive forms, and CLI workflow. The dev-only typed-definition generator and schema materializer implement narrower contracts; see Source generation.],
+      pending-entry(title: "Broader runtime-schema generation remains incomplete", kind: "build", adr: [#adr(8)])[Retain selected naming overrides, shared named definitions, enums and unions, aliases, recursive forms, and general CLI workflow. Closed-object schema generation, typed-definition generation, and schema materialization have distinct narrower contracts; see Schema-driven generation obligations.],
       pending-entry(title: "Retain complete compatibility verification", kind: "verify", adr: [#adr(7)])[Published source, legacy wire, recursive references, error paths, numeric boundaries, and deliberate acceptance corrections need separate fixtures. Existing examples and frozen comparators do not prove complete 1.x compatibility.],
       pending-entry(title: "Keep numerical oracle scope separate from projection", kind: "verify", adr: [#adr(2)])[The finite schema manifest compares Boolean acceptance for its selected cases. Broader numerical evidence must compare exact schema acceptance separately from native overflow, safe-integer refusal, and intentional Float rounding.],
   )
@@ -406,11 +406,77 @@
         [Sources: #lnk("../../codegen/src/json/blueprint/codegen/internal/schema_materialize.gleam")[materializer] and #lnk("../../codegen/test/schema_materialization_test.gleam")[schema materialization evidence].],
       )
     ]
+    #subsection(title: "Schema-driven native generator")[
+      #answers(title: "Schema generation boundary", responsibility: [Generate native record types and a typed codec from an admitted closed-object schema.], interface: [Dev-only json/blueprint/codegen/schema.compile(module_path: String, name: String, schema: codec.Schema) returns Result(codegen.GeneratedModule, schema.CompileError).], interactions: [The build compiler creates native types from returned source. Generated codec expressions use public codec combinators.], invariants: [No supported constraint is discarded. Native fields retain their original wire names through their codecs.], failure: [Typed generation failures distinguish invalid names, conflicting names, and unsupported shapes with logical schema paths. No partial module is returned.])
+      #points(
+        [The root must be a closed object. The explicit name is a validated lowercase accessor stem: order selects public Order and `order_codec()`. The module path follows the existing generator's source-path validation.],
+        [Generated root and nested record types are public so consumers can construct native values. Only the root codec accessor is public; nested codec functions are private. Generated applications depend on the runtime package and their compiled source, not the dev-only generator.],
+        [The generated module uses ordinary public codec constructors and record continuations. It does not emit a second Value validator or route through the typed-definition generator's specialized emitter. Caller mappings from generated records to business types remain application-owned.],
+        [Calling the root accessor constructs its codec and prebinds child codec definitions before field continuations. Exact bounds are reconstructed during that construction; retaining the returned codec reuses those child definitions and bounds across conversions. Each accessor call constructs a new codec without a global cache.],
+      )
+      #md-table(3, (
+        [Admitted schema shape], [Native type], [Preserved behavior],
+        [Closed object], [Public named record], [Requiredness, original wire names, and closed-object decoding],
+        [String / boolean], [String / Bool], [Primitive conversion],
+        [Integer / inclusive integer range], [Int], [Target-specific native projection and inclusive bounds],
+        [Number / inclusive number range], [Number], [Exact mathematical values and exact inclusive bounds],
+        [List / pair], [List(a) / `#(a, b)`], [Item conversion and exact pair length],
+        [Nullable], [Option(a)], [Existing nullable codec semantics],
+        [Optional object property], [Option(a)], [None omits the property; Some encodes through its child codec],
+      ))
+      #points(
+        [Optional nullable properties use Option(Option(a)). None means missing, Some(None) means explicit null, and Some(Some(value)) means present non-null data. Repeated nullable wrappers retain the existing codec's encoding rules.],
+        [Schema descriptions and exact numeric bounds survive generation. Object properties are sorted by Unicode codepoint order of their original wire names before traversal and source emission, so input property order does not select names, layout, or the fingerprint.],
+        [Native Int bounds retain the ordinary codec's target-specific limits. A bound admitted on Erlang may exceed JavaScript's safe-integer range; generated source must be checked on each intended target, where warnings-as-errors compilation and codec definition validation refuse unsafe integer bounds. Exact Number bounds remain independent of native Int and Float representation.],
+        [String enums, tagged unions, AnySchema, future OtherSchema, and every unsupported root produce located generation failures. Admitting a schema for runtime validation does not imply admitting it for native generation.],
+      )
+      #subsection(title: "Generated names and failures")[
+        #points(
+          [Native field names retain lowercase ASCII letters and digits. Each uppercase ASCII letter becomes lowercase and starts an underscore-separated word; runs of non-ASCII or nonalphanumeric delimiters collapse to one underscore. Leading and trailing underscores are removed, digit-leading results receive `field_`, Gleam keywords receive a trailing underscore, and an empty result is rejected.],
+          [A nested object stem joins its parent stem and normalized field name with an underscore. List children append `_item`; pair children append `_first` or `_second`; nullable wrappers keep the stem. Pascal-case conversion supplies record type and constructor names.],
+          [Native field collisions are rejected within one record. Generated type collisions are rejected across the module, including conflicts with builtin or used imported type names. Failures retain both origins as schema locations or reserved-name markers; the generator never assigns ordinal suffixes to hide a collision.],
+          [CompileError distinguishes invalid module paths, invalid root or field names, name collisions, and unsupported shapes. Locations use codec.PathSegment in the logical canonical rendered schema, including properties and collection positions; they are not byte offsets in the original document.],
+          [Module source and its content fingerprint are returned as a #term("term-generated-module"). The caller owns writing, formatting, compiling, reviewing, and drift checking the source. Generation starts no process, stores no global state, and adds no runtime cache.],
+        )
+      ]
+      #behavior(title: "A supported schema supplies compilable native records", level: "boundary", area: "Schema generation")[
+        #given[An admitted closed-object schema uses supported child forms and nonconflicting names.]
+        #given[Its integer bounds fit the intended target's native Int.]
+        #when[The caller generates the supported schema module.]
+        #then[The returned source compiles into public root and nested native records with a public root codec accessor.]
+        #then[The codec preserves the schema's supported constraints, descriptions, and wire names.]
+      ]
+      #behavior(title: "Native outbound values retain numeric constraints", level: "boundary", area: "Schema generation")[
+        #given[A generated native record contains a value outside a declared inclusive numeric bound.]
+        #when[The application encodes the record through its generated codec.]
+        #then[Encoding fails with the ordinary codec's located bound failure.]
+      ]
+      #behavior(title: "Optional nullable fields preserve three states", level: "boundary", area: "Schema generation")[
+        #given[A generated record has an optional nullable property.]
+        #when[The application converts a value through the generated codec.]
+        #then[Missing, explicit null, and present non-null values remain distinct native and wire states.]
+      ]
+      #behavior(title: "Unrepresentable source fails before a module is returned", level: "boundary", area: "Schema generation")[
+        #given[A schema has an unsupported shape or an invalid or conflicting generated name.]
+        #when[The caller generates its module.]
+        #then[Generation returns the typed failure and its applicable logical schema locations.]
+        #then[No partial source module is returned and no constraint is silently removed.]
+      ]
+      #behavior(title: "Equivalent property order regenerates identical source", level: "boundary", area: "Schema generation")[
+        #given[Two supported schemas differ only in object property order and use the same selected module path and root name.]
+        #when[The caller generates both modules.]
+        #then[Their source and content fingerprints are identical.]
+      ]
+      #points(
+        [The #lnk("../../codegen/consumer/README.md")[separate consumer] loads an order schema, compiles generated records, adds an application-owned envelope and dispatch policy, and tests failure recovery. Its separate generation task owns file effects and works before the generated application module exists. The #lnk("../../scripts/check-schema-consumer.sh")[consumer check] regenerates and compares source, runs the consumer tests on both targets, and compiles a production copy without the generator dependency.],
+        [The consumer's two-target corpus uses portable native bounds. Acceptance comparison distinguishes exact wire acceptance from native Int projection failures; it does not claim full-profile parity or general JSON Schema conformance. CPU, construction, generation, and allocation measurements are separate evidence and impose no timing assertion on semantic tests. #adr(8) records the implementation choice.],
+      )
+    ]
     #subsection(title: "Schema-driven generation obligations")[
       #points(
-        [Runtime-schema generation remains intended: an admitted finite contract can drive development-time native type and codec source. The build compiler creates the native type; an application does not obtain Codec(Order) by parsing a schema at runtime.],
-        [Stable selected module/type/field/constructor names, shared named definitions, nested objects, collections, numeric enums, aliases, and recursive generation need contracts beyond the typed-definition generator. Unsupported shapes must return located failures without losing constraints.],
-        [CLI workflow, committed-output drift checks, formatter integration, and upgrade fixtures remain retained tooling obligations. The pending generation entry preserves these requirements.],
+        [Broader schema-driven generation remains intended beyond closed-object roots and the stated child forms. The build compiler creates each native type; parsing a schema at application runtime cannot supply Codec(Order).],
+        [Selected naming overrides, shared named definitions, string and numeric enums, tagged and broader unions, aliases, and recursive generation retain unresolved contracts. Unsupported shapes return located failures without losing constraints until their generation rules are defined.],
+        [General CLI workflow, formatter integration, upgrade fixtures, and wider committed-output drift checking remain tooling obligations. Focused generated-consumer regeneration evidence does not discharge those broader obligations.],
       )
     ]
   ])
@@ -454,7 +520,7 @@
     #subsection(title: "Documentation and build contracts")[
       #points(
         [README's ten Gleam snippets are compared verbatim against compiled and executed tests. Public module documentation examples and codegen README examples have the same executable drift checks. Legacy examples in docs/v1.md remain paired with test/examples.],
-        [The package gate formats source/tests, builds with warnings as errors, and tests Erlang and JavaScript for root and codegen packages. It then runs the independent Python schema checker. Each package's own generated build artifacts are removed so obsolete compiled modules cannot hide missing source.],
+        [The package gate checks formatting, builds with warnings as errors, and tests Erlang and JavaScript for the root package, codegen package, and separate schema consumer. The consumer check also refuses stale generated output and compiles an isolated production application with runtime dependencies only. Independent Python schema and profile checkers run afterward; package build cleanup prevents obsolete compiled modules from hiding missing source.],
         [Nix owns tool versions and the Python oracle environment. Design checks validate source shape, links, and rendered freshness; they do not establish general schema conformance or complete semantic fidelity. #lnk("../../scripts/gate.sh")[package gate] and #lnk("../../flake.nix")[development environment] define operational verification.],
         [Separate public consumers own ordinary tasks, advanced admission, caller types, and failure handling. Existing Relay/Fabric/LLM paths retain codecs for publication and conversion; their provider/protocol policies remain external. No shared execution or error runtime is introduced.],
       )

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "An order accepted at the application boundary",
+  "type": "object",
+  "properties": {
+    "orderId": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999999,
+      "description": "Application order identifier"
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 99999.99
+          }
+        },
+        "required": [
+          "sku",
+          "quantity",
+          "unitPrice"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "shipping": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "coordinates": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "address",
+        "coordinates"
+      ],
+      "additionalProperties": false
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reference": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "required": [
+    "orderId",
+    "active",
+    "items",
+    "shipping",
+    "reference"
+  ],
+  "additionalProperties": false
+}

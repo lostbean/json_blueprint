@@ -1,0 +1,45 @@
+  Resolving versions
+Downloading packages
+ Downloaded 3 packages in 0.01s
+      Added gleam_crypto v1.6.0
+      Added gleam_json v3.1.0
+      Added gleam_stdlib v1.0.5
+      Added json_blueprint v1.7.1
+      Added json_blueprint_codegen v0.1.0
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling json_blueprint
+  Compiling json_blueprint_codegen
+  Compiling schema_order_generate
+error: Unknown module
+  ┌─ /code/gleam-dream/json_blueprint/codegen/consumer/generate/src/generate_order.gleam:3:1
+  │
+3 │ import json/blueprint/codegen/schema as schema_codegen
+  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No module has been found with the name `json/blueprint/codegen/schema`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/json_blueprint/codegen/consumer/generate/src/generate_order.gleam:30:59
+   │
+30 │ pub fn compile_order() -> Result(codegen.GeneratedModule, schema_codegen.CompileError) {
+   │                                                           ^^^^^^^^^^^^^^
+
+No module has been found with the name `schema_codegen`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/json_blueprint/codegen/consumer/generate/src/generate_order.gleam:31:3
+   │
+31 │   schema_codegen.compile("commerce/order", "order", contract.schema(order_schema()))
+   │   ^^^^^^^^^^^^^^
+
+No module has been found with the name `schema_codegen`.
+
+error: Unknown module
+   ┌─ /code/gleam-dream/json_blueprint/codegen/consumer/generate/src/generate_order.gleam:38:5
+   │
+38 │     schema_codegen.compile(module_path, name, contract.schema(loaded))
+   │     ^^^^^^^^^^^^^^
+
+No module has been found with the name `schema_codegen`.

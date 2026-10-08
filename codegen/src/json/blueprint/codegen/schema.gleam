@@ -1,0 +1,586 @@
+//// Generate native records and ordinary typed codecs from a closed-object schema.
+////
+//// This development-time module returns source; the caller writes, formats and
+//// compiles it. Generated applications need only `json_blueprint`. Retain the
+//// root codec when reusing it, as with a handwritten codec.
+////
+//// Supported children are strings, booleans, integers, exact numbers, inclusive
+//// ranges, objects, lists, pairs and nullable values. Optional nullable fields
+//// use `Option(Option(a))` to distinguish missing, null and a supplied value.
+//// Enums, unions and unconstrained values return located errors. Native `Int`
+//// projection retains the runtime codec's limits. BEAM-only integer bounds
+//// produce source that must be checked for the intended target; JavaScript
+//// cannot safely use those bounds. Exact `Number` does not use
+//// floating-point conversion.
+////
+//// Only the root `<name>_codec()` accessor is public. Root and nested records
+//// are public. Wire names are preserved; native names normalize codepoints.
+//// Uppercase ASCII letters each start an underscore-separated word. Delimiter
+//// runs collapse, digit-leading names gain `field_`, and keywords gain `_`.
+//// Empty names and collisions fail rather than silently renaming fields.
+////
+//// ```gleam
+//// import json/blueprint/codegen/schema
+//// import json/blueprint/contract
+//// import json/blueprint/value
+////
+//// pub fn generate_order() {
+////   let assert Ok(contract) =
+////     contract.parse(
+////       "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"orderId\":{\"type\":\"string\"}},\"required\":[\"orderId\"],\"additionalProperties\":false}",
+////       value.default_limits(),
+////     )
+////   schema.compile("generated/order", "order", contract.schema(contract))
+//// }
+//// ```
+
+import gleam/bit_array
+import gleam/crypto
+import gleam/int
+import gleam/list
+import gleam/option.{None, Some}
+import gleam/order
+import gleam/result
+import gleam/string
+import json/blueprint/codec
+import json/blueprint/codegen
+import json/blueprint/codegen/internal/schema_materialize as source
+import json/blueprint/number
+
+/// Logical canonical schema locations, or a language/imported type name.
+pub type NameOrigin {
+  SchemaLocation(List(codec.PathSegment))
+  ReservedName
+}
+
+/// A shape outside the native generation profile.
+pub type UnsupportedKind {
+  NonObjectRoot
+  StringEnum
+  TaggedUnion
+  AnyValue
+  UnknownShape
+}
+
+/// Generation refuses unsupported shapes or source names before returning source.
+/// Paths locate the canonical rendered schema, not the original document bytes.
+pub type CompileError {
+  InvalidModuleName(module_path: String, reason: String)
+  InvalidRootName(name: String, reason: String)
+  InvalidFieldName(path: List(codec.PathSegment), wire_name: String)
+  NameCollision(name: String, first: NameOrigin, second: NameOrigin)
+  UnsupportedShape(path: List(codec.PathSegment), kind: UnsupportedKind)
+}
+
+type Field {
+  Field(
+    wire: String,
+    name: String,
+    type_: String,
+    expression: String,
+    required: Bool,
+  )
+}
+
+type Record {
+  Record(
+    stem: String,
+    name: String,
+    fields: List(Field),
+    description: option.Option(String),
+  )
+}
+
+type State {
+  State(
+    names: List(#(String, NameOrigin)),
+    records: List(Record),
+    imports: List(String),
+  )
+}
+
+type Lowered {
+  Lowered(type_: String, expression: String, state: State)
+}
+
+/// Return deterministic source and its SHA-1 content fingerprint.
+/// Object properties are ordered by Unicode codepoint order of their wire names. The input must
+/// already be an admitted `Schema`; this function does not load JSON Schema.
+pub fn compile(
+  module_path: String,
+  name: String,
+  schema: codec.Schema,
+) -> Result(codegen.GeneratedModule, CompileError) {
+  use _ <- result.try(
+    source.validate_module_path(module_path)
+    |> result.map_error(fn(error) {
+      let assert source.InvalidModuleName(path, reason) = error
+      InvalidModuleName(path, reason)
+    }),
+  )
+  use _ <- result.try(
+    source.validate_accessor_name(name)
+    |> result.map_error(fn(error) {
+      let assert source.InvalidAccessorName(name, reason) = error
+      InvalidRootName(name, reason)
+    }),
+  )
+  use _ <- result.try(case codec.view(schema) {
+    codec.ObjectSchema(_) -> Ok(Nil)
+    _ -> Error(UnsupportedShape([], NonObjectRoot))
+  })
+  let reserved = [
+    "String",
+    "Int",
+    "Float",
+    "Bool",
+    "List",
+    "Result",
+    "Nil",
+    "BitArray",
+    "UtfCodepoint",
+  ]
+  let state =
+    State(list.map(reserved, fn(name) { #(name, ReservedName) }), [], [])
+  use lowered <- result.try(lower(schema, name, [], state))
+  use _ <- result.try(check_import_names(
+    lowered.state.imports,
+    lowered.state.names,
+  ))
+  let imports =
+    ["json/blueprint/codec", ..lowered.state.imports]
+    |> list.unique
+    |> list.sort(string.compare)
+  let content =
+    "// Generated by json_blueprint_codegen; regenerate from the source schema.\n\n"
+    <> string.join(
+      list.map(imports, fn(import_) { "import " <> import_ <> "\n" }),
+      "",
+    )
+    <> "\n"
+    <> string.join(
+      list.map(list.reverse(lowered.state.records), fn(record) {
+        emit_record(record, name)
+      }),
+      "\n",
+    )
+  let fingerprint =
+    content
+    |> bit_array.from_string
+    |> crypto.hash(crypto.Sha1, _)
+    |> bit_array.base16_encode
+  Ok(codegen.GeneratedModule(module_path <> ".gleam", content, fingerprint))
+}
+
+fn check_import_names(
+  imports: List(String),
+  names: List(#(String, NameOrigin)),
+) -> Result(Nil, CompileError) {
+  let types =
+    list.filter_map(imports, fn(module) {
+      case module {
+        "gleam/option.{type Option}" -> Ok("Option")
+        "json/blueprint/number.{type Number}" -> Ok("Number")
+        _ -> Error(Nil)
+      }
+    })
+  list.try_fold(types, Nil, fn(_, name) {
+    case list.key_find(names, name) {
+      Ok(origin) -> Error(NameCollision(name, ReservedName, origin))
+      Error(_) -> Ok(Nil)
+    }
+  })
+}
+
+fn lower(
+  schema: codec.Schema,
+  stem: String,
+  path: List(codec.PathSegment),
+  state: State,
+) -> Result(Lowered, CompileError) {
+  use lowered <- result.try(case codec.view(schema) {
+    codec.StringSchema -> Ok(Lowered("String", "codec.string()", state))
+    codec.BoolSchema -> Ok(Lowered("Bool", "codec.bool()", state))
+    codec.IntSchema -> Ok(Lowered("Int", "codec.int()", state))
+    codec.IntegerRangeSchema(min, max) ->
+      Ok(Lowered(
+        "Int",
+        "codec.integer_between("
+          <> integer_literal(min)
+          <> ", "
+          <> integer_literal(max)
+          <> ")",
+        state,
+      ))
+    codec.NumberSchema ->
+      Ok(Lowered(
+        "Number",
+        "codec.number()",
+        add_import(state, "json/blueprint/number.{type Number}"),
+      ))
+    codec.NumberRangeSchema(min, max) ->
+      Ok(Lowered(
+        "Number",
+        "codec.number_between("
+          <> exact_bound(min)
+          <> ", "
+          <> exact_bound(max)
+          <> ")",
+        state
+          |> add_import("json/blueprint/number.{type Number}")
+          |> add_import("gleam/result"),
+      ))
+    codec.ListSchema(child) -> {
+      use inner <- result.try(lower(
+        child,
+        stem <> "_item",
+        list.append(path, [codec.Field("items")]),
+        state,
+      ))
+      Ok(Lowered(
+        "List(" <> inner.type_ <> ")",
+        "codec.list(" <> inner.expression <> ")",
+        inner.state,
+      ))
+    }
+    codec.PairSchema(first, second) -> {
+      use left <- result.try(lower(
+        first,
+        stem <> "_first",
+        list.append(path, [codec.Field("prefixItems"), codec.Index(0)]),
+        state,
+      ))
+      use right <- result.try(lower(
+        second,
+        stem <> "_second",
+        list.append(path, [codec.Field("prefixItems"), codec.Index(1)]),
+        left.state,
+      ))
+      Ok(Lowered(
+        "#(" <> left.type_ <> ", " <> right.type_ <> ")",
+        "codec.pair(" <> left.expression <> ", " <> right.expression <> ")",
+        right.state,
+      ))
+    }
+    codec.NullableSchema(child) -> {
+      use inner <- result.try(lower(
+        child,
+        stem,
+        list.append(path, [codec.Field("anyOf"), codec.Index(1)]),
+        state,
+      ))
+      Ok(Lowered(
+        "Option(" <> inner.type_ <> ")",
+        "codec.nullable(" <> inner.expression <> ")",
+        add_import(inner.state, "gleam/option.{type Option}"),
+      ))
+    }
+    codec.ObjectSchema(properties) ->
+      lower_object(schema, properties, stem, path, state)
+    codec.StringEnumSchema(_) -> Error(UnsupportedShape(path, StringEnum))
+    codec.UnionSchema(_) -> Error(UnsupportedShape(path, TaggedUnion))
+    codec.AnySchema -> Error(UnsupportedShape(path, AnyValue))
+    codec.OtherSchema(_) -> Error(UnsupportedShape(path, UnknownShape))
+  })
+  case codec.view(schema) {
+    codec.ObjectSchema(_) -> Ok(lowered)
+    _ ->
+      Ok(
+        Lowered(
+          ..lowered,
+          expression: describe(lowered.expression, codec.description(schema)),
+        ),
+      )
+  }
+}
+
+fn add_import(state: State, name: String) -> State {
+  State(..state, imports: [name, ..state.imports])
+}
+
+fn lower_object(
+  schema: codec.Schema,
+  properties: List(codec.PropertySchema),
+  stem: String,
+  path: List(codec.PathSegment),
+  state: State,
+) -> Result(Lowered, CompileError) {
+  let name = pascal_case(stem)
+  use names <- result.try(register(name, SchemaLocation(path), state.names))
+  let state = State(..state, names: names)
+  let properties =
+    list.sort(properties, fn(a, b) { compare_wire_names(a.name, b.name) })
+  use lowered <- result.try(
+    list.try_fold(properties, #([], [], state), fn(acc, property) {
+      let #(fields, names, state) = acc
+      let location =
+        list.append(path, [
+          codec.Field("properties"),
+          codec.Field(property.name),
+        ])
+      let field_name = normalize_field(property.name)
+      use _ <- result.try(case field_name {
+        "" -> Error(InvalidFieldName(location, property.name))
+        _ -> Ok(Nil)
+      })
+      use names <- result.try(register(
+        field_name,
+        SchemaLocation(location),
+        names,
+      ))
+      use child <- result.try(lower(
+        property.schema,
+        stem <> "_" <> field_name,
+        location,
+        state,
+      ))
+      let #(type_, state) = case property.required {
+        True -> #(child.type_, child.state)
+        False -> #(
+          "Option(" <> child.type_ <> ")",
+          add_import(child.state, "gleam/option.{type Option}"),
+        )
+      }
+      Ok(#(
+        [
+          Field(
+            property.name,
+            field_name,
+            type_,
+            child.expression,
+            property.required,
+          ),
+          ..fields
+        ],
+        names,
+        state,
+      ))
+    }),
+  )
+  let #(fields, _, state) = lowered
+  let record =
+    Record(stem, name, list.reverse(fields), codec.description(schema))
+  Ok(Lowered(
+    name,
+    stem <> "_codec()",
+    State(..state, records: [record, ..state.records]),
+  ))
+}
+
+fn register(
+  name: String,
+  origin: NameOrigin,
+  names: List(#(String, NameOrigin)),
+) -> Result(List(#(String, NameOrigin)), CompileError) {
+  case list.key_find(names, name) {
+    Ok(first) -> Error(NameCollision(name, first, origin))
+    Error(_) -> Ok([#(name, origin), ..names])
+  }
+}
+
+fn emit_record(record: Record, root: String) -> String {
+  let fields =
+    list.map(record.fields, fn(field) {
+      "    " <> field.name <> ": " <> field.type_ <> ",\n"
+    })
+    |> string.join("")
+  let constructor = case record.fields {
+    [] -> record.name
+    _ -> record.name <> "(\n" <> fields <> "  )"
+  }
+  let prepared =
+    list.index_map(record.fields, fn(field, index) {
+      "  let codec_"
+      <> int.to_string(index)
+      <> " = "
+      <> field.expression
+      <> "\n"
+    })
+    |> string.join("")
+  let steps =
+    list.index_map(record.fields, fn(field, index) {
+      let function = case field.required {
+        True -> "field"
+        False -> "optional_field"
+      }
+      "  use field_"
+      <> int.to_string(index)
+      <> " <- codec."
+      <> function
+      <> "("
+      <> quote(field.wire)
+      <> ", codec_"
+      <> int.to_string(index)
+      <> ", get: fn(record) { record."
+      <> field.name
+      <> " })\n"
+    })
+    |> string.join("")
+  let arguments =
+    list.index_map(record.fields, fn(field, index) {
+      field.name <> ": field_" <> int.to_string(index)
+    })
+    |> string.join(", ")
+  let constructed = case record.fields {
+    [] -> record.name
+    _ -> record.name <> "(" <> arguments <> ")"
+  }
+  let body =
+    "{\n" <> prepared <> steps <> "  codec.success(" <> constructed <> ")\n}"
+  let visibility = case record.stem == root {
+    True -> "pub "
+    False -> ""
+  }
+  "pub type "
+  <> record.name
+  <> " {\n  "
+  <> constructor
+  <> "\n}\n\n"
+  <> visibility
+  <> "fn "
+  <> record.stem
+  <> "_codec() -> codec.Codec("
+  <> record.name
+  <> ") {\n"
+  <> describe(body, record.description)
+  <> "\n}\n"
+}
+
+fn describe(expression: String, description: option.Option(String)) -> String {
+  case description {
+    None -> expression
+    Some(text) -> "codec.describe(" <> expression <> ", " <> quote(text) <> ")"
+  }
+}
+
+// Parse only generator-checked canonical tokens, with limits derived from that
+// token. Bounds admitted with limits larger than defaults remain representable.
+fn exact_bound(value: number.Number) -> String {
+  let token = number.to_string(value)
+  let length = string.byte_size(token)
+  let exponent = case string.split_once(token, "e") {
+    Error(_) -> 0
+    Ok(#(_, digits)) -> {
+      let assert Ok(exponent) = int.parse(digits)
+      int.absolute_value(exponent)
+    }
+  }
+  "result.lazy_unwrap(number.parse("
+  <> quote(token)
+  <> ", number.limits(max_token_bytes: "
+  <> integer_literal(length)
+  <> ", max_significant_digits: "
+  <> integer_literal(length)
+  <> ", max_exponent: "
+  <> integer_literal(exponent + length)
+  <> ")), fn() { panic as \"Invalid generator-checked number bound\" })"
+}
+
+fn normalize_field(name: String) -> String {
+  let raw =
+    name
+    |> string.to_utf_codepoints
+    |> list.map(fn(point) {
+      let char = string.from_utf_codepoints([point])
+      case
+        string.contains("abcdefghijklmnopqrstuvwxyz0123456789", char),
+        string.contains("ABCDEFGHIJKLMNOPQRSTUVWXYZ", char)
+      {
+        True, _ -> char
+        _, True -> "_" <> string.lowercase(char)
+        _, _ -> "_"
+      }
+    })
+    |> string.join("")
+  let normalized =
+    raw
+    |> string.split("_")
+    |> list.filter(fn(word) { word != "" })
+    |> string.join("_")
+  case normalized {
+    "" -> ""
+    _ -> {
+      let prefixed = case string.to_graphemes(normalized) {
+        [first, ..] ->
+          case string.contains("0123456789", first) {
+            True -> "field_" <> normalized
+            False -> normalized
+          }
+        _ -> normalized
+      }
+      case source.is_gleam_keyword(prefixed) {
+        True -> prefixed <> "_"
+        False -> prefixed
+      }
+    }
+  }
+}
+
+fn pascal_case(stem: String) -> String {
+  stem
+  |> string.split("_")
+  |> list.map(fn(word) {
+    case string.pop_grapheme(word) {
+      Ok(#(first, rest)) -> string.uppercase(first) <> rest
+      Error(_) -> ""
+    }
+  })
+  |> string.join("")
+}
+
+fn quote(text: String) -> String {
+  // JSON escapes overlap Gleam except JSON's four-digit Unicode escape. Emit
+  // Gleam's braced codepoint escape for every C0 control and retain other UTF-8.
+  "\""
+  <> {
+    text
+    |> string.to_utf_codepoints
+    |> list.map(fn(point) {
+      let code = string.utf_codepoint_to_int(point)
+      case code {
+        34 -> "\\\""
+        92 -> "\\\\"
+        code if code < 32 -> "\\u{" <> int.to_base16(code) <> "}"
+        _ -> string.from_utf_codepoints([point])
+      }
+    })
+    |> string.join("")
+  }
+  <> "\""
+}
+
+fn integer_literal(value: Int) -> String {
+  case int.absolute_value(value) < 10_000 {
+    True -> int.to_string(value)
+    False -> source.format_int_literal(value)
+  }
+}
+
+// Host string ordering differs for astral characters between BEAM and JS.
+fn compare_wire_names(left: String, right: String) -> order.Order {
+  compare_codepoints(
+    string.to_utf_codepoints(left),
+    string.to_utf_codepoints(right),
+  )
+}
+
+fn compare_codepoints(
+  left: List(UtfCodepoint),
+  right: List(UtfCodepoint),
+) -> order.Order {
+  case left, right {
+    [], [] -> order.Eq
+    [], _ -> order.Lt
+    _, [] -> order.Gt
+    [left, ..left_rest], [right, ..right_rest] ->
+      case
+        int.compare(
+          string.utf_codepoint_to_int(left),
+          string.utf_codepoint_to_int(right),
+        )
+      {
+        order.Eq -> compare_codepoints(left_rest, right_rest)
+        other -> other
+      }
+  }
+}

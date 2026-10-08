@@ -1,0 +1,53 @@
+#!/bin/sh
+# Run from the repository Nix shell. Generation is a development-only package.
+set -eu
+cd "$(dirname "$0")/.."
+repository=$(pwd)
+consumer="$repository/codegen/consumer"
+output=$(mktemp -d)
+trap 'rm -rf "$output"' EXIT HUP INT TERM
+(
+  cd "$consumer/generate"
+  rm -rf build/dev/erlang/schema_order_generate build/dev/javascript/schema_order_generate
+  gleam format --check src
+  gleam build --warnings-as-errors
+  SCHEMA_OUTPUT="$output" gleam run -m generate_order
+)
+gleam format "$output"
+for module in commerce/order.gleam projection/numbers.gleam; do
+  if ! cmp "$output/$module" "$consumer/src/$module"; then
+    echo "Generated consumer drift: $module; regenerate using codegen/consumer/README.md" >&2
+    exit 1
+  fi
+done
+(
+  cd "$consumer"
+  rm -rf build/dev/erlang/schema_order_consumer build/dev/javascript/schema_order_consumer
+  gleam format --check src test
+  for target in erlang javascript; do
+    gleam build --target="$target" --warnings-as-errors
+    gleam test --target="$target"
+  done
+)
+# Compile only production source, with development dependencies removed.
+mkdir -p "$output/production"
+cp -R "$consumer/src" "$output/production/src"
+python3 - "$consumer" "$output/production" <<'PYCODE'
+import json
+from pathlib import Path
+import sys
+consumer, production = map(Path, sys.argv[1:])
+manifest = (consumer / "gleam.toml").read_text().split("[dev-dependencies]")[0]
+manifest = manifest.replace('path = "../.."', "path = " + json.dumps(str(consumer.parent.parent)))
+(production / "gleam.toml").write_text(manifest)
+PYCODE
+(
+  cd "$output/production"
+  for target in erlang javascript; do
+    gleam build --target="$target" --warnings-as-errors
+  done
+  if grep json_blueprint_codegen manifest.toml; then
+    echo "The generator leaked into production dependencies" >&2
+    exit 1
+  fi
+)

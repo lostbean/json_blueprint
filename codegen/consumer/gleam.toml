@@ -1,0 +1,9 @@
+name = "schema_order_consumer"
+version = "0.1.0"
+
+[dependencies]
+gleam_stdlib = ">= 0.60.0 and < 2.0.0"
+json_blueprint = { path = "../.." }
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

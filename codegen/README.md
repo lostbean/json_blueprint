@@ -1,8 +1,12 @@
 # json_blueprint_codegen
 
-Generate Gleam encoder, decoder, and schema functions from a typed
-[JSON Blueprint](../README.md) definition. Your build task writes and compiles
-the returned source.
+Generate reviewable Gleam source through two development-time paths:
+
+- A caller-authored typed `Definition(a)` generates specialized encoder, decoder, and schema functions for an existing native type.
+- An [admitted closed-object schema](#generate-native-records-from-a-schema) generates native record types and an ordinary typed codec.
+
+Your build task writes, formats, and compiles the returned source. Both paths use
+[JSON Blueprint](../README.md) at runtime.
 
 This package and the codec API are unpublished. For an application beside this
 checkout, use the runtime package by path and keep the generator in development
@@ -58,3 +62,13 @@ gleam run -m compiled_codec_runner && gleam format test/generated
 The [benchmark guide](../docs/benchmarks.md) explains the timing workloads,
 retained results, and commands for both targets. [ADR 0008](../docs/adr/0008-development-time-source-generation.md)
 records generation ownership and the remaining scope.
+
+## Generate native records from a schema
+
+- The separate `json/blueprint/codegen/schema` module accepts an admitted closed-object `codec.Schema` and explicit module and root names. Its `compile` function returns the same `GeneratedModule` source record as the typed-definition generator.
+- A generated schema module exports native root and nested record types plus one root codec accessor. Applications use ordinary `codec.encode`, `codec.decode`, and their strict text counterparts with that codec.
+- Supported children include closed records, strings, booleans, native integers and integer ranges, exact numbers and number ranges, lists, pairs, nullable values, and optional properties. Constraints and descriptions survive generation; supported structure is checked by Gleam on outbound native values while ordinary codecs check value constraints.
+- Wire names are preserved. Native names are deterministic; invalid names, name collisions, and unsupported shapes return typed failures with logical schema locations instead of partial source.
+- Enums, tagged unions, unconstrained values, shared or recursive definitions, and non-object roots are outside this generation slice. Runtime-schema admission does not imply generation support.
+- The [separate order consumer](consumer/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and stale-output checks. Its production package depends only on the runtime package and compiled source.
+- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. The [measurement report](../docs/benchmarks/schema-generation-2026-10-08/README.md) separates construction, conversion, and build-time generation cost.

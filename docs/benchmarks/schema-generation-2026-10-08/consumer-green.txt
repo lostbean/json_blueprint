@@ -1,0 +1,38 @@
+  Compiling schema_order_generate
+   Compiled in 0.45s
+   Compiled in 0.42s
+    Running generate_order.main
+Generated commerce/order.gleam
+Generated projection/numbers.gleam
+  Compiling schema_order_consumer
+   Compiled in 0.58s
+   Compiled in 0.42s
+    Running schema_order_consumer_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+10 passed, no failures[39m
+  Compiling schema_order_consumer
+   Compiled in 0.04s
+   Compiled in 0.02s
+    Running schema_order_consumer_test.main
+[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m.[39m[32m
+10 passed, no failures[39m
+  Resolving versions
+Downloading packages
+ Downloaded 3 packages in 0.01s
+      Added gleam_crypto v1.6.0
+      Added gleam_json v3.1.0
+      Added gleam_stdlib v1.0.5
+      Added json_blueprint v1.7.1
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling json_blueprint
+  Compiling schema_order_consumer
+   Compiled in 1.85s
+  Resolving versions
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling json_blueprint
+  Compiling schema_order_consumer
+   Compiled in 0.25s
