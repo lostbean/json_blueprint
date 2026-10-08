@@ -1,0 +1,1410 @@
+[
+  {
+    "target": "erlang",
+    "case": "any_array_10000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 66.67,
+    "trial_median_min_ns": 56.66,
+    "trial_median_max_ns": 70.37,
+    "batch_min_ns": 51.11,
+    "batch_max_ns": 75.19,
+    "trial_medians_ns": [
+      70.37,
+      56.66,
+      66.67
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "any_array_10000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 2769454.73,
+    "trial_median_min_ns": 2768398.05,
+    "trial_median_max_ns": 2835551.89,
+    "batch_min_ns": 2740230.16,
+    "batch_max_ns": 3097586.66,
+    "trial_medians_ns": [
+      2835551.89,
+      2769454.73,
+      2768398.05
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_array_10",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 48.2412,
+    "trial_median_min_ns": 46.3116,
+    "trial_median_max_ns": 49.8746,
+    "batch_min_ns": 45.282,
+    "batch_max_ns": 53.945,
+    "trial_medians_ns": [
+      46.3116,
+      48.2412,
+      49.8746
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_array_10",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 1774.5926,
+    "trial_median_min_ns": 1758.4294,
+    "trial_median_max_ns": 1783.289,
+    "batch_min_ns": 1747.744,
+    "batch_max_ns": 1823.1966,
+    "trial_medians_ns": [
+      1783.289,
+      1774.5926,
+      1758.4294
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_array_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 54.07,
+    "trial_median_min_ns": 53.71,
+    "trial_median_max_ns": 55.55,
+    "batch_min_ns": 48.89,
+    "batch_max_ns": 60.93,
+    "trial_medians_ns": [
+      53.71,
+      54.07,
+      55.55
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_array_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 120354.77,
+    "trial_median_min_ns": 120343.66,
+    "trial_median_max_ns": 122757.39,
+    "batch_min_ns": 119839.02,
+    "batch_max_ns": 123428.51,
+    "trial_medians_ns": [
+      120343.66,
+      122757.39,
+      120354.77
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_array_10000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 57.59,
+    "trial_median_min_ns": 54.63,
+    "trial_median_max_ns": 59.07,
+    "batch_min_ns": 46.67,
+    "batch_max_ns": 61.67,
+    "trial_medians_ns": [
+      54.63,
+      57.59,
+      59.07
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_array_10000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 1483532.83,
+    "trial_median_min_ns": 1480404.1,
+    "trial_median_max_ns": 1485705.63,
+    "batch_min_ns": 1416324.17,
+    "batch_max_ns": 1584518.52,
+    "trial_medians_ns": [
+      1480404.1,
+      1485705.63,
+      1483532.83
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_int",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 44.82047,
+    "trial_median_min_ns": 44.61621,
+    "trial_median_max_ns": 44.84991,
+    "batch_min_ns": 44.46028,
+    "batch_max_ns": 45.37843,
+    "trial_medians_ns": [
+      44.61621,
+      44.82047,
+      44.84991
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "bounded_int",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 139.60775,
+    "trial_median_min_ns": 139.312,
+    "trial_median_max_ns": 139.74386,
+    "batch_min_ns": 138.66088,
+    "batch_max_ns": 141.04072,
+    "trial_medians_ns": [
+      139.60775,
+      139.312,
+      139.74386
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 44.66028,
+    "trial_median_min_ns": 44.50102,
+    "trial_median_max_ns": 44.76769,
+    "batch_min_ns": 44.4275,
+    "batch_max_ns": 69.39794,
+    "trial_medians_ns": [
+      44.50102,
+      44.76769,
+      44.66028
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 139.45015,
+    "trial_median_min_ns": 139.21071,
+    "trial_median_max_ns": 139.72478,
+    "batch_min_ns": 138.53607,
+    "batch_max_ns": 140.50091,
+    "trial_medians_ns": [
+      139.21071,
+      139.72478,
+      139.45015
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int_array_10",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 51.056,
+    "trial_median_min_ns": 49.1894,
+    "trial_median_max_ns": 56.5598,
+    "batch_min_ns": 45.5746,
+    "batch_max_ns": 127.416,
+    "trial_medians_ns": [
+      49.1894,
+      56.5598,
+      51.056
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int_array_10",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 1782.9704,
+    "trial_median_min_ns": 1772.374,
+    "trial_median_max_ns": 1796.0854,
+    "batch_min_ns": 1759.5702,
+    "batch_max_ns": 1834.6412,
+    "trial_medians_ns": [
+      1782.9704,
+      1796.0854,
+      1772.374
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int_array_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 55.0,
+    "trial_median_min_ns": 54.82,
+    "trial_median_max_ns": 55.74,
+    "batch_min_ns": 48.33,
+    "batch_max_ns": 59.08,
+    "trial_medians_ns": [
+      55.0,
+      54.82,
+      55.74
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int_array_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 120324.59,
+    "trial_median_min_ns": 119647.17,
+    "trial_median_max_ns": 121321.26,
+    "batch_min_ns": 119450.31,
+    "batch_max_ns": 122012.93,
+    "trial_medians_ns": [
+      120324.59,
+      121321.26,
+      119647.17
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int_array_10000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 56.29,
+    "trial_median_min_ns": 54.45,
+    "trial_median_max_ns": 56.85,
+    "batch_min_ns": 47.22,
+    "batch_max_ns": 58.89,
+    "trial_medians_ns": [
+      54.45,
+      56.85,
+      56.29
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "int_array_10000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 1691113.7,
+    "trial_median_min_ns": 1676637.07,
+    "trial_median_max_ns": 1692732.04,
+    "batch_min_ns": 1662771.36,
+    "batch_max_ns": 1726466.29,
+    "trial_medians_ns": [
+      1691113.7,
+      1676637.07,
+      1692732.04
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "invalid_bound_first_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 55.56,
+    "trial_median_min_ns": 51.66,
+    "trial_median_max_ns": 56.48,
+    "batch_min_ns": 49.26,
+    "batch_max_ns": 94.08,
+    "trial_medians_ns": [
+      51.66,
+      55.56,
+      56.48
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "invalid_bound_first_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 165191.9,
+    "trial_median_min_ns": 164769.67,
+    "trial_median_max_ns": 165348.38,
+    "batch_min_ns": 129085.23,
+    "batch_max_ns": 168167.31,
+    "trial_medians_ns": [
+      165191.9,
+      165348.38,
+      164769.67
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "invalid_bound_last_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 54.26,
+    "trial_median_min_ns": 53.7,
+    "trial_median_max_ns": 54.26,
+    "batch_min_ns": 47.22,
+    "batch_max_ns": 150.18,
+    "trial_medians_ns": [
+      53.7,
+      54.26,
+      54.26
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "invalid_bound_last_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 163055.77,
+    "trial_median_min_ns": 162693.73,
+    "trial_median_max_ns": 164983.19,
+    "batch_min_ns": 162260.76,
+    "batch_max_ns": 166607.84,
+    "trial_medians_ns": [
+      162693.73,
+      164983.19,
+      163055.77
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_depth_8",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 48.612,
+    "trial_median_min_ns": 48.075,
+    "trial_median_max_ns": 51.519,
+    "batch_min_ns": 44.871,
+    "batch_max_ns": 52.223,
+    "trial_medians_ns": [
+      48.612,
+      51.519,
+      48.075
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_depth_8",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 7038.184,
+    "trial_median_min_ns": 7037.332,
+    "trial_median_max_ns": 7260.89,
+    "batch_min_ns": 6927.702,
+    "batch_max_ns": 7461.578,
+    "trial_medians_ns": [
+      7260.89,
+      7038.184,
+      7037.332
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_width_10",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 56.48,
+    "trial_median_min_ns": 54.81,
+    "trial_median_max_ns": 57.59,
+    "batch_min_ns": 52.23,
+    "batch_max_ns": 62.96,
+    "trial_medians_ns": [
+      54.81,
+      57.59,
+      56.48
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_width_10",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 6125.99,
+    "trial_median_min_ns": 6109.7,
+    "trial_median_max_ns": 6287.84,
+    "batch_min_ns": 5778.02,
+    "batch_max_ns": 10137.51,
+    "trial_medians_ns": [
+      6109.7,
+      6287.84,
+      6125.99
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_width_100",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 55.37,
+    "trial_median_min_ns": 52.03,
+    "trial_median_max_ns": 58.33,
+    "batch_min_ns": 46.66,
+    "batch_max_ns": 63.34,
+    "trial_medians_ns": [
+      52.03,
+      58.33,
+      55.37
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_width_100",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 63670.66,
+    "trial_median_min_ns": 63008.8,
+    "trial_median_max_ns": 63698.07,
+    "batch_min_ns": 61942.5,
+    "batch_max_ns": 66942.17,
+    "trial_medians_ns": [
+      63670.66,
+      63698.07,
+      63008.8
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_width_500",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 57.78,
+    "trial_median_min_ns": 56.29,
+    "trial_median_max_ns": 59.08,
+    "batch_min_ns": 49.26,
+    "batch_max_ns": 2352.25,
+    "trial_medians_ns": [
+      56.29,
+      59.08,
+      57.78
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "object_width_500",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 322217.24,
+    "trial_median_min_ns": 320584.07,
+    "trial_median_max_ns": 322517.79,
+    "batch_min_ns": 317697.75,
+    "batch_max_ns": 337060.91,
+    "trial_medians_ns": [
+      322517.79,
+      322217.24,
+      320584.07
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "order",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 55.1562,
+    "trial_median_min_ns": 53.8526,
+    "trial_median_max_ns": 55.5004,
+    "batch_min_ns": 45.293,
+    "batch_max_ns": 284.2438,
+    "trial_medians_ns": [
+      55.1562,
+      55.5004,
+      53.8526
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "order",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 7069.903,
+    "trial_median_min_ns": 6880.5382,
+    "trial_median_max_ns": 7088.8552,
+    "batch_min_ns": 6815.9968,
+    "batch_max_ns": 8017.45,
+    "trial_medians_ns": [
+      7069.903,
+      7088.8552,
+      6880.5382
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "order",
+    "operation": "generated_encode",
+    "outcome": "ok",
+    "median_ns": 929.2726,
+    "trial_median_min_ns": 917.7836,
+    "trial_median_max_ns": 950.0432,
+    "batch_min_ns": 890.7314,
+    "batch_max_ns": 1012.5846,
+    "trial_medians_ns": [
+      929.2726,
+      950.0432,
+      917.7836
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "order",
+    "operation": "generated_encode_json",
+    "outcome": "ok",
+    "median_ns": 3967.7968,
+    "trial_median_min_ns": 3942.5188,
+    "trial_median_max_ns": 4035.9752,
+    "batch_min_ns": 3924.4852,
+    "batch_max_ns": 4131.3318,
+    "trial_medians_ns": [
+      3942.5188,
+      4035.9752,
+      3967.7968
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "order",
+    "operation": "typed_encode",
+    "outcome": "ok",
+    "median_ns": 1715.303,
+    "trial_median_min_ns": 1638.8874,
+    "trial_median_max_ns": 1747.2626,
+    "batch_min_ns": 1606.6834,
+    "batch_max_ns": 1817.1004,
+    "trial_medians_ns": [
+      1638.8874,
+      1747.2626,
+      1715.303
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "order",
+    "operation": "typed_encode_json",
+    "outcome": "ok",
+    "median_ns": 9096.6426,
+    "trial_median_min_ns": 9089.2612,
+    "trial_median_max_ns": 9242.0738,
+    "batch_min_ns": 8942.2856,
+    "batch_max_ns": 9531.8398,
+    "trial_medians_ns": [
+      9096.6426,
+      9242.0738,
+      9089.2612
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "record_6_fields",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 49.6152,
+    "trial_median_min_ns": 46.2374,
+    "trial_median_max_ns": 49.745,
+    "batch_min_ns": 45.0302,
+    "batch_max_ns": 52.4858,
+    "trial_medians_ns": [
+      46.2374,
+      49.745,
+      49.6152
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "record_6_fields",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 4370.912,
+    "trial_median_min_ns": 4327.2672,
+    "trial_median_max_ns": 4385.0418,
+    "batch_min_ns": 4291.2818,
+    "batch_max_ns": 4576.1996,
+    "trial_medians_ns": [
+      4385.0418,
+      4327.2672,
+      4370.912
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "records_1000_sparse_bounds",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 56.11,
+    "trial_median_min_ns": 55.56,
+    "trial_median_max_ns": 57.22,
+    "batch_min_ns": 48.7,
+    "batch_max_ns": 66.67,
+    "trial_medians_ns": [
+      55.56,
+      57.22,
+      56.11
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "records_1000_sparse_bounds",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 8227059.44,
+    "trial_median_min_ns": 8123009.65,
+    "trial_median_max_ns": 8807414.92,
+    "batch_min_ns": 6732054.44,
+    "batch_max_ns": 9434260.7,
+    "trial_medians_ns": [
+      8807414.92,
+      8227059.44,
+      8123009.65
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "records_1000_sparse_bounds",
+    "operation": "validate_then_encode_json",
+    "outcome": "ok",
+    "median_ns": 7106132.41,
+    "trial_median_min_ns": 7095405.26,
+    "trial_median_max_ns": 7147271.91,
+    "batch_min_ns": 7035201.49,
+    "batch_max_ns": 7228525.91,
+    "trial_medians_ns": [
+      7106132.41,
+      7147271.91,
+      7095405.26
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "records_1000_sparse_bounds",
+    "operation": "validate_then_render",
+    "outcome": "ok",
+    "median_ns": 7097473.06,
+    "trial_median_min_ns": 7041137.48,
+    "trial_median_max_ns": 7150336.57,
+    "batch_min_ns": 7004894.87,
+    "batch_max_ns": 7195237.04,
+    "trial_medians_ns": [
+      7097473.06,
+      7150336.57,
+      7041137.48
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "string",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 44.78325,
+    "trial_median_min_ns": 44.63065,
+    "trial_median_max_ns": 45.04473,
+    "batch_min_ns": 44.4888,
+    "batch_max_ns": 45.63325,
+    "trial_medians_ns": [
+      44.63065,
+      44.78325,
+      45.04473
+    ]
+  },
+  {
+    "target": "erlang",
+    "case": "string",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 217.19003,
+    "trial_median_min_ns": 217.00578,
+    "trial_median_max_ns": 218.22986,
+    "batch_min_ns": 216.44947,
+    "batch_max_ns": 219.31895,
+    "trial_medians_ns": [
+      218.22986,
+      217.00578,
+      217.19003
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "any_array_10000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 291.12,
+    "trial_median_min_ns": 288.52,
+    "trial_median_max_ns": 292.97,
+    "batch_min_ns": 275.19,
+    "batch_max_ns": 303.89,
+    "trial_medians_ns": [
+      291.12,
+      292.97,
+      288.52
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "any_array_10000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 2346616.43,
+    "trial_median_min_ns": 2335070.21,
+    "trial_median_max_ns": 2423373.72,
+    "batch_min_ns": 2313250.72,
+    "batch_max_ns": 2714799.34,
+    "trial_medians_ns": [
+      2346616.43,
+      2335070.21,
+      2423373.72
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_array_10",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 276.2622,
+    "trial_median_min_ns": 269.3028,
+    "trial_median_max_ns": 277.514,
+    "batch_min_ns": 267.4918,
+    "batch_max_ns": 308.4218,
+    "trial_medians_ns": [
+      277.514,
+      276.2622,
+      269.3028
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_array_10",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 4032.0752,
+    "trial_median_min_ns": 4014.601,
+    "trial_median_max_ns": 4055.4198,
+    "batch_min_ns": 3944.7446,
+    "batch_max_ns": 4136.1948,
+    "trial_medians_ns": [
+      4014.601,
+      4055.4198,
+      4032.0752
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_array_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 287.96,
+    "trial_median_min_ns": 283.7,
+    "trial_median_max_ns": 296.11,
+    "batch_min_ns": 274.81,
+    "batch_max_ns": 318.16,
+    "trial_medians_ns": [
+      287.96,
+      296.11,
+      283.7
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_array_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 363634.34,
+    "trial_median_min_ns": 360181.15,
+    "trial_median_max_ns": 372579.24,
+    "batch_min_ns": 358177.43,
+    "batch_max_ns": 381471.19,
+    "trial_medians_ns": [
+      360181.15,
+      363634.34,
+      372579.24
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_array_10000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 292.05,
+    "trial_median_min_ns": 281.86,
+    "trial_median_max_ns": 295.19,
+    "batch_min_ns": 264.82,
+    "batch_max_ns": 4854.68,
+    "trial_medians_ns": [
+      295.19,
+      292.05,
+      281.86
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_array_10000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 3935677.96,
+    "trial_median_min_ns": 3912517.91,
+    "trial_median_max_ns": 3975937.64,
+    "batch_min_ns": 3901496.87,
+    "batch_max_ns": 4100828.38,
+    "trial_medians_ns": [
+      3912517.91,
+      3975937.64,
+      3935677.96
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_int",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 275.07379,
+    "trial_median_min_ns": 274.55304,
+    "trial_median_max_ns": 285.46593,
+    "batch_min_ns": 270.42874,
+    "batch_max_ns": 286.85484,
+    "trial_medians_ns": [
+      275.07379,
+      285.46593,
+      274.55304
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "bounded_int",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 810.18269,
+    "trial_median_min_ns": 810.12805,
+    "trial_median_max_ns": 814.02143,
+    "batch_min_ns": 805.18856,
+    "batch_max_ns": 819.15889,
+    "trial_medians_ns": [
+      810.18269,
+      814.02143,
+      810.12805
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 252.53744,
+    "trial_median_min_ns": 251.35613,
+    "trial_median_max_ns": 254.45505,
+    "batch_min_ns": 245.7496,
+    "batch_max_ns": 360.23726,
+    "trial_medians_ns": [
+      251.35613,
+      252.53744,
+      254.45505
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 773.48786,
+    "trial_median_min_ns": 760.53791,
+    "trial_median_max_ns": 775.08028,
+    "batch_min_ns": 758.59214,
+    "batch_max_ns": 809.37489,
+    "trial_medians_ns": [
+      775.08028,
+      760.53791,
+      773.48786
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int_array_10",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 280.8844,
+    "trial_median_min_ns": 269.9694,
+    "trial_median_max_ns": 281.5178,
+    "batch_min_ns": 265.4806,
+    "batch_max_ns": 288.7362,
+    "trial_medians_ns": [
+      280.8844,
+      281.5178,
+      269.9694
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int_array_10",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 4032.0122,
+    "trial_median_min_ns": 4018.2862,
+    "trial_median_max_ns": 4035.3234,
+    "batch_min_ns": 3949.0522,
+    "batch_max_ns": 4142.9764,
+    "trial_medians_ns": [
+      4035.3234,
+      4018.2862,
+      4032.0122
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int_array_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 300.19,
+    "trial_median_min_ns": 294.08,
+    "trial_median_max_ns": 302.78,
+    "batch_min_ns": 280.75,
+    "batch_max_ns": 338.71,
+    "trial_medians_ns": [
+      302.78,
+      300.19,
+      294.08
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int_array_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 363603.78,
+    "trial_median_min_ns": 354769.43,
+    "trial_median_max_ns": 370649.41,
+    "batch_min_ns": 350387.35,
+    "batch_max_ns": 387460.69,
+    "trial_medians_ns": [
+      354769.43,
+      363603.78,
+      370649.41
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int_array_10000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 288.7,
+    "trial_median_min_ns": 282.41,
+    "trial_median_max_ns": 300.93,
+    "batch_min_ns": 266.85,
+    "batch_max_ns": 337.78,
+    "trial_medians_ns": [
+      288.7,
+      300.93,
+      282.41
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "int_array_10000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 3837743.79,
+    "trial_median_min_ns": 3713618.43,
+    "trial_median_max_ns": 4017008.07,
+    "batch_min_ns": 3697048.62,
+    "batch_max_ns": 4302098.44,
+    "trial_medians_ns": [
+      4017008.07,
+      3837743.79,
+      3713618.43
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "invalid_bound_first_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 407.04,
+    "trial_median_min_ns": 402.41,
+    "trial_median_max_ns": 437.05,
+    "batch_min_ns": 380.01,
+    "batch_max_ns": 484.08,
+    "trial_medians_ns": [
+      407.04,
+      437.05,
+      402.41
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "invalid_bound_first_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 347560.47,
+    "trial_median_min_ns": 343943.95,
+    "trial_median_max_ns": 351303.47,
+    "batch_min_ns": 341732.07,
+    "batch_max_ns": 362852.3,
+    "trial_medians_ns": [
+      351303.47,
+      343943.95,
+      347560.47
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "invalid_bound_last_1000",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 450.19,
+    "trial_median_min_ns": 417.23,
+    "trial_median_max_ns": 454.64,
+    "batch_min_ns": 382.79,
+    "batch_max_ns": 1187.79,
+    "trial_medians_ns": [
+      450.19,
+      454.64,
+      417.23
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "invalid_bound_last_1000",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 347407.13,
+    "trial_median_min_ns": 343183.57,
+    "trial_median_max_ns": 348171.22,
+    "batch_min_ns": 339889.28,
+    "batch_max_ns": 354190.35,
+    "trial_medians_ns": [
+      348171.22,
+      347407.13,
+      343183.57
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_depth_8",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 268.447,
+    "trial_median_min_ns": 262.836,
+    "trial_median_max_ns": 291.54,
+    "batch_min_ns": 260.243,
+    "batch_max_ns": 327.04,
+    "trial_medians_ns": [
+      268.447,
+      291.54,
+      262.836
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_depth_8",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 3098.773,
+    "trial_median_min_ns": 3097.606,
+    "trial_median_max_ns": 3143.125,
+    "batch_min_ns": 3046.754,
+    "batch_max_ns": 3638.278,
+    "trial_medians_ns": [
+      3143.125,
+      3098.773,
+      3097.606
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_width_10",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 293.9,
+    "trial_median_min_ns": 285.0,
+    "trial_median_max_ns": 309.45,
+    "batch_min_ns": 267.97,
+    "batch_max_ns": 317.78,
+    "trial_medians_ns": [
+      293.9,
+      309.45,
+      285.0
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_width_10",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 4648.93,
+    "trial_median_min_ns": 4644.12,
+    "trial_median_max_ns": 4682.65,
+    "batch_min_ns": 4496.53,
+    "batch_max_ns": 4925.6,
+    "trial_medians_ns": [
+      4648.93,
+      4682.65,
+      4644.12
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_width_100",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 295.0,
+    "trial_median_min_ns": 287.78,
+    "trial_median_max_ns": 306.3,
+    "batch_min_ns": 265.74,
+    "batch_max_ns": 327.59,
+    "trial_medians_ns": [
+      295.0,
+      306.3,
+      287.78
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_width_100",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 42127.84,
+    "trial_median_min_ns": 41966.55,
+    "trial_median_max_ns": 42987.48,
+    "batch_min_ns": 41431.91,
+    "batch_max_ns": 47846.98,
+    "trial_medians_ns": [
+      42127.84,
+      41966.55,
+      42987.48
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_width_500",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 300.01,
+    "trial_median_min_ns": 288.89,
+    "trial_median_max_ns": 315.37,
+    "batch_min_ns": 273.15,
+    "batch_max_ns": 350.93,
+    "trial_medians_ns": [
+      300.01,
+      315.37,
+      288.89
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "object_width_500",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 210169.22,
+    "trial_median_min_ns": 210022.18,
+    "trial_median_max_ns": 210180.15,
+    "batch_min_ns": 207291.23,
+    "batch_max_ns": 216784.47,
+    "trial_medians_ns": [
+      210180.15,
+      210169.22,
+      210022.18
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "order",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 276.8658,
+    "trial_median_min_ns": 270.9582,
+    "trial_median_max_ns": 290.2438,
+    "batch_min_ns": 266.4028,
+    "batch_max_ns": 366.8002,
+    "trial_medians_ns": [
+      276.8658,
+      290.2438,
+      270.9582
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "order",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 4530.5434,
+    "trial_median_min_ns": 4493.4578,
+    "trial_median_max_ns": 4574.5366,
+    "batch_min_ns": 4467.6946,
+    "batch_max_ns": 4672.5338,
+    "trial_medians_ns": [
+      4574.5366,
+      4530.5434,
+      4493.4578
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "order",
+    "operation": "generated_encode",
+    "outcome": "ok",
+    "median_ns": 9892.4474,
+    "trial_median_min_ns": 9711.1676,
+    "trial_median_max_ns": 14206.8624,
+    "batch_min_ns": 9620.1778,
+    "batch_max_ns": 17452.511,
+    "trial_medians_ns": [
+      9892.4474,
+      9711.1676,
+      14206.8624
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "order",
+    "operation": "generated_encode_json",
+    "outcome": "ok",
+    "median_ns": 10642.0698,
+    "trial_median_min_ns": 10543.2468,
+    "trial_median_max_ns": 11502.9974,
+    "batch_min_ns": 10204.7764,
+    "batch_max_ns": 15232.6324,
+    "trial_medians_ns": [
+      10642.0698,
+      11502.9974,
+      10543.2468
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "order",
+    "operation": "typed_encode",
+    "outcome": "ok",
+    "median_ns": 21960.9726,
+    "trial_median_min_ns": 21772.8522,
+    "trial_median_max_ns": 22416.6184,
+    "batch_min_ns": 18486.2922,
+    "batch_max_ns": 23800.4476,
+    "trial_medians_ns": [
+      22416.6184,
+      21772.8522,
+      21960.9726
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "order",
+    "operation": "typed_encode_json",
+    "outcome": "ok",
+    "median_ns": 26404.845,
+    "trial_median_min_ns": 26235.3062,
+    "trial_median_max_ns": 26450.1232,
+    "batch_min_ns": 23992.0458,
+    "batch_max_ns": 27252.7724,
+    "trial_medians_ns": [
+      26404.845,
+      26450.1232,
+      26235.3062
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "record_6_fields",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 277.703,
+    "trial_median_min_ns": 271.4324,
+    "trial_median_max_ns": 288.203,
+    "batch_min_ns": 268.2656,
+    "batch_max_ns": 341.9852,
+    "trial_medians_ns": [
+      277.703,
+      288.203,
+      271.4324
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "record_6_fields",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 3234.0818,
+    "trial_median_min_ns": 3176.7256,
+    "trial_median_max_ns": 3241.8004,
+    "batch_min_ns": 3092.1358,
+    "batch_max_ns": 3572.515,
+    "trial_medians_ns": [
+      3241.8004,
+      3234.0818,
+      3176.7256
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "records_1000_sparse_bounds",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 291.48,
+    "trial_median_min_ns": 286.49,
+    "trial_median_max_ns": 295.0,
+    "batch_min_ns": 273.9,
+    "batch_max_ns": 335.19,
+    "trial_medians_ns": [
+      291.48,
+      295.0,
+      286.49
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "records_1000_sparse_bounds",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 3664813.85,
+    "trial_median_min_ns": 3605063.59,
+    "trial_median_max_ns": 3702252.75,
+    "batch_min_ns": 3392873.98,
+    "batch_max_ns": 3931697.55,
+    "trial_medians_ns": [
+      3664813.85,
+      3702252.75,
+      3605063.59
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "records_1000_sparse_bounds",
+    "operation": "validate_then_encode_json",
+    "outcome": "ok",
+    "median_ns": 15482323.4,
+    "trial_median_min_ns": 15359357.67,
+    "trial_median_max_ns": 16022379.37,
+    "batch_min_ns": 15276606.81,
+    "batch_max_ns": 16272158.27,
+    "trial_medians_ns": [
+      15482323.4,
+      15359357.67,
+      16022379.37
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "records_1000_sparse_bounds",
+    "operation": "validate_then_render",
+    "outcome": "ok",
+    "median_ns": 15410510.98,
+    "trial_median_min_ns": 15363971.05,
+    "trial_median_max_ns": 15922564.26,
+    "batch_min_ns": 15315341.46,
+    "batch_max_ns": 16187927.39,
+    "trial_medians_ns": [
+      15363971.05,
+      15410510.98,
+      15922564.26
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "string",
+    "operation": "encode",
+    "outcome": "ok",
+    "median_ns": 281.74515,
+    "trial_median_min_ns": 278.29123,
+    "trial_median_max_ns": 290.05228,
+    "batch_min_ns": 272.42265,
+    "batch_max_ns": 292.09526,
+    "trial_medians_ns": [
+      281.74515,
+      290.05228,
+      278.29123
+    ]
+  },
+  {
+    "target": "javascript",
+    "case": "string",
+    "operation": "encode_json",
+    "outcome": "ok",
+    "median_ns": 687.07437,
+    "trial_median_min_ns": 684.69082,
+    "trial_median_max_ns": 698.90116,
+    "batch_min_ns": 681.19949,
+    "batch_max_ns": 704.56862,
+    "trial_medians_ns": [
+      684.69082,
+      687.07437,
+      698.90116
+    ]
+  }
+]

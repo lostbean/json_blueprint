@@ -23,7 +23,6 @@
   #pending-ledger(
       pending-entry(title: "Broader schema families need concrete contracts", kind: "build", adr: [#adr(1)])[String constraints, broader numeric and collection constraints, arbitrary alternatives, numeric enums, aliases, and recursive references remain intended. Their concrete limits, annotation policies, and validation rules are unresolved; see Schema extension families.],
       pending-entry(title: "Runtime-schema native generation remains incomplete", kind: "build", adr: [#adr(8)])[Retain schema-driven native type and codec generation, stable selected names, shared definitions, nested and recursive forms, and CLI workflow. The dev-only typed-definition generator and schema materializer implement narrower contracts; see Source generation.],
-      pending-entry(title: "Define encoding laws for contract.value_codec", kind: "ruling", adr: [#adr(6)])[Decoding validates; encoding returns the value unchanged, including values outside the schema. Do not extend the native codec-law claim to this adapter without deciding its encoding contract.],
       pending-entry(title: "Retain complete compatibility verification", kind: "verify", adr: [#adr(7)])[Published source, legacy wire, recursive references, error paths, numeric boundaries, and deliberate acceptance corrections need separate fixtures. Existing examples and frozen comparators do not prove complete 1.x compatibility.],
       pending-entry(title: "Keep numerical oracle scope separate from projection", kind: "verify", adr: [#adr(2)])[The finite schema manifest compares Boolean acceptance for its selected cases. Broader numerical evidence must compare exact schema acceptance separately from native overflow, safe-integer refusal, and intentional Float rounding.],
   )
@@ -344,9 +343,16 @@
         [Closed object and union validation reject duplicate or unknown names before validating declared children. Required properties and payloads retain Field paths; collections retain Index paths. AnySchema accepts the supplied value unchanged, including a manually constructed raw Object with duplicate members.],
         [Successful validation creates the opaque witness. contract.decode obtains the retained codec's schema, compares normalized shapes, then invokes that codec's native decoder. Schema mismatch and unavailable schema both become ContractMismatch.],
         [A witness for the mathematical integer 1e30 can still fail codec.int native decoding due to its 24-digit projection bound or JavaScript safety. A witness for a finite exact number beyond binary64 can fail codec.float with FloatOutOfRange. Those outcomes do not invalidate the mathematical schema.],
-        [contract.value_codec supplies Codec(Value) with the contract's schema. Its decoder validates, while its encoder returns Value unchanged; invalid encodings remain possible. This adapter's current asymmetry is explicit in the pending ruling and cannot establish the full bidirectional schema law.],
+        [contract.value_codec supplies Codec(Value) with the contract's schema. Encoding and decoding validate against that same finite schema. Successful conversion returns the supplied Value unchanged, retaining object order and exact numbers. A failure retains the validation path and Reason in the operation's EncodeError or DecodeError. Enclosing record and collection codecs prepend their Field and Index paths.],
+        [This adapter validates structure and supported value constraints on each call without projecting exact numbers into native types. Typed and generated codecs retain their own encoding checks; they do not gain a separate schema-validation pass. Schema acceptance does not certify caller callbacks or business policy. #adr(6) records the scope and migration cost.],
         [Direct validate/load have no independent depth, width, or time guard. Values supplied through strict parsing inherit those parse bounds; manually assembled values do not. Consumers choose bounded construction/admission where their threat model requires it.],
       )
+      #behavior(title: "The dynamic codec enforces its contract when encoding", level: "boundary", area: "Value encoding")[
+        #given[The application retains a contract-backed Value codec.]
+        #when[The application encodes a value through that codec.]
+        #then[A value accepted by the contract is returned unchanged.]
+        #then[A value refused by the contract returns an encoding failure with the first validation path and reason.]
+      ]
     ]
   ])
 
@@ -432,7 +438,7 @@
       #points(
         [The independent oracle compares emitted and normalized schemas, codec decoding, and runtime validation with Python jsonschema Draft202012Validator against a frozen manifest. Selected cases carry stable identifiers and expected schemas/instances; missing, extra, duplicate, or replaced cases fail closed.],
         [The current source manifest contains 85 finite cases in 16 families. That count identifies the stored corpus rather than a new execution claim. Duplicate-key evidence is checked before native export can erase it. Exact-number kernel tests and target float-bit tests remain separate from this Boolean finite corpus.],
-        [Constructor law tests cover admitted native encode/decode and valid re-encoding where applicable. Custom mapping, asymmetric Value adapters, and native projection constraints require their own explicit law scope.],
+        [Constructor law tests cover admitted native encode/decode and valid re-encoding where applicable. The contract-backed Value adapter enforces finite schema acceptance in both directions. Custom mapping and native projection constraints require their own explicit law scope.],
         [Hostile tests exercise parser grammar, resource bounds, duplicate keys, malformed/unsupported schemas, and deterministic generated inputs. Wide collection traversal uses tail-recursive paths where the implementation supplies them; caller-constructed unbounded trees retain no guaranteed stack bound.],
         [Sources: #lnk("../../test/schema_check.py")[independent checker], #lnk("../../test/schema_manifest.json")[frozen manifest], #lnk("../../test/schema_oracle_test.gleam")[runtime cases], and #lnk("../../test/hostile_test.gleam")[hostile cases]. #lnk("../../test/oracle/README.md")[Oracle instructions] state reproducible commands and evidence limits; #adr(2) records historical source attribution.],
       )

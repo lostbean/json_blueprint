@@ -2,6 +2,7 @@
 
 ## Unreleased — intended 2.0
 
+- `contract.value_codec` now validates encoding as well as decoding. Invalid dynamic values return `EncodeError` with the first validation path and reason; valid values retain member order and exact numbers. This corrects the former encoding passthrough without changing signatures or adding validation passes to typed or generated codecs.
 - Runtime-schema refusals distinguish finite-profile restrictions from malformed keyword values. Valid omitted/default-open object members, one-sided bounds and other unsupported forms remain refused with `UnsupportedDocument`; the accepted profile is unchanged.
 - Schema-aware `Codec(a)` combines typed conversion with schema publication, including records, unions, refinements and explicit custom mappings.
 - Strict JSON values retain exact numbers, duplicate-key evidence and independently configurable admission limits.

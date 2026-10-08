@@ -408,11 +408,21 @@ pub fn check_arguments(
 ```
 
 `contract.value_codec(contract)` is a `Codec(Value)` with the contract's
-schema that validates while decoding, and `contract.decode` decodes a
-validated value with a codec whose schema matches. `codec.value()` passes
+schema that validates on encoding and decoding. Success preserves the value,
+including object member order and exact numbers. Failure retains the first
+validation path and reason in `EncodeError` or `DecodeError`; enclosing
+fields and lists prepend their paths. `contract.decode` decodes a validated
+value with a codec whose schema matches. `codec.value()` passes
 any JSON through as a `Value`, for a value the application forwards as it
 came, such as a tool result from a remote peer; its schema is `{}`, which
 accepts every value.
+
+The dynamic adapter checks structure and supported value constraints on each
+call. Its encoding traverses the value before serialization and imposes no
+independent resource limits. Typed and generated codecs retain their existing
+checks during encoding; they do not gain a separate schema-validation pass.
+Code that previously relied on unchecked dynamic encoding must now handle
+`EncodeError` for values outside the advertised contract.
 
 The first release supports an explicit finite profile. It does not promise
 to load arbitrary third-party MCP schemas. The root must be an object with
