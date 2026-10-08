@@ -1,0 +1,5 @@
+PASS: both 1848-batch captures reconstructed from raw logs; summaries match.
+PASS: only contract.gleam differs between measured source sets.
+PASS: current source fingerprints match the completed after capture.
+PASS: package gate and public replay receipts retained in checks/.
+Derived samples.json files omitted; raw logs preserve every sample.

@@ -1,0 +1,3 @@
+Equivalent contract.validate, encode, decode, and encode_json results for 58936 inputs.
+   Compiled in 0.57s
+    Running search_equivalence_production.main

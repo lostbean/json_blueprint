@@ -1,0 +1,7 @@
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+  Compiling json_blueprint_codegen
+   Compiled in 28.64s
