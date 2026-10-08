@@ -23,7 +23,6 @@
   #pending-ledger(
       pending-entry(title: "Broader schema families need concrete contracts", kind: "build", adr: [#adr(1)])[String constraints, broader numeric and collection constraints, arbitrary alternatives, numeric enums, aliases, and recursive references remain intended. Their concrete limits, annotation policies, and validation rules are unresolved; see Schema extension families.],
       pending-entry(title: "Runtime-schema native generation remains incomplete", kind: "build", adr: [#adr(8)])[Retain schema-driven native type and codec generation, stable selected names, shared definitions, nested and recursive forms, and CLI workflow. The dev-only typed-definition generator and schema materializer implement narrower contracts; see Source generation.],
-      pending-entry(title: "Classify valid schemas outside the finite profile", kind: "ruling", adr: [#adr(1)])[The loader reports a valid default-open object without additionalProperties as MalformedDocument(MissingKeyword), while explicit true is UnsupportedDocument(OpenObject). Decide the unsupported-versus-malformed contract and external-schema expansion separately.],
       pending-entry(title: "Define encoding laws for contract.value_codec", kind: "ruling", adr: [#adr(6)])[Decoding validates; encoding returns the value unchanged, including values outside the schema. Do not extend the native codec-law claim to this adapter without deciding its encoding contract.],
       pending-entry(title: "Retain complete compatibility verification", kind: "verify", adr: [#adr(7)])[Published source, legacy wire, recursive references, error paths, numeric boundaries, and deliberate acceptance corrections need separate fixtures. Existing examples and frozen comparators do not prove complete 1.x compatibility.],
       pending-entry(title: "Keep numerical oracle scope separate from projection", kind: "verify", adr: [#adr(2)])[The finite schema manifest compares Boolean acceptance for its selected cases. Broader numerical evidence must compare exact schema acceptance separately from native overflow, safe-integer refusal, and intentional Float rounding.],
@@ -304,9 +303,16 @@
       ))
       #points(
         [description is permitted as an annotation on interpreted object schemas. Other keywords reject at their member path. The loader does not accept equivalent arbitrary forms, references, open objects, boolean false, standalone null, type arrays, or general anyOf/oneOf.],
-        [Duplicate raw document members reject before interpretation. MalformedDocument reports wrong JSON types and incomplete supported forms; UnsupportedDocument reports unhandled keywords/forms; UnsupportedDialect retains the declared dialect; InvalidDefinition locates contradictions such as reversed bounds or duplicate enum labels/tags.],
-        [Actual profile restrictions can misclassify a valid general schema as malformed. Missing properties/required/additionalProperties currently yields MissingKeyword, and undeclared required names reject. These classifications are documented observations, not general JSON Schema validity judgments; the corresponding pending ruling controls correction.],
+        [Duplicate raw document members reject before interpretation. MalformedDocument reports observed keyword type and shape violations. UnsupportedDocument reports unhandled keywords, omitted profile-required members, and restrictions on otherwise valid schema forms. UnsupportedDialect retains the declared dialect; InvalidDefinition locates contradictions in the codec model such as reversed bounds or duplicate enum labels/tags.],
+        [Object profile restrictions return UnsupportedDocument: omitted additionalProperties reports OpenObject; omitted properties or required and undeclared required names report UnsupportedSchemaForm at the member or name path. Schema-valued additionalProperties also rejects as UnsupportedSchemaForm. Explicit wrong member types and duplicate required names remain malformed. No omitted member is filled in to admit a new shape.],
+        [Document errors describe the first profile rejection, not complete Draft 2020-12 meta-schema validation. UnsupportedDocument does not certify that the rest of the schema is valid. Boolean roots, missing dialect/type, type arrays, one-sided or nonnative integer bounds, nonstring enum values and tags, and noncanonical tuple/nullable/tagged forms remain refused as unsupported. Actual wrong keyword types remain malformed. Arbitrary third-party protocol schemas are outside the initial release contract.],
       )
+      #behavior(title: "Profile restrictions do not claim malformed schema", level: "boundary", area: "Document loading")[
+        #given[A schema uses an otherwise valid form outside the finite profile.]
+        #when[The application requests a runtime contract.]
+        #then[Loading refuses it as unsupported at the relevant path.]
+        #then[No broader schema form is admitted by changing the diagnostic.]
+      ]
       #behavior(title: "An unsupported keyword remains an error", level: "boundary", area: "Document loading")[
         #given[A finite-profile schema includes an unhandled keyword.]
         #when[The application loads it as a contract.]

@@ -414,11 +414,39 @@ any JSON through as a `Value`, for a value the application forwards as it
 came, such as a tool result from a remote peer; its schema is `{}`, which
 accepts every value.
 
-The profile covers closed objects with required and optional properties,
-pairs, lists, nullable values, bounded integers and numbers, string enums,
-tagged unions and any value (`{}`, or `true` in a loaded document).
-Recursive references (`$ref`), untagged unions and string patterns are
-outside it.
+The first release supports an explicit finite profile. It does not promise
+to load arbitrary third-party MCP schemas. The root must be an object with
+`"$schema": "https://json-schema.org/draft/2020-12/schema"`.
+
+| Form | Supported spelling |
+| --- | --- |
+| Any value | `{}` or a description-only object; nested `true` also works |
+| Primitives | String, boolean, integer, or number `type` |
+| String enum | String `type` with nonempty, unique string labels |
+| Numeric bounds | Both inclusive `minimum` and `maximum`, or neither; integer bounds must be native-representable integers |
+| Closed object | Explicit `properties`, `required`, and `additionalProperties: false`; every required name declared |
+| List | Array `type` with one `items` schema |
+| Pair | Array `type`, two `prefixItems`, and `minItems` and `maxItems` both two; no `items` |
+| Nullable | Two `anyOf` branches: plain `{"type":"null"}` and one supported object schema |
+| Tagged union | Object `type` with nonempty `oneOf`; closed variants require a string `tag` constant and exactly their declared `value` payload |
+
+`description` annotations are retained. Recursive references (`$ref`),
+string patterns, general unions, open objects, one-sided bounds, type arrays,
+and Boolean `false` schemas are outside this profile.
+
+Profile restrictions return `UnsupportedDocument`, including a default-open
+object that omits `additionalProperties`. Explicit `true` has the same
+`OpenObject` reason. Omitting `properties` or `required` is also unsupported;
+the loader does not insert defaults or discard constraints to accept it.
+Wrong keyword types remain `MalformedDocument`; codec-model contradictions
+such as reversed bounds remain `InvalidDefinition`. Paths locate the relevant
+keyword or array entry.
+
+Loading stops at its first refusal. `UnsupportedDocument` identifies an
+unsupported feature; it does not certify the rest of the document as valid
+JSON Schema. The [fixture check](test/schema_profile_check.py) independently
+checks the retained diagnostic examples with Draft 2020-12, without claiming
+general conformance.
 
 </details>
 

@@ -1,0 +1,659 @@
+[
+  {
+    "name": "default-open",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "kind": "unsupported",
+    "path": "$[\"additionalProperties\"]"
+  },
+  {
+    "name": "explicit-open",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": true
+    },
+    "kind": "unsupported",
+    "path": "$[\"additionalProperties\"]"
+  },
+  {
+    "name": "missing-properties",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "required": [],
+      "additionalProperties": false
+    },
+    "kind": "unsupported",
+    "path": "$[\"properties\"]"
+  },
+  {
+    "name": "missing-required",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "kind": "unsupported",
+    "path": "$[\"required\"]"
+  },
+  {
+    "name": "undeclared-required",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "unsupported",
+    "path": "$[\"required\"][0]"
+  },
+  {
+    "name": "schema-additional-properties",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "kind": "unsupported",
+    "path": "$[\"additionalProperties\"]"
+  },
+  {
+    "name": "nested-default-open",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    "kind": "unsupported",
+    "path": "$[\"items\"][\"additionalProperties\"]"
+  },
+  {
+    "name": "closed-object",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "accepted",
+    "path": "$"
+  },
+  {
+    "name": "bad-properties",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": [],
+      "required": [],
+      "additionalProperties": false
+    },
+    "kind": "malformed",
+    "path": "$[\"properties\"]"
+  },
+  {
+    "name": "bad-required",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": true,
+      "additionalProperties": false
+    },
+    "kind": "malformed",
+    "path": "$[\"required\"]"
+  },
+  {
+    "name": "bad-additional-properties",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": 12
+    },
+    "kind": "malformed",
+    "path": "$[\"additionalProperties\"]"
+  },
+  {
+    "name": "duplicate-required",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "required": [
+        "x",
+        "x"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "malformed",
+    "path": "$[\"required\"][1]"
+  },
+  {
+    "name": "missing-dialect",
+    "schema": {
+      "type": "string"
+    },
+    "kind": "unsupported",
+    "path": "$[\"$schema\"]"
+  },
+  {
+    "name": "missing-type",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "minimum": 0
+    },
+    "kind": "unsupported",
+    "path": "$[\"type\"]"
+  },
+  {
+    "name": "boolean-root-true",
+    "schema": true,
+    "kind": "unsupported",
+    "path": "$"
+  },
+  {
+    "name": "boolean-root-false",
+    "schema": false,
+    "kind": "unsupported",
+    "path": "$"
+  },
+  {
+    "name": "false-items",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": false
+    },
+    "kind": "unsupported",
+    "path": "$[\"items\"]"
+  },
+  {
+    "name": "type-array",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"type\"]"
+  },
+  {
+    "name": "bad-type",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": 12
+    },
+    "kind": "malformed",
+    "path": "$[\"type\"]"
+  },
+  {
+    "name": "bad-dialect",
+    "schema": {
+      "$schema": 12,
+      "type": "string"
+    },
+    "kind": "malformed",
+    "path": "$[\"$schema\"]"
+  },
+  {
+    "name": "mixed-enum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": [
+        "ok",
+        12
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"enum\"][1]"
+  },
+  {
+    "name": "bad-enum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "enum": 12
+    },
+    "kind": "malformed",
+    "path": "$[\"enum\"]"
+  },
+  {
+    "name": "integer-minimum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": 1
+    },
+    "kind": "unsupported",
+    "path": "$"
+  },
+  {
+    "name": "integer-bad-minimum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": "bad"
+    },
+    "kind": "malformed",
+    "path": "$[\"minimum\"]"
+  },
+  {
+    "name": "integer-maximum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "maximum": 1
+    },
+    "kind": "unsupported",
+    "path": "$"
+  },
+  {
+    "name": "integer-bad-maximum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "maximum": "bad"
+    },
+    "kind": "malformed",
+    "path": "$[\"maximum\"]"
+  },
+  {
+    "name": "number-minimum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "number",
+      "minimum": 1
+    },
+    "kind": "unsupported",
+    "path": "$"
+  },
+  {
+    "name": "number-bad-minimum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "number",
+      "minimum": "bad"
+    },
+    "kind": "malformed",
+    "path": "$[\"minimum\"]"
+  },
+  {
+    "name": "number-maximum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "number",
+      "maximum": 1
+    },
+    "kind": "unsupported",
+    "path": "$"
+  },
+  {
+    "name": "number-bad-maximum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "number",
+      "maximum": "bad"
+    },
+    "kind": "malformed",
+    "path": "$[\"maximum\"]"
+  },
+  {
+    "name": "fractional-integer-bounds",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": 0.5,
+      "maximum": 2.5
+    },
+    "kind": "unsupported",
+    "path": "$[\"minimum\"]"
+  },
+  {
+    "name": "fractional-integer-maximum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2.5
+    },
+    "kind": "unsupported",
+    "path": "$[\"maximum\"]"
+  },
+  {
+    "name": "nullable-boolean",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        true
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"anyOf\"][1]"
+  },
+  {
+    "name": "nullable-empty",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": []
+    },
+    "kind": "malformed",
+    "path": "$[\"anyOf\"]"
+  },
+  {
+    "name": "nullable-wrong-branch",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        12
+      ]
+    },
+    "kind": "malformed",
+    "path": "$[\"anyOf\"][1]"
+  },
+  {
+    "name": "tuple-missing-minimum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "maxItems": 2
+    },
+    "kind": "unsupported",
+    "path": "$[\"minItems\"]"
+  },
+  {
+    "name": "tuple-missing-maximum",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "minItems": 2
+    },
+    "kind": "unsupported",
+    "path": "$[\"maxItems\"]"
+  },
+  {
+    "name": "tuple-negative-length",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {},
+        {}
+      ],
+      "minItems": -1,
+      "maxItems": 2
+    },
+    "kind": "malformed",
+    "path": "$[\"minItems\"]"
+  },
+  {
+    "name": "tuple-fractional-length",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [
+        {},
+        {}
+      ],
+      "minItems": 1.5,
+      "maxItems": 2
+    },
+    "kind": "malformed",
+    "path": "$[\"minItems\"]"
+  },
+  {
+    "name": "tuple-empty-prefix",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "prefixItems": [],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "kind": "malformed",
+    "path": "$[\"prefixItems\"]"
+  },
+  {
+    "name": "tagged-boolean-variant",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        true
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0]"
+  },
+  {
+    "name": "tagged-string-variant",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"type\"]"
+  },
+  {
+    "name": "tagged-type-array",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"type\"]"
+  },
+  {
+    "name": "tagged-bad-type",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": 12
+        }
+      ]
+    },
+    "kind": "malformed",
+    "path": "$[\"oneOf\"][0][\"type\"]"
+  },
+  {
+    "name": "tagged-optional-tag",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "ok"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"required\"]"
+  },
+  {
+    "name": "tagged-optional-payload",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": "ok"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"required\"]"
+  },
+  {
+    "name": "tagged-missing-tag",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"properties\"]"
+  },
+  {
+    "name": "tagged-numeric-tag",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "const": 12
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"properties\"][\"tag\"][\"const\"]"
+  },
+  {
+    "name": "tagged-any-tag",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": {}
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"properties\"][\"tag\"][\"const\"]"
+  },
+  {
+    "name": "tagged-boolean-tag",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tag": true
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "kind": "unsupported",
+    "path": "$[\"oneOf\"][0][\"properties\"][\"tag\"]"
+  }
+]

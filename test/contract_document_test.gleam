@@ -48,9 +48,9 @@ pub fn document_dialect_validation_test() {
   // Missing $schema
   contract.load(value.Object([#("type", value.String("string"))]))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [Field("$schema")],
-      contract.MissingKeyword("$schema"),
+      contract.UnsupportedSchemaForm,
     )),
   )
 
@@ -89,9 +89,9 @@ pub fn document_dialect_validation_test() {
   // schema; see `document_any_schema_test`.
   contract.load(doc("\"minimum\":1"))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [Field("type")],
-      contract.MissingKeyword("type"),
+      contract.UnsupportedSchemaForm,
     )),
   )
 }
@@ -151,7 +151,10 @@ pub fn document_any_schema_test() {
   // `false` stays outside the profile.
   contract.load(doc("\"type\":\"array\",\"items\":false"))
   |> should.equal(
-    Error(contract.MalformedDocument([Field("items")], contract.ExpectedObject)),
+    Error(contract.UnsupportedDocument(
+      [Field("items")],
+      contract.UnsupportedSchemaForm,
+    )),
   )
   // A nested `$schema` is still refused inside an otherwise empty schema.
   contract.load(doc(
@@ -535,9 +538,9 @@ pub fn document_union_shape_errors_test() {
     <> "\"required\":[],\"additionalProperties\":false}]",
   ))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [Field("oneOf"), Index(0), Field("required")],
-      contract.InvalidTaggedAlternatives,
+      contract.UnsupportedTaggedShape,
     )),
   )
 
@@ -547,9 +550,9 @@ pub fn document_union_shape_errors_test() {
     <> "\"value\":{\"type\":\"string\"}},\"required\":[\"tag\"],\"additionalProperties\":false}]",
   ))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [Field("oneOf"), Index(0), Field("required")],
-      contract.InvalidTaggedAlternatives,
+      contract.UnsupportedTaggedShape,
     )),
   )
 
@@ -559,9 +562,9 @@ pub fn document_union_shape_errors_test() {
     <> "\"required\":[\"value\"],\"additionalProperties\":false}]",
   ))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [Field("oneOf"), Index(0), Field("properties")],
-      contract.ExpectedClosedTag,
+      contract.UnsupportedTaggedShape,
     )),
   )
 
@@ -599,7 +602,7 @@ pub fn document_union_shape_errors_test() {
     <> "\"required\":[\"tag\"],\"additionalProperties\":false}]",
   ))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [
         Field("oneOf"),
         Index(0),
@@ -607,16 +610,16 @@ pub fn document_union_shape_errors_test() {
         Field("tag"),
         Field("const"),
       ],
-      contract.ExpectedText,
+      contract.UnsupportedTaggedShape,
     )),
   )
 
   // A variant that is not an object schema
   contract.load(doc("\"type\":\"object\",\"oneOf\":[{\"type\":\"string\"}]"))
   |> should.equal(
-    Error(contract.MalformedDocument(
+    Error(contract.UnsupportedDocument(
       [Field("oneOf"), Index(0), Field("type")],
-      contract.ExpectedObjectSchema,
+      contract.UnsupportedTaggedShape,
     )),
   )
 
@@ -759,7 +762,7 @@ pub fn describe_document_error_test() {
   )
 
   describe(value.Object([#("type", value.String("string"))]))
-  |> should.equal("$[\"$schema\"]: missing keyword \"$schema\"")
+  |> should.equal("$[\"$schema\"]: unsupported schema form")
 
   describe(doc("\"type\":\"integer\",\"minimum\":10,\"maximum\":5"))
   |> should.equal("$[\"minimum\"]: integer bounds 10 to 5 are reversed")
@@ -801,7 +804,7 @@ pub fn describe_document_error_omits_document_values_test() {
     ),
     #(
       doc("\"type\":\"string\",\"enum\":[\"ok\",123456789]"),
-      "$[\"enum\"][1]: expected a string",
+      "$[\"enum\"][1]: unsupported schema form",
       "123456789",
     ),
     #(
@@ -814,12 +817,12 @@ pub fn describe_document_error_omits_document_values_test() {
         "\"type\":\"object\",\"oneOf\":[{\"type\":\"object\",\"properties\":{\"tag\":{\"const\":424242}},"
         <> "\"required\":[\"tag\"],\"additionalProperties\":false}]",
       ),
-      "$[\"oneOf\"][0][\"properties\"][\"tag\"][\"const\"]: expected a string",
+      "$[\"oneOf\"][0][\"properties\"][\"tag\"][\"const\"]: unsupported tagged shape",
       "424242",
     ),
     #(
       doc("\"type\":\"integer\",\"minimum\":1.5,\"maximum\":3"),
-      "$[\"minimum\"]: expected an integer",
+      "$[\"minimum\"]: unsupported schema form",
       "1.5",
     ),
     #(
