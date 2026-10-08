@@ -2,6 +2,7 @@
 
 ## Unreleased — intended 2.0
 
+- Runtime-schema refusals distinguish finite-profile restrictions from malformed keyword values. Valid omitted/default-open object members, one-sided bounds and other unsupported forms remain refused with `UnsupportedDocument`; the accepted profile is unchanged.
 - Schema-aware `Codec(a)` combines typed conversion with schema publication, including records, unions, refinements and explicit custom mappings.
 - Strict JSON values retain exact numbers, duplicate-key evidence and independently configurable admission limits.
 - Finite runtime contracts provide validation and retained witnesses independently of application-native types. The development-only generator remains a separate capability with explicit scope limits.

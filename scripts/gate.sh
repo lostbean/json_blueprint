@@ -21,7 +21,7 @@ run() {
 nix flake check
 actionlint
 shellcheck scripts/*.sh
-ruff check scripts test/schema_check.py
+ruff check scripts test/schema_check.py test/schema_profile_check.py
 python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
 sh scripts/check-native.sh
 
@@ -40,3 +40,4 @@ for package in . codegen; do
 done
 
 python3 test/schema_check.py
+python3 test/schema_profile_check.py
