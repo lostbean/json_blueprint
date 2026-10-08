@@ -1,0 +1,9 @@
+{
+  "gleam": "gleam 1.18.1",
+  "node": "v24.21.0",
+  "erlang": "OTP 28 ERTS 16.4.0.6 word bytes 8",
+  "revision": "1a00699c074928389c5aeedaddfc993b8575a125",
+  "platform": "Linux-6.18.34-aarch64-with-glibc2.44",
+  "cpu_count": 4,
+  "erlang_flags": "+S 1:1"
+}

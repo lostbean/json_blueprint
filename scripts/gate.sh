@@ -39,5 +39,7 @@ for package in . codegen; do
   )
 done
 
+sh scripts/check-schema-consumer.sh
+
 python3 test/schema_check.py
 python3 test/schema_profile_check.py

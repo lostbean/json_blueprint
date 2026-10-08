@@ -42,3 +42,26 @@ fn blocks(text: String, found: List(String)) -> List(String) {
       }
   }
 }
+
+pub fn schema_module_example_is_tested_verbatim_test() {
+  let assert Ok(tests) =
+    read_file_to_string("test/module_docs/schema_example_test.gleam")
+  let assert Ok(source) =
+    read_file_to_string("src/json/blueprint/codegen/schema.gleam")
+  let doc =
+    source
+    |> string.split("\n")
+    |> list.take_while(fn(line) { string.starts_with(line, "////") })
+    |> list.map(fn(line) {
+      case line {
+        "//// " <> rest -> rest
+        _ -> ""
+      }
+    })
+    |> string.join("\n")
+  let examples = blocks(doc, [])
+  list.length(examples) |> should.equal(1)
+  examples
+  |> list.filter(fn(example) { !string.contains(tests, example) })
+  |> should.equal([])
+}
