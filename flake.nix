@@ -3,7 +3,7 @@
 
   inputs = {
     design-layer.url = "github:lostbean/design-layer";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix.follows = "design-layer/treefmt-nix";
   };
@@ -89,8 +89,8 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gleam
-            rebar3
-            beam28Packages.erlang
+            beam29Packages.rebar3
+            beam29Packages.erlang
             nodejs_24
             actionlint
             shellcheck
