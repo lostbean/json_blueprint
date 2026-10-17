@@ -119,7 +119,7 @@ the codec API.
 
 ## Targets
 
-CI tests Erlang/OTP 28 and JavaScript on Node.js 24. On
+CI tests Erlang/OTP 29 and JavaScript on Node.js 24. On
 JavaScript, native integers are limited to the safe range: `codec.int()`
 refuses larger ones instead of rounding them, and `codec.number()` keeps them
 exact. Browser JavaScript is not tested.
@@ -135,7 +135,7 @@ aggregation, and missing machine provenance.
 ## Development
 
 ```sh
-nix develop          # Gleam 1.18.1, Erlang/OTP 28, Node.js 24, Python + jsonschema
+nix develop          # Gleam 1.19.2, Erlang/OTP 29, Node.js 24, Python + jsonschema
 sh scripts/gate.sh   # formatting, tooling lint, warnings, both-target tests and schema oracle
 nix fmt -- PATH...   # format named authored files
 ```
