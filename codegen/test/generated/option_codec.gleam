@@ -8,17 +8,19 @@ import json/blueprint/internal/generated
 import json/blueprint/internal/schema_tree
 import json/blueprint/value
 
-pub const generated_fingerprint: String = "EFCBAE4911113C0C3F1E3A6D22C07F4C294F5D63"
+pub const generated_fingerprint: String =
+  "EFCBAE4911113C0C3F1E3A6D22C07F4C294F5D63"
 
-const option_schema_value: schema_tree.Tree = schema_tree.ObjectSchema(
-  [
-    schema_tree.PropertySchema(
-      "note",
-      False,
-      schema_tree.NullableSchema(schema_tree.StringSchema),
-    ),
-  ],
-)
+const option_schema_value: schema_tree.Tree =
+  schema_tree.ObjectSchema(
+    [
+      schema_tree.PropertySchema(
+        "note",
+        False,
+        schema_tree.NullableSchema(schema_tree.StringSchema),
+      ),
+    ],
+  )
 
 const option_compiled_property_names: List(String) = ["note"]
 

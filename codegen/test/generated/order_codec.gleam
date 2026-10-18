@@ -9,37 +9,47 @@ import json/blueprint/internal/schema_tree
 import json/blueprint/value
 import materialize_fixtures
 
-pub const generated_fingerprint: String = "6AEC872050FE749233BFB01021B48A346BFEBE5C"
+pub const generated_fingerprint: String =
+  "6AEC872050FE749233BFB01021B48A346BFEBE5C"
 
-const order_schema_value: schema_tree.Tree = schema_tree.ObjectSchema(
-  [
-    schema_tree.PropertySchema(
-      "order_id",
-      True,
-      schema_tree.IntegerRangeSchema(1, 999_999),
-    ),
-    schema_tree.PropertySchema(
-      "items_\"list\"",
-      True,
-      schema_tree.ListSchema(
-        schema_tree.PairSchema(schema_tree.StringSchema, schema_tree.IntSchema),
+const order_schema_value: schema_tree.Tree =
+  schema_tree.ObjectSchema(
+    [
+      schema_tree.PropertySchema(
+        "order_id",
+        True,
+        schema_tree.IntegerRangeSchema(1, 999_999),
       ),
-    ),
-    schema_tree.PropertySchema(
-      "customer\n\r\f\t\\note",
-      False,
-      schema_tree.NullableSchema(schema_tree.StringSchema),
-    ),
-    schema_tree.PropertySchema("type", True, schema_tree.BoolSchema),
-    schema_tree.PropertySchema(
-      "status",
-      True,
-      schema_tree.StringEnumSchema(
-        ["pending", "processing", "shipped\n\r\f\t\"quoted\"", "delivered 🚀 fn"],
+      schema_tree.PropertySchema(
+        "items_\"list\"",
+        True,
+        schema_tree.ListSchema(
+          schema_tree.PairSchema(
+            schema_tree.StringSchema,
+            schema_tree.IntSchema,
+          ),
+        ),
       ),
-    ),
-  ],
-)
+      schema_tree.PropertySchema(
+        "customer\n\r\f\t\\note",
+        False,
+        schema_tree.NullableSchema(schema_tree.StringSchema),
+      ),
+      schema_tree.PropertySchema("type", True, schema_tree.BoolSchema),
+      schema_tree.PropertySchema(
+        "status",
+        True,
+        schema_tree.StringEnumSchema(
+          [
+            "pending",
+            "processing",
+            "shipped\n\r\f\t\"quoted\"",
+            "delivered 🚀 fn",
+          ],
+        ),
+      ),
+    ],
+  )
 
 const order_compiled_inner_property_names: List(String) = [
   "order_id",
