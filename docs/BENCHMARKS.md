@@ -156,8 +156,9 @@ The first harness ran 200 untimed warmup calls and timed 1,000 calls in one
 interval; the reported mean is the integer quotient of elapsed nanoseconds. It
 recorded no distribution, hardware, OS, compiler version or raw output, and later
 parser, codec and API changes prevent treating the figures as current baselines.
-The [original report](https://github.com/lostbean/json_blueprint/blob/8f2d46c5a4174a3700e0f214e37e612b0c65316a/test/oracle/wave-4-report.md#3-measured-local-benchmark-baselines)
-names starting commit `cf378926647ed83dc0669f49d4bb8591b5e1381f`.
+The retired report for that run named starting commit
+`cf378926647ed83dc0669f49d4bb8591b5e1381f`; the figures below are the only
+retained record of it.
 
 | Workload | Unit | Erlang/OTP 28 | Node 24.15.0 |
 | --- | --- | ---: | ---: |
