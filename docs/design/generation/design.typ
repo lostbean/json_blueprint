@@ -15,6 +15,7 @@
   #pagebreak(weak: true)
   #pending-ledger(
     pending-entry(title: "Broader runtime-schema generation is not designed", kind: "build", since: "2026-10-08", adr: [#adr(8)])[Selected naming overrides, shared named definitions, string and numeric enums, tagged and broader unions, aliases, recursive forms, and a general command-line workflow are outside generation. The build compiler creates each native type, so parsing a schema at application runtime cannot supply a typed codec. Formatter integration, upgrade fixtures, and wider committed-output drift checks remain tooling work beyond the focused consumer regeneration check.],
+    pending-entry(title: "Check the generated-record claims against code", kind: "verify", since: "2026-10-17")[The optional, nullable and absent three-state rule, the exact Number against native Int projection and the naming rules for nested stems were carried over from the retired consumer guide. The compiled consumer exercises them, but no check compares each design statement with the generator source.],
   )
 
   #pagebreak(weak: true)
