@@ -47,6 +47,7 @@
             "docs/design/*"
             "build/*"
             "codegen/build/*"
+            "examples/build/*"
             ".ci-results/*"
           ];
         };
