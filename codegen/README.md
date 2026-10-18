@@ -59,9 +59,7 @@ From `codegen/` in the repository Nix shell, regenerate its fixtures with:
 gleam run -m compiled_codec_runner && gleam format test/generated
 ```
 
-The [benchmark guide](../docs/benchmarks.md) explains the timing workloads,
-retained results, and commands for both targets. [ADR 0008](../docs/adr/0008-development-time-source-generation.md)
-records generation ownership and the remaining scope.
+From the repository root, `nix develop --command sh scripts/benchmark.sh` runs the timing harness on both targets and writes a fresh evidence directory. [ADR 0008](../docs/adr/0008-development-time-source-generation.md) records generation ownership and the remaining scope, and [ADR 0010](../docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the measurement policy; method, provenance and retained results are in [docs/BENCHMARKS.md](../docs/BENCHMARKS.md).
 
 ## Generate native records from a schema
 
@@ -71,4 +69,4 @@ records generation ownership and the remaining scope.
 - Wire names are preserved. Native names are deterministic; invalid names, name collisions, and unsupported shapes return typed failures with logical schema locations instead of partial source.
 - Enums, tagged unions, unconstrained values, shared or recursive definitions, and non-object roots are outside this generation slice. Runtime-schema admission does not imply generation support.
 - The [separate order consumer](consumer/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and stale-output checks. Its production package depends only on the runtime package and compiled source.
-- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. The [measurement report](../docs/benchmarks/schema-generation-2026-10-08/README.md) separates construction, conversion, and build-time generation cost.
+- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. [ADR 0010](../docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the separate construction, conversion, and build-time generation costs.
