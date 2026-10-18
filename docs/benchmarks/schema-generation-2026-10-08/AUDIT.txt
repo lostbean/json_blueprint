@@ -1,1 +1,2 @@
 474 observations match raw logs. Three samples per measurement. 44 input fingerprints match the measured files.
+Retention note: the raw logs named above are no longer in the tree; they remain in repository history at commit c79211d. results.json holds every observation.

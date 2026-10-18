@@ -16,8 +16,12 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | Schema-driven generation, 2026-10-08 | How do generated, handwritten and dynamic codecs compare, and what does generation cost? | [ADR 0008](adr/0008-development-time-source-generation.md) |
 | Timed calls, 2026-09-20 | Historical baselines of the first harness | [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) |
 
-Raw logs, summaries and provenance sit beside each capture under
-[`benchmarks/`](benchmarks/) and are not markdown.
+Summaries and provenance sit beside each capture under
+[`benchmarks/`](benchmarks/) and are not markdown. A summary holds every VM
+median and its range, and the schema-generation `results.json` holds every
+trial, so the tables here do not depend on raw logs. Raw per-run logs and command
+output are not retained in the tree; they remain in repository history at commit
+`c79211d`.
 
 ## Method
 

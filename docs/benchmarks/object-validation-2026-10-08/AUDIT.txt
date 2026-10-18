@@ -3,3 +3,4 @@ PASS: only contract.gleam differs between measured source sets.
 PASS: current source fingerprints match the completed after capture.
 PASS: package gate and public replay receipts retained in checks/.
 Derived samples.json files omitted; raw logs preserve every sample.
+Retention note: the raw logs and the checks/ receipts named above are no longer in the tree; they remain in repository history at commit c79211d.
