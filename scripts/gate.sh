@@ -1,7 +1,9 @@
 #!/bin/sh
 # The repository gate: formatting, compiler warnings and the tests on both
 # targets, for json_blueprint and for the json_blueprint_codegen package in
-# codegen/. Each package's own build output is removed first, so a stale
+# codegen/, then the compiled usage examples in examples/ (built with warnings
+# as errors, tested on both targets and run once, so API drift fails the gate).
+# Each package's own build output is removed first, so a stale
 # module cannot hide a missing one. The Python schema oracle then compares
 # emitted schemas, decoders and contracts against Draft 2020-12.
 set -eu
@@ -38,6 +40,18 @@ for package in . codegen; do
     run gleam test --target=javascript
   )
 done
+
+echo "== examples"
+(
+  cd examples
+  rm -rf build/dev/erlang/json_blueprint_examples build/dev/javascript/json_blueprint_examples
+  gleam format --check src test
+  run gleam build --target=erlang --warnings-as-errors
+  run gleam build --target=javascript --warnings-as-errors
+  run gleam test --target=erlang
+  run gleam test --target=javascript
+  gleam run --target=erlang >/dev/null
+)
 
 sh scripts/check-schema-consumer.sh
 
