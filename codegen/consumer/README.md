@@ -13,7 +13,7 @@ gleam test --target erlang
 gleam test --target javascript
 ```
 
-From the repository root in the same shell, `sh scripts/check-schema-consumer.sh` regenerates to a temporary directory, compares the formatted source with the committed output, tests both targets, and builds production output without the generator. `SCHEMA_OUTPUT` selects the output directory of the generation task.
+From the repository root in the same shell, `sh scripts/check-schema-consumer.sh` regenerates to a temporary directory, uses that fresh source in a disposable consumer, tests both targets, and builds production output without the generator. `SCHEMA_OUTPUT` selects the output directory of the generation task.
 
 `python3 scripts/schema_generation_benchmark.py --output /tmp/schema-generation-results` captures CPU and allocation for 1, 25, and 100 items across three fresh VMs per target; the method and retained results are in [docs/BENCHMARKS.md](../../docs/BENCHMARKS.md#schema-driven-generation-2026-10-08).
 

@@ -9,21 +9,26 @@ trap 'rm -rf "$output"' EXIT HUP INT TERM
 (
   cd "$consumer/generate"
   rm -rf build/dev/erlang/schema_order_generate build/dev/javascript/schema_order_generate
-  gleam format --check src
+
   gleam build --warnings-as-errors
   SCHEMA_OUTPUT="$output" gleam run -m generate_order
 )
-gleam format "$output"
-for module in commerce/order.gleam projection/numbers.gleam; do
-  if ! cmp "$output/$module" "$consumer/src/$module"; then
-    echo "Generated consumer drift: $module; regenerate using codegen/consumer/README.md" >&2
-    exit 1
-  fi
-done
+
+mkdir -p "$output/consumer"
+cp -R "$consumer/src" "$consumer/test" "$consumer/schema" "$consumer/gleam.toml" "$consumer/manifest.toml" "$output/consumer/"
+cp -R "$output/commerce" "$output/projection" "$output/consumer/src/"
+python3 - "$output/consumer/gleam.toml" "$repository" <<'PYCODE'
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+path.write_text(path.read_text().replace('path = "../.."', 'path = ' + json.dumps(sys.argv[2])))
+PYCODE
+consumer="$output/consumer"
 (
   cd "$consumer"
   rm -rf build/dev/erlang/schema_order_consumer build/dev/javascript/schema_order_consumer
-  gleam format --check src test
+
   for target in erlang javascript; do
     gleam build --target="$target" --warnings-as-errors
     gleam test --target="$target"

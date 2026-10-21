@@ -14,7 +14,7 @@
 
   #pagebreak(weak: true)
   #pending-ledger(
-    pending-entry(title: "Broader runtime-schema generation is not designed", kind: "build", since: "2026-10-08", adr: [#adr(8)])[Selected naming overrides, shared named definitions, string and numeric enums, tagged and broader unions, aliases, recursive forms, and a general command-line workflow are outside generation. The build compiler creates each native type, so parsing a schema at application runtime cannot supply a typed codec. Formatter integration, upgrade fixtures, and wider committed-output drift checks remain tooling work beyond the focused consumer regeneration check.],
+    pending-entry(title: "Broader runtime-schema generation is not designed", kind: "build", since: "2026-10-08", adr: [#adr(8)])[Selected naming overrides, shared named definitions, string and numeric enums, tagged and broader unions, aliases, recursive forms, and a general command-line workflow are outside generation. The build compiler creates each native type, so parsing a schema at application runtime cannot supply a typed codec. Formatter integration and upgrade fixtures remain tooling work beyond the focused consumer integration tests; committed-output freshness is reviewed manually.],
     pending-entry(title: "Check the generated-record claims against code", kind: "verify", since: "2026-10-17")[The optional, nullable and absent three-state rule, the exact Number against native Int projection and the naming rules for nested stems were carried over from the retired consumer guide. The compiled consumer exercises them, but no check compares each design statement with the generator source.],
   )
 
@@ -131,7 +131,7 @@
         #then[Their source and content fingerprints are identical.]
       ]
       #points(
-        [The #lnk("../../../codegen/consumer/README.md")[separate consumer] loads an order schema, compiles generated records, adds an application-owned envelope and dispatch policy, and tests failure recovery. Its separate generation task owns file effects and works before the generated application module exists. The #lnk("../../../scripts/check-schema-consumer.sh")[consumer check] regenerates and compares source, runs the consumer tests on both targets, and compiles a production copy without the generator dependency.],
+        [The #lnk("../../../codegen/consumer/README.md")[separate consumer] loads an order schema, compiles generated records, adds an application-owned envelope and dispatch policy, and tests failure recovery. Its separate generation task owns file effects and works before the generated application module exists. The #lnk("../../../scripts/check-schema-consumer.sh")[consumer check] regenerates source into a disposable consumer, runs the consumer tests on both targets, and compiles a production copy without the generator dependency.],
         [The consumer's two-target corpus uses portable native bounds. Acceptance comparison distinguishes exact wire acceptance from native Int projection failures; it does not claim full-profile parity or general JSON Schema conformance. CPU, construction, generation, and allocation measurements are separate evidence and impose no timing assertion on semantic tests. #adr(8) records the implementation choice.],
       )
     ]

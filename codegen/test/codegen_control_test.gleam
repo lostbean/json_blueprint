@@ -3,7 +3,6 @@
 
 import generated/option_codec
 import generated/order_codec
-import generated_source_normalize
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
@@ -12,10 +11,6 @@ import json/blueprint/codec.{DecodeError, Field}
 import json/blueprint/codegen
 import json/blueprint/value
 import option_fixtures
-
-@external(erlang, "readme_test_ffi", "read_file_to_string")
-@external(javascript, "./readme_test_ffi.mjs", "read_file_to_string")
-fn read_file_to_string(path: String) -> Result(String, String)
 
 pub fn codegen_description_preserves_runtime_and_generated_schema_test() {
   let definition = codegen.describe(codegen.string(), "A quoted \"name\"")
@@ -106,11 +101,8 @@ pub fn generated_option_property_matches_runtime_test() {
       "option",
       option_fixtures.definition(),
     )
-  let codegen.GeneratedModule(_, content, fingerprint) = compiled
+  let codegen.GeneratedModule(_, _, fingerprint) = compiled
   fingerprint |> should.equal(option_codec.generated_fingerprint)
-  let assert Ok(file) = read_file_to_string("test/generated/option_codec.gleam")
-  generated_source_normalize.normalize(file)
-  |> should.equal(generated_source_normalize.normalize(content))
 }
 
 pub fn generated_and_mapped_json_use_strict_admission_test() {

@@ -198,7 +198,9 @@ exact. Browser JavaScript is not tested.
 
 ```sh
 nix develop          # Gleam, Erlang/OTP, Node.js, Python with jsonschema
-sh scripts/gate.sh   # formatting, tooling lint, warnings, both-target tests, examples and schema oracle
+sh scripts/gate.sh   # compilation, both-target tests, examples and schema oracle
+nix flake check     # shared formatting check
+nix run .#design-gate-check -- docs/design .
 nix fmt -- PATH...   # format named authored files
 ```
 

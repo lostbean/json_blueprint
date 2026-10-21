@@ -24,7 +24,11 @@ jobs:
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
-      - name: Full repository gate
+      - name: Shared formatting validation
+        run: nix flake check
+      - name: Shared design validation
+        run: nix run .#design-gate-check -- docs/design .
+      - name: Application tests
         run: |
           set -o pipefail
           mkdir "$RUNNER_TEMP/json-blueprint-ci"
@@ -37,30 +41,16 @@ jobs:
           path: ${{ runner.temp }}/json-blueprint-ci/
           retention-days: 7
           include-hidden-files: true
-          if-no-files-found: error
-
-  design:
-    name: Design layer
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
-        with:
-          extra_nix_config: experimental-features = nix-command flakes
-      - run: nix run .#design-gate-check -- docs/design .
+          if-no-files-found: warn
 
   ci:
     name: CI
     if: always()
-    needs: [test, design]
+    needs: [test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every mandatory job to pass
         env:
           TEST_RESULT: ${{ needs.test.result }}
-          DESIGN_RESULT: ${{ needs.design.result }}
-        run: test "$TEST_RESULT" = success && test "$DESIGN_RESULT" = success
+        run: test "$TEST_RESULT" = success

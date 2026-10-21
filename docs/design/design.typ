@@ -51,22 +51,21 @@
       #md-table(2, (
         [Check], [Scope],
         [Formatting], [A Nix check formats a copied source tree; frozen oracle bytes, generated fixtures, rendered design evidence and build output are excluded],
-        [Tooling lint], [Workflow, shell and Python sources],
-        [Native compilation], [Authored Erlang FFI compiles independently with warnings as errors; a warning counterexample and a positive control exercise the compiler gate],
+        [Native compilation], [Authored Erlang FFI compiles independently with warnings as errors],
         [Package tests], [Compilation with warnings as errors and the test suite on Erlang and JavaScript for the root package and for the codegen package],
         [Usage examples], [The examples package builds with warnings as errors, runs its tests on Erlang and JavaScript, and runs once; every usage topic and the legacy and migration forms are compiled code],
-        [Schema consumer], [Regeneration compared with committed output, tests on both targets, and an isolated production build without the generator],
+        [Schema consumer], [Fresh generation in disposable packages, tests on both targets, and an isolated production build without the generator],
         [Independent oracles], [A Python checker compares emitted schemas, decoders and contracts with a Draft 2020-12 validator; a second checker covers retained profile diagnostics. #lnk("../ORACLE.md")[The oracle document] pins the references and states the limits of the comparison],
       ))
       #points(
         [The package gate removes each package's build output first, so an obsolete compiled module cannot hide a missing source module. Runtime logs are evidence and never substitute for compiler diagnostics.],
-        [Continuous integration runs the gate on Erlang/OTP and Node.js and runs the design-layer check as a separate mandatory job. Nix pins the compiler, the runtimes and the Python oracle environment. Browser JavaScript is not tested.],
-        [The design gate validates source shape, links and rendered freshness. It does not establish general schema conformance or semantic fidelity. #lnk("../../scripts/gate.sh")[The package gate] and #lnk("../../flake.nix")[the development environment] define operational verification.],
+        [Continuous integration runs the gate on Erlang/OTP and Node.js with formatting and compilation as the required checks. Nix pins the compiler, the runtimes and the Python oracle environment. Browser JavaScript is not tested.],
+        [CI invokes the shared treefmt and design-layer validators directly. Local scripts own application behavior; no local formatter or design-check wrappers are maintained. #adr(12) #lnk("../../scripts/gate.sh")[The package gate] and #lnk("../../flake.nix")[the development environment] define operational verification.],
       )
     ]
     #subsection(title: "Executable documentation")[
       #points(
-        [Usage is compiled code. Each topic is a module of the #lnk("../../examples/README.md")[examples package], which the gate builds and runs on both targets; every README Gleam snippet must appear verbatim in one of those modules, and a root test fails when it does not. The legacy 1.x forms and the move to a codec are compiled tests under #lnk("../../examples/test/legacy/union_type_test.gleam")[examples/test]. Public module documentation examples and the codegen consumer have their own executable drift checks.],
+        [Usage is compiled code. Each topic is a module of the #lnk("../../examples/README.md")[examples package], which the gate builds and runs on both targets. README snippets are reviewed manually. The legacy 1.x forms and the move to a codec are compiled tests under #lnk("../../examples/test/legacy/union_type_test.gleam")[examples/test]. Public module examples and the codegen consumer remain executable behavioral tests.],
         [Prose and checked examples stay aligned. Documentation that states a limit or default names the design section that owns it.],
       )
     ]

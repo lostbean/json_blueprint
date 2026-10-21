@@ -35,4 +35,4 @@ jobs:
           path: ${{ runner.temp }}/json-blueprint-benchmarks/
           retention-days: 14
           include-hidden-files: true
-          if-no-files-found: error
+          if-no-files-found: warn

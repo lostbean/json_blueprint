@@ -12,7 +12,7 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 | --- | --- | --- | --- |
 | `jsonschema` `Draft202012Validator` | <https://github.com/python-jsonschema/jsonschema> | 4.26.0, fixed by `flake.lock` through the repository Nix shell; `scripts/benchmark.sh` records the version it ran | Independent judgment of emitted and normalized schemas against instances |
 | JSON Schema Draft 2020-12 meta-schema | <https://json-schema.org/draft/2020-12/schema> | the copy bundled with the pinned `jsonschema` | `Draft202012Validator.check_schema` over the finite-profile diagnostic fixtures |
-| Frozen manifest [`test/schema_manifest.json`](../test/schema_manifest.json) | this repository | checked in; the checker fixes its 16 families and 85 cases | Case identities, instances, schemas and expected outcomes |
+| Frozen manifest [`test/schema_manifest.json`](../test/schema_manifest.json) | this repository | checked-in behavioral fixtures | Case identities, instances, schemas and expected outcomes |
 | Diagnostic fixtures [`test/contract_profile_cases.json`](../test/contract_profile_cases.json) | this repository | checked in; 50 fixtures | Valid, unsupported and malformed schema documents with their diagnostic paths |
 | Source baseline 1.7.1 | this repository, commit `0e379c6491d34aca49795f716e87b9003df0130e` (MIT) | commit | The frozen 1.x source and wire contracts |
 | Oversight interface-laboratory probes | sibling workspace, commit `bd0b83743533313eb9b4eee2bf7f99ed68a26750` | commit | Origin of the initial exact-number and finite-schema cases; the source ledger declared no license, so no third-party grant is claimed |
@@ -39,7 +39,7 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 | --- | --- | --- |
 | Agreement | Codec, contract and validator accept or reject the instance alike | pass |
 | Disagreement | Any of the three differs from the manifest or from each other | fail |
-| Missing, extra, repeated or replaced case | The corpus no longer matches the frozen manifest or the family counts | fail, closed |
+| Missing, extra, repeated or replaced case | The corpus no longer matches the frozen manifest  | fail, closed |
 | Native projection refusal | A mathematically valid number that a native `Int` or `Float` cannot hold | outside this corpus; covered by the number tests |
 
 ## Exclusions and deliberate differences
