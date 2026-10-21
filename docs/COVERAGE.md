@@ -5,7 +5,7 @@
 
 | Meaningful system part | Classification | Owning section or reason |
 | --- | --- | --- |
-| Exact mathematical Number and checked Int/Float conversion (`src/json/blueprint/number.gleam`) | captured | [Exact numbers](design/contracts/design.typ#exact-numbers) |
+| Exact mathematical Number and checked Int/Float conversion (`src/json/blueprint/number.gleam`, `test/number_oracle_runner.gleam`, `test/number_check.py`) | captured | [Exact numbers](design/contracts/design.typ#exact-numbers) |
 | Number host boundaries (`src/json_number_ffi.erl`, `src/json_number_ffi.mjs`) | captured | [Native host boundaries](design/contracts/design.typ#native-host-boundaries) |
 | Value algebra, duplicate-preserving raw objects and checked construction (`src/json/blueprint/value.gleam`) | captured | [Whole model](design/contracts/design.typ#whole-model), [Wire values](design/contracts/design.typ#wire-values) |
 | UTF-8 strict parser, location model and independent limits | captured | [Strict document admission](design/contracts/design.typ#strict-document-admission), [ADR-0003](adr/0003-strict-parsing-and-independent-resource-bounds.md#adr-0003) |

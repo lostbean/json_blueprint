@@ -8,7 +8,7 @@
 ## Commands
 
 - Application checks, in the Nix shell: `nix develop --command sh scripts/gate.sh` (native compilation, both-target tests for the root and `codegen/` packages, schema consumer, Python oracles).
-- Focused checks: `sh scripts/check-schema-consumer.sh`, `python3 test/schema_check.py`, `python3 test/schema_profile_check.py`.
+- Focused checks: `sh scripts/check-schema-consumer.sh`, `python3 test/schema_check.py`, `python3 test/schema_profile_check.py`, `python3 test/number_check.py` (independent Erlang arithmetic oracle).
 - Format named authored files with `nix fmt -- PATH...`. Benchmarks (`sh scripts/benchmark.sh`) are observations and never gate.
 - Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the frozen 1.x API and the migration in `examples/test/`), run by the gate on both targets. Compiled module examples and the codegen consumer run as behavioral tests; README and module-documentation text is reviewed manually.
 - Run the examples alone with `cd examples && gleam run` and `gleam test --target erlang|javascript` in the Nix shell.
