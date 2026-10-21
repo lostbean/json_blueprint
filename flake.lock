@@ -7,15 +7,16 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1789473361,
-        "narHash": "sha256-wgfpX4bd3UGiTeZTJJA4x5rTcLZG+PSz4PPVQ5n9/Zo=",
+        "lastModified": 1792582887,
+        "narHash": "sha256-1t9J+SqH4PhNYX8locaF67AQ1O6cd09Dft9gptgCTY8=",
         "owner": "lostbean",
         "repo": "design-layer",
-        "rev": "2d1f78f231ddd65899442aa32e45033a5cba1a73",
+        "rev": "e8785021cf50649c8eb48aae5bc4513f17749cb1",
         "type": "github"
       },
       "original": {
         "owner": "lostbean",
+        "ref": "main",
         "repo": "design-layer",
         "type": "github"
       }

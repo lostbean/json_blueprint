@@ -10,6 +10,7 @@
 //// and keep no process or connection to close.
 //// The README quotes the first snippet below verbatim.
 
+// snips-start: record
 import gleam/option.{type Option}
 import gleam/result
 import json/blueprint/codec.{type Codec}
@@ -46,6 +47,8 @@ pub fn round_trip() -> Result(User, String) {
   let assert Ok(_schema) = codec.schema_json(user_codec())
   Ok(user)
 }
+
+// snips-end: record
 
 /// Decodes a user whose age is out of range, so the failure names its path.
 pub fn out_of_range_age() -> String {

@@ -51,6 +51,9 @@ stored data, is compiled and run in
 
 ## A record, both ways
 
+<!-- prettier-ignore-start -->
+
+<!-- snips: examples/src/examples/record.gleam#record -->
 ```gleam
 import gleam/option.{type Option}
 import gleam/result
@@ -88,7 +91,10 @@ pub fn round_trip() -> Result(User, String) {
   let assert Ok(_schema) = codec.schema_json(user_codec())
   Ok(user)
 }
+
 ```
+
+<!-- prettier-ignore-end -->
 
 - `codec.field` adds a required field and `codec.optional_field` an optional
   one; `codec.success` builds the record from the decoded fields. Pass each
@@ -105,6 +111,9 @@ to close. Custom callbacks own their effects.
 
 ## Tagged unions
 
+<!-- prettier-ignore-start -->
+
+<!-- snips: examples/src/examples/unions.gleam#tagged-union -->
 ```gleam
 pub type Shape {
   Circle(radius: Int)
@@ -126,7 +135,10 @@ pub fn shape_codec() -> Codec(Shape) {
     })
   })
 }
+
 ```
+
+<!-- prettier-ignore-end -->
 
 The JSON is `{"tag": "circle", "value": 2}`, and `{"tag": "empty"}` for a unit
 variant. Gleam checks that the `case` covers every constructor.

@@ -1,5 +1,6 @@
 //// The `json/blueprint/codegen` module doc example, verbatim.
 
+// snips-start: codegen-example
 import json/blueprint/codec
 import json/blueprint/codegen
 
@@ -15,6 +16,8 @@ pub fn example() {
     codegen.compile("generated/names_codec", "names", names_definition())
   #(path, content)
 }
+
+// snips-end: codegen-example
 
 import gleeunit/should
 

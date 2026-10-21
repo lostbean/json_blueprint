@@ -65,7 +65,7 @@
     ]
     #subsection(title: "Executable documentation")[
       #points(
-        [Usage is compiled code. Each topic is a module of the #lnk("../../examples/README.md")[examples package], which the gate builds and runs on both targets. README snippets are reviewed manually. The legacy 1.x forms and the move to a codec are compiled tests under #lnk("../../examples/test/legacy/union_type_test.gleam")[examples/test]. Public module examples and the codegen consumer remain executable behavioral tests.],
+        [Usage is compiled code. Each topic is a module of the #lnk("../../examples/README.md")[examples package], which the gate builds and runs on both targets. The shared pinned Snips tool synchronizes README snippets from marked regions of compiled, tested examples. Local bespoke snippet-equality checkers remain removed. The legacy 1.x forms and the move to a codec are compiled tests under #lnk("../../examples/test/legacy/union_type_test.gleam")[examples/test]. Public module examples and the codegen consumer remain executable behavioral tests.],
         [Prose and checked examples stay aligned. Documentation that states a limit or default names the design section that owns it.],
       )
     ]

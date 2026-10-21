@@ -5,6 +5,7 @@
 
 import json/blueprint/codec.{type Codec}
 
+// snips-start: tagged-union
 pub type Shape {
   Circle(radius: Int)
   Label(text: String)
@@ -25,6 +26,8 @@ pub fn shape_codec() -> Codec(Shape) {
     })
   })
 }
+
+// snips-end: tagged-union
 
 /// Runs the example and returns what it shows.
 pub fn demonstrate() -> String {
