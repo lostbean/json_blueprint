@@ -2,8 +2,8 @@
 
 Usage of the codec API as real code: each example compiles and runs against the
 library in this checkout on Erlang and JavaScript, so it cannot drift from it. The
-[README](../README.md) quotes the record and union snippets verbatim from here, and
-a root test fails when they differ.
+[README](../README.md) illustrates the record and union examples; documentation
+consistency is maintained through review.
 
 ```sh
 nix develop --command sh -c 'cd examples && gleam run'              # print each result

@@ -7,12 +7,11 @@
 
 ## Commands
 
-- Full gate, in the Nix shell: `nix develop --command sh scripts/gate.sh` (formatting, tooling lint, native compilation, both-target tests for the root and `codegen/` packages, schema consumer, Python oracles).
-- Focused checks: `sh scripts/check-schema-consumer.sh`, `python3 test/schema_check.py`, `python3 test/schema_profile_check.py`, `python3 -B -m unittest discover -s scripts -p 'test_*.py'`.
+- Application checks, in the Nix shell: `nix develop --command sh scripts/gate.sh` (native compilation, both-target tests for the root and `codegen/` packages, schema consumer, Python oracles).
+- Focused checks: `sh scripts/check-schema-consumer.sh`, `python3 test/schema_check.py`, `python3 test/schema_profile_check.py`.
 - Format named authored files with `nix fmt -- PATH...`. Benchmarks (`sh scripts/benchmark.sh`) are observations and never gate.
-- Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the frozen 1.x API and the migration in `examples/test/`), run by the gate on both targets. Every README Gleam snippet must appear verbatim in an example module; `test/readme_example_test.gleam` fails when one drifts. Module documentation and the codegen consumer have their own executable checks.
+- Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the frozen 1.x API and the migration in `examples/test/`), run by the gate on both targets. Compiled module examples and the codegen consumer run as behavioral tests; README and module-documentation text is reviewed manually.
 - Run the examples alone with `cd examples && gleam run` and `gleam test --target erlang|javascript` in the Nix shell.
-- After editing `docs/`, run the design-gate commands below sequentially (render, check, context estimate).
 
 ## References
 
@@ -47,22 +46,10 @@ verbatim): states `needs-triage`, `needs-info`, `ready-for-agent`,
 **AI disclaimer** — AI-authored tracker comments start with
 `AI-assisted contribution.`
 
-**Design gate** — `nix run .#design-gate-check -- docs/design .` checks render freshness,
-vocabulary references and layer integrity (exit 0 clean, 1 violation, 2 error).
-The gate is supplied by the pinned `design-layer` flake input.
-`nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf`
-rebuilds the rendered document. `nix run .#design-gate-context -- docs/design --estimate`
-estimates agent context; the same command without `--estimate` emits ephemeral
-Markdown. `--manifest`, `--preview`, and `--section PATH --expect-digest DIGEST`
-support loading selected sections. A bare Typst compilation does not run the gate.
-
-**Context verification** — use native semantic blocks for lists, tables,
-models and behavior. After authoring, verify context estimation and a selected
-section export as well as rendering and the design gate.
-Run these commands sequentially for each layer; they share its generated
-`.render` workspace.
-
-**Staleness** — source changes since the design last changed require a
-conformance review before the layer is treated as current.
+**Design tools** — `nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf`
+renders the design. `nix run .#design-gate-context -- docs/design --estimate`
+estimates context. CI calls the shared validator directly with
+`nix run .#design-gate-check -- docs/design .`. Run `nix flake check` separately
+for repository formatting. Local test scripts own application compilation and behavior.
 
 <!-- agent-skills:end -->

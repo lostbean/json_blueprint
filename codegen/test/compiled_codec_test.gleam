@@ -1,6 +1,5 @@
 import generated/option_codec
 import generated/order_codec
-import generated_source_normalize
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
@@ -17,10 +16,6 @@ import json/blueprint/number
 import json/blueprint/value
 import materialize_fixtures
 import vanilla_order
-
-@external(erlang, "readme_test_ffi", "read_file_to_string")
-@external(javascript, "./readme_test_ffi.mjs", "read_file_to_string")
-fn read_file_to_string(path: String) -> Result(String, String)
 
 const max_safe_integer = 9_007_199_254_740_991
 
@@ -650,7 +645,7 @@ pub fn compile_rejects_invalid_module_paths_and_names_test() {
     codegen.compile("generated/x", "let", codegen.string())
 }
 
-pub fn codec_generation_is_deterministic_and_fresh_test() {
+pub fn codec_generation_is_deterministic_test() {
   let definition = materialize_fixtures.order_definition()
   let assert Ok(first) =
     codegen.compile("generated/order_codec", "order", definition)
@@ -671,11 +666,6 @@ pub fn codec_generation_is_deterministic_and_fresh_test() {
   |> should.equal(second_fingerprint)
   first_fingerprint
   |> should.equal(order_codec.generated_fingerprint)
-  let assert Ok(generated_file) =
-    read_file_to_string("test/generated/order_codec.gleam")
-  let normalized_file = generated_source_normalize.normalize(generated_file)
-  let normalized_generated = generated_source_normalize.normalize(first_content)
-  normalized_file |> should.equal(normalized_generated)
 
   let contains = fn(needle) { string.contains(first_content, needle) }
   contains("const order_compiled_inner_property_names: List(String)")

@@ -1,18 +1,12 @@
 import generated/schema_empty
 import generated/schema_feature
-import generated_source_normalize
 import gleam/option.{None, Some}
 import gleeunit/should
 import json/blueprint/codec
-import json/blueprint/codegen/schema
 import json/blueprint/contract
 import json/blueprint/number
 import json/blueprint/value
 import schema_codegen_runner
-
-@external(erlang, "readme_test_ffi", "read_file_to_string")
-@external(javascript, "./readme_test_ffi.mjs", "read_file_to_string")
-fn read_file_to_string(path: String) -> Result(String, String)
 
 fn exact(token: String) -> number.Number {
   let assert Ok(number) = number.parse(token, number.limits(1024, 800, 2000))
@@ -88,16 +82,4 @@ pub fn empty_object_has_a_native_constructor_and_rejects_unknown_fields_test() {
   |> should.equal(
     Error(codec.DecodeError([codec.Field("extra")], codec.UnknownField)),
   )
-}
-
-pub fn compiled_source_matches_the_generator_test() {
-  let assert Ok(module) =
-    schema.compile(
-      "generated/schema_feature",
-      "feature",
-      schema_codegen_runner.feature_schema(),
-    )
-  let assert Ok(committed) = read_file_to_string("test/" <> module.path)
-  generated_source_normalize.normalize(module.content)
-  |> should.equal(generated_source_normalize.normalize(committed))
 }

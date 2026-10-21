@@ -93,8 +93,6 @@
             beam29Packages.rebar3
             beam29Packages.erlang
             nodejs_24
-            actionlint
-            shellcheck
             ruff
             findutils
             (python3.withPackages (pythonPackages: [ pythonPackages.jsonschema ]))

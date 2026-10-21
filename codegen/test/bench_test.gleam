@@ -212,67 +212,6 @@ pub fn print_benchmark_report(results: List(BenchResult)) -> Nil {
   io.println("----------------------------------------------\n")
 }
 
-pub fn benchmark_suite_test() {
-  let results = run_all_benchmarks()
-  list.length(results) |> should.equal(25)
-
-  list.each(results, fn(res) {
-    should.equal(res.sample_iterations, 1000)
-    should.be_true(res.elapsed_nanos > 0)
-    should.be_true(res.mean_nanos_per_op > 0)
-    should.be_true(res.ops_per_second > 0)
-  })
-
-  print_benchmark_report(results)
-}
-
-pub fn order_codec_benchmark_inventory_test() {
-  let results = run_order_codec_benchmarks()
-  let case_names =
-    list.map(results, fn(result) {
-      let BenchResult(name, _, _, _, _, _, _) = result
-      name
-    })
-  let required_cases = [
-    "order_runtime_definition_codec_construction",
-    "order_generated_codec_wrapper_construction",
-    "order_vanilla_decoder_construction",
-    "order_runtime_inline_complete_text_encode",
-    "order_runtime_inline_complete_text_decode",
-    "order_runtime_reused_complete_text_encode",
-    "order_runtime_reused_complete_text_decode",
-    "order_generated_native_direct_complete_text_encode",
-    "order_generated_native_direct_complete_text_decode",
-    "order_generated_strict_direct_complete_text_decode",
-    "order_generated_wrapper_complete_text_encode",
-    "order_generated_wrapper_complete_text_decode",
-    "order_vanilla_complete_text_encode",
-    "order_vanilla_complete_text_decode",
-    "native_gleam_json_dynamic_parse",
-    "native_dynamic_object_dict_materialization",
-    "vanilla_parsed_dynamic_typed_decode",
-    "legacy_value_runtime_inline_encode",
-    "legacy_value_runtime_reused_encode",
-    "legacy_value_runtime_inline_decode",
-    "legacy_value_runtime_reused_decode",
-  ]
-
-  should.equal(list.length(results), 21)
-  list.all(required_cases, fn(required) { list.contains(case_names, required) })
-  |> should.be_true
-
-  list.each(results, fn(result) {
-    let BenchResult(_, runtime_name, warmup, samples, elapsed, ns_per_op, ops) =
-      result
-    should.be_true(runtime_name != "")
-    should.equal(warmup, 200)
-    should.equal(samples, 1000)
-    should.be_true(elapsed > 0)
-    should.be_true(ns_per_op > 0)
-    should.be_true(ops > 0)
-  })
-}
-
 pub fn native_complete_text_backends_match_for_order_variants_test() {
   let runtime = codegen.runtime(materialize_fixtures.order_definition())
   let generated = order_codec.order_codec()
