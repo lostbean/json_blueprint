@@ -2,7 +2,7 @@
   description = "Gleam development environment";
 
   inputs = {
-    design-layer.url = "github:lostbean/design-layer";
+    design-layer.url = "github:lostbean/design-layer/main";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix.follows = "design-layer/treefmt-nix";
@@ -80,6 +80,7 @@
           };
       in
       {
+        apps.snips = design-layer.apps.${system}.snips;
         apps.design-gate-check = designApp "check";
         apps.design-gate-render = designApp "render";
         apps.design-gate-context = designApp "context";

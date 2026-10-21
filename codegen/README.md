@@ -20,6 +20,9 @@ json_blueprint = { path = "../json_blueprint" }
 json_blueprint_codegen = { path = "../json_blueprint/codegen" }
 ```
 
+<!-- prettier-ignore-start -->
+
+<!-- snips: test/module_docs/codegen_example_test.gleam#codegen-example -->
 ```gleam
 import json/blueprint/codec
 import json/blueprint/codegen
@@ -36,7 +39,10 @@ pub fn example() {
     codegen.compile("generated/names_codec", "names", names_definition())
   #(path, content)
 }
+
 ```
+
+<!-- prettier-ignore-end -->
 
 - A `Definition(a)` mirrors the codec shapes: `string`, `int`, `number`,
   `bool`, `integer_between`, `pair`, `list`, `nullable`, `string_enum`,
@@ -68,5 +74,5 @@ From the repository root, `nix develop --command sh scripts/benchmark.sh` runs t
 - Supported children include closed records, strings, booleans, native integers and integer ranges, exact numbers and number ranges, lists, pairs, nullable values, and optional properties. Constraints and descriptions survive generation; supported structure is checked by Gleam on outbound native values while ordinary codecs check value constraints.
 - Wire names are preserved. Native names are deterministic; invalid names, name collisions, and unsupported shapes return typed failures with logical schema locations instead of partial source.
 - Enums, tagged unions, unconstrained values, shared or recursive definitions, and non-object roots are outside this generation slice. Runtime-schema admission does not imply generation support.
-- The [separate order consumer](consumer/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and stale-output checks. Its production package depends only on the runtime package and compiled source.
+- The [separate order consumer](consumer/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and freshly generated-code integration tests. Its production package depends only on the runtime package and compiled source.
 - Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. [ADR 0010](../docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the separate construction, conversion, and build-time generation costs.

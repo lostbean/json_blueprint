@@ -28,6 +28,8 @@ jobs:
         run: nix flake check
       - name: Shared design validation
         run: nix run .#design-gate-check -- docs/design .
+      - name: README snippets
+        run: nix run --no-update-lock-file .#snips -- --check --commands deny README.md codegen/README.md
       - name: Application tests
         run: |
           set -o pipefail
