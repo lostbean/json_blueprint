@@ -33,6 +33,15 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 3. **Runtime cases** ([`test/schema_oracle_test.gleam`](../test/schema_oracle_test.gleam))
    replay the manifest through the Gleam package on both targets.
 
+4. **Exact arithmetic** ([`test/number_check.py`](../test/number_check.py)) runs
+   `number_oracle_runner` against the public number API on Erlang. Python's
+   standard `Decimal`, `Fraction` and binary64 operations independently check
+   all 62 retained numerical cases: 39 parsing cases, 11 comparisons, seven
+   float origins and five integer origins. This preserves the original Erlang
+   oracle scope, including integers beyond JavaScript's safe range. Existing
+   number unit tests continue on both targets with their explicit native-integer
+   differences. This oracle uses no downloaded input.
+
 ## Outcome classes
 
 | Class | Meaning | Result |
@@ -65,6 +74,7 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 ```sh
 nix develop --command python3 test/schema_check.py
 nix develop --command python3 test/schema_profile_check.py
+python3 test/number_check.py
 nix develop --command sh scripts/gate.sh   # the broader gate, which runs both
 ```
 

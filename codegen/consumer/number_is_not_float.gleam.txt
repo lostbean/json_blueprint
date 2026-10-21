@@ -1,0 +1,5 @@
+import json/blueprint/number
+
+pub fn invalid(exact: number.Number) -> Float {
+  exact
+}

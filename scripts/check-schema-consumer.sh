@@ -55,4 +55,19 @@ PYCODE
     echo "The generator leaked into production dependencies" >&2
     exit 1
   fi
+  # The positive production build above rules out unrelated dependency failures.
+  cp "$repository/codegen/consumer/number_is_not_float.gleam.txt" src/number_is_not_float.gleam
+  for target in erlang javascript; do
+    if gleam check --target="$target" >number-negative.log 2>&1; then
+      echo "An exact Number was accepted as a native Float" >&2
+      exit 1
+    fi
+    for expected in 'Type mismatch' 'number_is_not_float.gleam' 'Number' 'Float'; do
+      if ! grep -qF "$expected" number-negative.log; then
+        cat number-negative.log >&2
+        exit 1
+      fi
+    done
+  done
+
 )
