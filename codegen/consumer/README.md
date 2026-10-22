@@ -19,4 +19,4 @@ From the repository root in the same shell, `sh scripts/check-schema-consumer.sh
 
 ## Reference
 
-The [generation design](../../docs/design/generation/design.typ#schema-driven-native-generator) states the contract this consumer exercises. [ADR 0008](../../docs/adr/0008-development-time-source-generation.md) records the decision and [ADR 0010](../../docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) the measurement policy. The usage examples for the codec API are in [`examples/`](../../examples/README.md).
+The [generation design](../../docs/design/design-layer.pdf) states the contract this consumer exercises. [ADR 0008](../../docs/adr/0008-development-time-source-generation.md) records the decision and [ADR 0010](../../docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) the measurement policy. The usage examples for the codec API are in [`examples/`](../../examples/README.md).
