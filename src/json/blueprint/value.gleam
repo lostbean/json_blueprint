@@ -1,25 +1,20 @@
-//// The JSON value model, its strict bounded parser, its text form and its
-//// bridges to `gleam/json`.
+//// The JSON value model, byte-bounded parsing, its text form and bridges
+//// to `gleam/json`.
 ////
-//// `Value` is what `parse` returns, what `json/blueprint/contract` validates
-//// and what `codec.encode` and `codec.decode` exchange. Object members keep
-//// their order. Numbers are `number.Number`, so they are exact.
+//// Numbers retain exact mathematical values and repeated object keys reject.
+//// Erlang parses through OTP's native JSON parser; JavaScript uses the package
+//// parser. Parsed object member order and syntax diagnostics are target-specific.
+//// Manually constructed `Object` values retain the supplied member order.
 ////
-//// `parse` reads JSON text strictly: it rejects duplicate object keys, keeps
-//// numbers exact, and stops at the `Limits` it is given. Start from
-//// `default_limits()` and change one bound with a `with_` setter:
+//// `default_limits()` admits at most 1 MiB (1,048,576 bytes). Change that bound
+//// with `with_max_bytes`. There are no document-depth, value-count or global
+//// numeric-token admission limits. The byte bound is not a heap-memory quota.
+//// Numeric native projection and codec constraints still apply independently.
+//// JavaScript recursion remains subject to the host stack capacity; exhaustion
+//// returns `RuntimeCapacityExceeded`, not a configured document-depth failure.
 ////
-//// | Bound | Default | Setter |
-//// | --- | --- | --- |
-//// | input bytes | 1 MiB (1,048,576) | `with_max_bytes` |
-//// | array and object nesting | 64 | `with_max_depth` |
-//// | values in the document | 262,144 | `with_max_elements` |
-//// | number tokens | 1,024 bytes, 800 digits, exponent 1,200 | `with_number_limits` |
-////
-//// A bound below 1 rejects every input. `to_string` renders compact JSON
-//// text. `to_json` converts a value to `gleam/json`, and `decoder` reads a
-//// value from `gleam/json`'s parser, for use with libraries that speak
-//// `gleam/json`.
+//// `to_string` renders compact JSON. `to_json` and `decoder` bridge native
+//// `gleam/json` values, whose parsing policy differs from this module.
 ////
 //// ```gleam
 //// import json/blueprint/value
@@ -42,7 +37,9 @@ import gleam/json
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/order
+import gleam/result
 import gleam/string
+import json/blueprint/internal/native
 import json/blueprint/internal/text
 import json/blueprint/number.{type Number}
 
@@ -86,102 +83,42 @@ fn find_duplicate_key(
 
 // --- limits ------------------------------------------------------------------
 
-/// Bounds for `parse`: input bytes, nesting depth, the number of values, and
-/// number tokens.
+/// The input-byte admission bound for `parse` and `parse_bits`.
 pub opaque type Limits {
-  Limits(
-    max_bytes: Int,
-    max_depth: Int,
-    max_elements: Int,
-    numbers: number.Limits,
-    // Whether every integer token of at most 15 digits fits `numbers`, so the
-    // parser may build such integers directly.
-    small_integers_fit: Bool,
-  )
+  Limits(max_bytes: Int)
 }
 
-/// 1 MiB (1,048,576 bytes) of JSON text, nesting depth 64, 262,144 values,
-/// and `number.default_limits()`.
-///
-/// The value bound is one per 4 bytes of the byte bound, so it stops only
-/// documents denser than JSON text written for people; it caps the parsed
-/// value's memory when the byte bound is raised. The README defaults table
-/// lists the measured peak heap at these defaults.
+/// Admit at most 1 MiB (1,048,576 bytes) of JSON text.
 pub fn default_limits() -> Limits {
-  // The default number limits admit every integer token of 15 digits.
-  Limits(
-    max_bytes: default_max_bytes,
-    max_depth: default_max_depth,
-    max_elements: default_max_elements,
-    numbers: number.default_limits(),
-    small_integers_fit: True,
-  )
-}
-
-const default_max_bytes = 1_048_576
-
-const default_max_depth = 64
-
-const default_max_elements = 262_144
-
-fn new_limits(
-  max_bytes: Int,
-  max_depth: Int,
-  max_elements: Int,
-  numbers: number.Limits,
-) -> Limits {
-  // Every integer token of at most 15 digits passes the bounds when the
-  // longest one and the one with the largest exponent do.
-  let small_integers_fit = case
-    number.parse("-999999999999999", numbers),
-    number.parse("-100000000000000", numbers)
-  {
-    Ok(_), Ok(_) -> True
-    _, _ -> False
-  }
-  Limits(max_bytes, max_depth, max_elements, numbers, small_integers_fit)
+  Limits(1_048_576)
 }
 
 /// Accept at most `bytes` bytes of UTF-8 text. Below 1 rejects every input.
-pub fn with_max_bytes(limits: Limits, bytes: Int) -> Limits {
-  Limits(..limits, max_bytes: bytes)
-}
-
-/// Accept arrays and objects nested at most `depth` deep. A depth of 0 admits
-/// only scalar documents.
-pub fn with_max_depth(limits: Limits, depth: Int) -> Limits {
-  Limits(..limits, max_depth: depth)
-}
-
-/// Accept at most `count` values in a document: every scalar, array and
-/// object counts once, including the root and object member values.
-pub fn with_max_elements(limits: Limits, count: Int) -> Limits {
-  Limits(..limits, max_elements: count)
-}
-
-/// Bound number tokens with `numbers`.
-pub fn with_number_limits(limits: Limits, numbers: number.Limits) -> Limits {
-  new_limits(limits.max_bytes, limits.max_depth, limits.max_elements, numbers)
+pub fn with_max_bytes(_limits: Limits, bytes: Int) -> Limits {
+  Limits(max_bytes: bytes)
 }
 
 // --- errors ------------------------------------------------------------------
 
-/// Where a parse failed: the byte offset from 0, and the line and column from
-/// 1. Columns count graphemes.
+/// Where a parse failed: byte offset from 0, line and column from 1.
+/// Columns count graphemes. A native diagnostic without a portable source
+/// position uses `Location(0, 0, 0)`; it does not identify the first byte.
 pub type Location {
   Location(byte_offset: Int, line: Int, column: Int)
 }
 
-/// Why a parse failed. The `*LimitExceeded` variants, and an `InvalidNumber`
-/// other than `number.InvalidSyntax`, mean the input exceeded `Limits`.
+/// Why parsing failed. `ByteLimitExceeded` is the input admission failure.
 /// May gain variants in a minor release; match with a `_` branch.
 pub type ParseReason {
   UnexpectedCharacter
+  /// The native parser rejected the document without a portable location.
+  NativeSyntax
+  /// The host runtime could not finish parsing, independently of byte limits.
+  RuntimeCapacityExceeded
   UnexpectedEndOfInput
   InvalidUtf8
+  InvalidUnicodeScalar
   ByteLimitExceeded(max: Int)
-  DepthLimitExceeded(max: Int)
-  ElementLimitExceeded(max: Int)
   InvalidNumber(number.NumberError)
   DuplicateObjectKey
   UnterminatedString
@@ -199,10 +136,7 @@ pub type ParseError {
 /// invalid JSON.
 pub fn is_limit_exceeded(error: ParseError) -> Bool {
   case error.reason {
-    ByteLimitExceeded(_) | DepthLimitExceeded(_) | ElementLimitExceeded(_) ->
-      True
-    InvalidNumber(number.InvalidSyntax) -> False
-    InvalidNumber(_) -> True
+    ByteLimitExceeded(_) -> True
     _ -> False
   }
 }
@@ -212,32 +146,33 @@ pub fn is_limit_exceeded(error: ParseError) -> Bool {
 /// the setter for a limit error and contains no input text.
 pub fn describe_parse_error(error: ParseError) -> String {
   let ParseError(location, reason) = error
-  "invalid JSON at line "
-  <> int.to_string(location.line)
-  <> ", column "
-  <> int.to_string(location.column)
-  <> ": "
-  <> describe_reason(reason)
+  case location.line {
+    0 -> "invalid JSON: " <> describe_reason(reason)
+    _ ->
+      "invalid JSON at line "
+      <> int.to_string(location.line)
+      <> ", column "
+      <> int.to_string(location.column)
+      <> ": "
+      <> describe_reason(reason)
+  }
 }
 
 fn describe_reason(reason: ParseReason) -> String {
   case reason {
     UnexpectedCharacter -> "unexpected character"
+    NativeSyntax -> "native parser rejected the document"
+    RuntimeCapacityExceeded -> "runtime parsing capacity exceeded"
     UnexpectedEndOfInput -> "unexpected end of input"
     InvalidUtf8 -> "invalid UTF-8"
+    InvalidUnicodeScalar -> "invalid Unicode scalar"
     ByteLimitExceeded(max) ->
       "more than " <> int.to_string(max) <> " bytes (value.with_max_bytes)"
-    DepthLimitExceeded(max) ->
-      "nesting deeper than " <> int.to_string(max) <> " (value.with_max_depth)"
-    ElementLimitExceeded(max) ->
-      "more than " <> int.to_string(max) <> " values (value.with_max_elements)"
     InvalidNumber(number.InvalidSyntax) -> "invalid number"
-    InvalidNumber(number.TokenTooLong) ->
-      "number token too long (value.with_number_limits)"
+    InvalidNumber(number.TokenTooLong) -> "number token too long"
     InvalidNumber(number.TooManySignificandDigits) ->
-      "number has too many digits (value.with_number_limits)"
-    InvalidNumber(number.ExponentOutOfRange) ->
-      "number exponent out of range (value.with_number_limits)"
+      "number has too many digits"
+    InvalidNumber(number.ExponentOutOfRange) -> "number exponent out of range"
     DuplicateObjectKey -> "duplicate object key"
     UnterminatedString -> "unterminated string"
     InvalidEscape -> "invalid escape sequence"
@@ -248,17 +183,99 @@ fn describe_reason(reason: ParseReason) -> String {
 
 // --- parsing -----------------------------------------------------------------
 
-/// Parse JSON text within `limits`.
-pub fn parse(text: String, limits: Limits) -> Result(Value, ParseError) {
-  case text.exceeds_byte_limit(text, limits.max_bytes) {
-    True ->
-      Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(limits.max_bytes)))
-    False -> parse_document(limits, bit_array.from_string(text))
+/// Parse JSON with byte admission, duplicate rejection and exact numbers.
+/// Erlang uses native parsing; object order and syntax diagnostics may differ
+/// from JavaScript. No depth, value-count or global numeric cap is applied.
+pub fn parse(source: String, limits: Limits) -> Result(Value, ParseError) {
+  case native.supported() {
+    True -> parse_native(source, limits) |> result.try(from_native)
+    False -> {
+      use bytes <- result.try(admit_text(source, limits))
+      parse_document(bytes)
+    }
   }
 }
 
-/// Parse JSON text given as UTF-8 bytes within `limits`. Invalid UTF-8 fails
-/// with `InvalidUtf8` at the first invalid byte.
+/// Native parsing without building the public Value tree. Codec decoding
+/// uses this path only on a supported backend. Native syntax and duplicate
+/// diagnostics have no portable source position and use Location(0, 0, 0).
+@internal
+pub fn parse_native(
+  source: String,
+  limits: Limits,
+) -> Result(native.Raw, ParseError) {
+  native.parse(source, limits.max_bytes)
+  |> result.map_error(fn(error) {
+    case error {
+      native.ByteLimitExceeded ->
+        ParseError(Location(0, 1, 1), ByteLimitExceeded(limits.max_bytes))
+      native.InvalidUnicodeScalar ->
+        ParseError(Location(0, 0, 0), InvalidUnicodeScalar)
+      native.DuplicateKey(_) ->
+        ParseError(Location(0, 0, 0), DuplicateObjectKey)
+      native.Syntax(_) | native.UnsupportedRuntime ->
+        ParseError(Location(0, 0, 0), NativeSyntax)
+    }
+  })
+}
+
+/// Materialize a native subtree only for a public Value or custom-codec
+/// fallback. Numbers become exact Number values on demand. Native map key
+/// order is not the original source order.
+@internal
+pub fn from_native(raw: native.Raw) -> Result(Value, ParseError) {
+  case native.kind(raw) {
+    native.Null -> Ok(Null)
+    native.Bool -> {
+      let assert Ok(item) = native.bool(raw)
+      Ok(Bool(item))
+    }
+    native.String -> {
+      let assert Ok(item) = native.string(raw)
+      Ok(String(item))
+    }
+    native.Number ->
+      native.number(raw)
+      |> result.map(Number)
+      |> result.map_error(fn(_) {
+        ParseError(Location(0, 0, 0), InvalidNumber(number.InvalidSyntax))
+      })
+    native.Array -> {
+      let assert Ok(items) = native.array_items(raw)
+      list.try_map(items, from_native) |> result.map(Array)
+    }
+    native.Object -> {
+      let assert Ok(keys) = native.keys(raw)
+      keys
+      |> list.try_map(fn(key) {
+        let assert Ok(item) = native.field(raw, key)
+        from_native(item) |> result.map(fn(item) { #(key, item) })
+      })
+      |> result.map(Object)
+    }
+  }
+}
+
+fn admit_text(source: String, limits: Limits) -> Result(BitArray, ParseError) {
+  case text.exceeds_byte_limit(source, limits.max_bytes) {
+    True ->
+      Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(limits.max_bytes)))
+    False ->
+      case text.validate_scalars(source) {
+        Ok(Nil) -> Ok(bit_array.from_string(source))
+        Error(prefix) -> {
+          let prefix = bit_array.from_string(prefix)
+          Error(locate(
+            prefix,
+            Failure(bit_array.byte_size(prefix), Known(InvalidUnicodeScalar)),
+          ))
+        }
+      }
+  }
+}
+
+/// Parse UTF-8 bytes. Byte admission precedes UTF-8 validation. Invalid UTF-8
+/// retains the first invalid byte location independently of the JSON backend.
 pub fn parse_bits(
   bytes: BitArray,
   limits: Limits,
@@ -270,7 +287,14 @@ pub fn parse_bits(
       case bit_array.is_utf8(bytes) {
         False ->
           Error(ParseError(find_invalid_utf8(bytes, 0, 1, 1), InvalidUtf8))
-        True -> parse_document(limits, bytes)
+        True ->
+          case native.supported() {
+            True -> {
+              let assert Ok(source) = bit_array.to_string(bytes)
+              parse_native(source, limits) |> result.try(from_native)
+            }
+            False -> parse_document(bytes)
+          }
       }
   }
 }
@@ -286,26 +310,37 @@ type FailureKind {
   Known(ParseReason)
 }
 
-/// A parsed item, the rest of the input, its offset, and the number of
-/// values parsed so far.
+/// A parsed item, the rest of the input and its offset.
 type Parsed(a) =
-  Result(#(a, BitArray, Int, Int), Failure)
+  Result(#(a, BitArray, Int), Failure)
 
 @external(erlang, "json_blueprint_ffi", "copy_string")
 @external(javascript, "../../json_blueprint_ffi.mjs", "copy_string")
 fn copy_string(text: String) -> String
 
-fn parse_document(
-  limits: Limits,
-  source: BitArray,
+@external(javascript, "../../json_blueprint_ffi.mjs", "with_parser_capacity")
+fn with_parser_capacity(
+  work: fn() -> Result(Value, ParseError),
+  _capacity_error: ParseError,
 ) -> Result(Value, ParseError) {
+  work()
+}
+
+fn parse_document(source: BitArray) -> Result(Value, ParseError) {
+  with_parser_capacity(
+    fn() { parse_portable_document(source) },
+    ParseError(Location(0, 0, 0), RuntimeCapacityExceeded),
+  )
+}
+
+fn parse_portable_document(source: BitArray) -> Result(Value, ParseError) {
   let #(rest, offset) = skip_whitespace(source, 0)
   let result = case rest {
     <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
     _ ->
-      case parse_any(limits, rest, offset, 0, 0) {
+      case parse_any(rest, offset) {
         Error(failure) -> Error(failure)
-        Ok(#(parsed, rest, offset, _)) -> {
+        Ok(#(parsed, rest, offset)) -> {
           let #(rest, offset) = skip_whitespace(rest, offset)
           case rest {
             <<>> -> Ok(parsed)
@@ -330,76 +365,53 @@ fn skip_whitespace(bytes: BitArray, offset: Int) -> #(BitArray, Int) {
   }
 }
 
-fn parse_any(
-  limits: Limits,
-  bytes: BitArray,
-  offset: Int,
-  depth: Int,
-  count: Int,
-) -> Parsed(Value) {
-  case count + 1 > limits.max_elements {
-    True ->
-      Error(Failure(offset, Known(ElementLimitExceeded(limits.max_elements))))
-    False -> parse_counted(limits, bytes, offset, depth, count + 1)
-  }
-}
-
-fn parse_counted(
-  limits: Limits,
-  bytes: BitArray,
-  offset: Int,
-  depth: Int,
-  count: Int,
-) -> Parsed(Value) {
+fn parse_any(bytes: BitArray, offset: Int) -> Parsed(Value) {
   case bytes {
     <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
     // null
-    <<0x6E, 0x75, 0x6C, 0x6C, rest:bytes>> ->
-      Ok(#(Null, rest, offset + 4, count))
+    <<0x6E, 0x75, 0x6C, 0x6C, rest:bytes>> -> Ok(#(Null, rest, offset + 4))
     // true
     <<0x74, 0x72, 0x75, 0x65, rest:bytes>> ->
-      Ok(#(Bool(True), rest, offset + 4, count))
+      Ok(#(Bool(True), rest, offset + 4))
     // false
     <<0x66, 0x61, 0x6C, 0x73, 0x65, rest:bytes>> ->
-      Ok(#(Bool(False), rest, offset + 5, count))
+      Ok(#(Bool(False), rest, offset + 5))
     <<0x22, rest:bytes>> ->
       case parse_string(rest, offset + 1, offset) {
         Error(failure) -> Error(failure)
-        Ok(#(text, rest, offset)) -> Ok(#(String(text), rest, offset, count))
+        Ok(#(text, rest, offset)) -> Ok(#(String(text), rest, offset))
       }
-    <<0x5B, rest:bytes>> -> parse_array(limits, rest, offset, depth, count)
-    <<0x7B, rest:bytes>> -> parse_object(limits, rest, offset, depth, count)
+    <<0x5B, rest:bytes>> -> parse_array(rest, offset)
+    <<0x7B, rest:bytes>> -> parse_object(rest, offset)
     <<byte, _:bytes>> if byte == 0x2D || byte >= 0x30 && byte <= 0x39 ->
-      case parse_number(limits, bytes, offset) {
+      case parse_number(bytes, offset) {
         Error(failure) -> Error(failure)
-        Ok(#(parsed, rest, offset)) ->
-          Ok(#(Number(parsed), rest, offset, count))
+        Ok(#(parsed, rest, offset)) -> Ok(#(Number(parsed), rest, offset))
       }
     _ -> Error(Failure(offset, Unexpected))
   }
 }
 
 fn parse_number(
-  limits: Limits,
   bytes: BitArray,
   offset: Int,
 ) -> Result(#(Number, BitArray, Int), Failure) {
   let #(length, rest) = number_span(bytes, 0)
   let assert Ok(token_bytes) = bit_array.slice(bytes, 0, length)
-  let small = case limits.small_integers_fit, simple_integer(token_bytes) {
-    True, Ok(#(negative, magnitude)) ->
+  let small = case simple_integer(token_bytes) {
+    Ok(#(negative, magnitude)) ->
       case negative {
         True -> number.from_int(0 - magnitude)
         False -> number.from_int(magnitude)
       }
       |> result_to_nil
-    _, _ -> Error(Nil)
+    Error(_) -> Error(Nil)
   }
   case small {
     Ok(parsed) -> Ok(#(parsed, rest, offset + length))
     Error(Nil) -> {
       let assert Ok(token) = bit_array.to_string(token_bytes)
-      case number.parse(token, limits.numbers) {
+      case number.from_json_token(token) {
         Error(error) -> Error(Failure(offset, Known(InvalidNumber(error))))
         Ok(parsed) -> Ok(#(parsed, rest, offset + length))
       }
@@ -486,8 +498,7 @@ fn scan_string(
   case bytes {
     <<>> -> Error(Failure(start, Known(UnterminatedString)))
     <<0x22, rest:bytes>> -> {
-      let chunks = add_run(chunks, run, run_length)
-      Ok(#(finish_string(chunks), rest, offset + 1))
+      Ok(#(finish_string(run, run_length, chunks), rest, offset + 1))
     }
     <<0x5C, rest:bytes>> -> {
       let chunks = add_run(chunks, run, run_length)
@@ -498,6 +509,16 @@ fn scan_string(
       }
     }
     <<byte, _:bytes>> if byte < 0x20 -> Error(Failure(offset, Unexpected))
+    // Scan ordinary runs two bytes at a time to reduce bit-array slicing.
+    // Quotes, escapes and controls still take the single-byte branches.
+    <<a, b, rest:bytes>>
+      if a >= 0x20
+      && a != 0x22
+      && a != 0x5C
+      && b >= 0x20
+      && b != 0x22
+      && b != 0x5C
+    -> scan_string(run, rest, run_length + 2, offset + 2, start, chunks)
     <<_, rest:bytes>> ->
       scan_string(run, rest, run_length + 1, offset + 1, start, chunks)
     _ -> Error(Failure(start, Known(UnterminatedString)))
@@ -518,11 +539,23 @@ fn add_run(
   }
 }
 
-fn finish_string(chunks: List(BitArray)) -> String {
-  // Pieces split the valid UTF-8 input only at ASCII quotes and backslashes,
-  // and decoded escapes are valid scalar values, so the result is UTF-8.
-  let assert Ok(text) =
-    bit_array.to_string(bit_array.concat(list.reverse(chunks)))
+fn finish_string(
+  run: BitArray,
+  run_length: Int,
+  chunks: List(BitArray),
+) -> String {
+  // Unescaped strings need no chunk list or concatenation. Keep the copy:
+  // a short string must not retain the document's source binary.
+  let bytes = case chunks {
+    [] -> {
+      let assert Ok(piece) = bit_array.slice(run, 0, run_length)
+      piece
+    }
+    _ -> bit_array.concat(list.reverse(add_run(chunks, run, run_length)))
+  }
+  // Runs split valid UTF-8 only at ASCII quotes and backslashes, and decoded
+  // escapes are scalar values, so the assembled result is valid UTF-8.
+  let assert Ok(text) = bit_array.to_string(bytes)
   copy_string(text)
 }
 
@@ -609,37 +642,23 @@ fn hex_value(byte: Int) -> Result(Int, Nil) {
 }
 
 /// `bytes` follows the `[` at `open`.
-fn parse_array(
-  limits: Limits,
-  bytes: BitArray,
-  open: Int,
-  depth: Int,
-  count: Int,
-) -> Parsed(Value) {
-  case depth + 1 > limits.max_depth {
-    True -> Error(Failure(open, Known(DepthLimitExceeded(limits.max_depth))))
-    False -> {
-      let #(rest, offset) = skip_whitespace(bytes, open + 1)
-      case rest {
-        <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
-        <<0x5D, rest:bytes>> -> Ok(#(Array([]), rest, offset + 1, count))
-        _ -> parse_elements(limits, rest, offset, depth + 1, count, [])
-      }
-    }
+fn parse_array(bytes: BitArray, open: Int) -> Parsed(Value) {
+  let #(rest, offset) = skip_whitespace(bytes, open + 1)
+  case rest {
+    <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+    <<0x5D, rest:bytes>> -> Ok(#(Array([]), rest, offset + 1))
+    _ -> parse_elements(rest, offset, [])
   }
 }
 
 fn parse_elements(
-  limits: Limits,
   bytes: BitArray,
   offset: Int,
-  depth: Int,
-  count: Int,
   elements: List(Value),
 ) -> Parsed(Value) {
-  case parse_any(limits, bytes, offset, depth, count) {
+  case parse_any(bytes, offset) {
     Error(failure) -> Error(failure)
-    Ok(#(element, rest, offset, count)) -> {
+    Ok(#(element, rest, offset)) -> {
       let #(rest, offset) = skip_whitespace(rest, offset)
       case rest {
         <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
@@ -647,20 +666,11 @@ fn parse_elements(
           let #(rest, offset) = skip_whitespace(rest, offset + 1)
           case rest {
             <<0x5D, _:bytes>> -> Error(Failure(offset, Unexpected))
-            _ ->
-              parse_elements(limits, rest, offset, depth, count, [
-                element,
-                ..elements
-              ])
+            _ -> parse_elements(rest, offset, [element, ..elements])
           }
         }
         <<0x5D, rest:bytes>> ->
-          Ok(#(
-            Array(list.reverse([element, ..elements])),
-            rest,
-            offset + 1,
-            count,
-          ))
+          Ok(#(Array(list.reverse([element, ..elements])), rest, offset + 1))
         _ -> Error(Failure(offset, Unexpected))
       }
     }
@@ -668,24 +678,12 @@ fn parse_elements(
 }
 
 /// `bytes` follows the `{` at `open`.
-fn parse_object(
-  limits: Limits,
-  bytes: BitArray,
-  open: Int,
-  depth: Int,
-  count: Int,
-) -> Parsed(Value) {
-  case depth + 1 > limits.max_depth {
-    True -> Error(Failure(open, Known(DepthLimitExceeded(limits.max_depth))))
-    False -> {
-      let #(rest, offset) = skip_whitespace(bytes, open + 1)
-      case rest {
-        <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
-        <<0x7D, rest:bytes>> -> Ok(#(Object([]), rest, offset + 1, count))
-        _ ->
-          parse_members(limits, rest, offset, depth + 1, count, dict.new(), [])
-      }
-    }
+fn parse_object(bytes: BitArray, open: Int) -> Parsed(Value) {
+  let #(rest, offset) = skip_whitespace(bytes, open + 1)
+  case rest {
+    <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
+    <<0x7D, rest:bytes>> -> Ok(#(Object([]), rest, offset + 1))
+    _ -> parse_members(rest, offset, dict.new(), [])
   }
 }
 
@@ -695,30 +693,19 @@ type Next {
 }
 
 fn parse_members(
-  limits: Limits,
   bytes: BitArray,
   offset: Int,
-  depth: Int,
-  count: Int,
   seen: Dict(String, Nil),
   members: List(#(String, Value)),
 ) -> Parsed(Value) {
-  case parse_member(limits, bytes, offset, depth, count, seen) {
+  case parse_member(bytes, offset, seen) {
     Error(failure) -> Error(failure)
-    Ok(#(#(key, member, next), rest, offset, count)) -> {
+    Ok(#(#(key, member, next), rest, offset)) -> {
       let members = [#(key, member), ..members]
       case next {
         More ->
-          parse_members(
-            limits,
-            rest,
-            offset,
-            depth,
-            count,
-            dict.insert(seen, key, Nil),
-            members,
-          )
-        Last -> Ok(#(Object(list.reverse(members)), rest, offset, count))
+          parse_members(rest, offset, dict.insert(seen, key, Nil), members)
+        Last -> Ok(#(Object(list.reverse(members)), rest, offset))
       }
     }
   }
@@ -726,11 +713,8 @@ fn parse_members(
 
 /// Parse one `"key": value` member and the `,` or `}` that follows it.
 fn parse_member(
-  limits: Limits,
   bytes: BitArray,
   offset: Int,
-  depth: Int,
-  count: Int,
   seen: Dict(String, Nil),
 ) -> Parsed(#(String, Value, Next)) {
   case bytes {
@@ -740,8 +724,7 @@ fn parse_member(
         Ok(#(key, rest, after_key)) ->
           case dict.has_key(seen, key) {
             True -> Error(Failure(offset, Known(DuplicateObjectKey)))
-            False ->
-              parse_member_value(limits, rest, after_key, depth, count, key)
+            False -> parse_member_value(rest, after_key, key)
           }
       }
     <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
@@ -750,20 +733,17 @@ fn parse_member(
 }
 
 fn parse_member_value(
-  limits: Limits,
   bytes: BitArray,
   offset: Int,
-  depth: Int,
-  count: Int,
   key: String,
 ) -> Parsed(#(String, Value, Next)) {
   let #(rest, offset) = skip_whitespace(bytes, offset)
   case rest {
     <<0x3A, rest:bytes>> -> {
       let #(rest, offset) = skip_whitespace(rest, offset + 1)
-      case parse_any(limits, rest, offset, depth, count) {
+      case parse_any(rest, offset) {
         Error(failure) -> Error(failure)
-        Ok(#(member, rest, offset, count)) -> {
+        Ok(#(member, rest, offset)) -> {
           let #(rest, offset) = skip_whitespace(rest, offset)
           case rest {
             <<>> -> Error(Failure(offset, Known(UnexpectedEndOfInput)))
@@ -771,11 +751,11 @@ fn parse_member_value(
               let #(rest, offset) = skip_whitespace(rest, offset + 1)
               case rest {
                 <<0x7D, _:bytes>> -> Error(Failure(offset, Unexpected))
-                _ -> Ok(#(#(key, member, More), rest, offset, count))
+                _ -> Ok(#(#(key, member, More), rest, offset))
               }
             }
             <<0x7D, rest:bytes>> ->
-              Ok(#(#(key, member, Last), rest, offset + 1, count))
+              Ok(#(#(key, member, Last), rest, offset + 1))
             _ -> Error(Failure(offset, Unexpected))
           }
         }

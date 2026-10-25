@@ -1,0 +1,128 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "runs": [
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "strict",
+      "bytes": 20001,
+      "median_ns": 3710643,
+      "samples_ns": [
+        3597638,
+        3731699,
+        3839277,
+        3776574,
+        4227976,
+        3649407,
+        3597884,
+        3788185,
+        3596384,
+        3520953,
+        3712351,
+        3869736,
+        3673842,
+        3710643,
+        3599986
+      ],
+      "memory": [
+        {
+          "process_bytes": 55184,
+          "vm_bytes": 44329994,
+          "peak_rss": 71483392
+        },
+        {
+          "process_bytes": 55184,
+          "vm_bytes": 44310906,
+          "peak_rss": 70942720
+        },
+        {
+          "process_bytes": 55184,
+          "vm_bytes": 44310882,
+          "peak_rss": 71647232
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "native",
+      "bytes": 20001,
+      "median_ns": 221430,
+      "samples_ns": [
+        221430,
+        215032,
+        212009,
+        209981,
+        200976,
+        223694,
+        216726,
+        222736,
+        217226,
+        227018,
+        228939,
+        228805,
+        212888,
+        223051,
+        235439
+      ],
+      "memory": [
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44299008,
+          "peak_rss": 71073792
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44298824,
+          "peak_rss": 71041024
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44298792,
+          "peak_rss": 71155712
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "lossless",
+      "bytes": 20001,
+      "median_ns": 261074,
+      "samples_ns": [
+        243824,
+        234810,
+        238023,
+        255648,
+        240078,
+        272324,
+        277231,
+        272037,
+        294194,
+        261074,
+        267888,
+        258504,
+        263717,
+        273134,
+        259601
+      ],
+      "memory": [
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44219313,
+          "peak_rss": 71073792
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44219201,
+          "peak_rss": 70811648
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44219097,
+          "peak_rss": 71237632
+        }
+      ]
+    }
+  ]
+}

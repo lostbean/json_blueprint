@@ -3,7 +3,6 @@
 import json/blueprint/codec
 import json/blueprint/codegen/schema
 import json/blueprint/contract
-import json/blueprint/number
 import json/blueprint/value
 
 @external(erlang, "file_test_ffi", "write_file")
@@ -11,9 +10,7 @@ import json/blueprint/value
 fn write_file(path: String, content: String) -> Result(Nil, String)
 
 pub fn feature_schema() -> codec.Schema {
-  let limits =
-    value.default_limits()
-    |> value.with_number_limits(number.limits(1024, 800, 2000))
+  let limits = value.default_limits()
   let assert Ok(contract) =
     contract.parse(
       "{

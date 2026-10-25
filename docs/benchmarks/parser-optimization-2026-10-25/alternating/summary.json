@@ -1,0 +1,602 @@
+[
+  {
+    "fixture": "record",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 6378,
+    "range_ns": [
+      5685,
+      6456
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 5987,
+    "range_ns": [
+      5239,
+      6027
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 5659,
+    "range_ns": [
+      5476,
+      6063
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 28506,
+    "range_ns": [
+      27802,
+      28614
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 25173,
+    "range_ns": [
+      24661,
+      25195
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 23882,
+    "range_ns": [
+      23848,
+      24211
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 270469,
+    "range_ns": [
+      270219,
+      292223
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 277083,
+    "range_ns": [
+      254894,
+      281503
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 275537,
+    "range_ns": [
+      261367,
+      283943
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 1219500,
+    "range_ns": [
+      1217969,
+      1221583
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 1047734,
+    "range_ns": [
+      1027386,
+      1047988
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 1044181,
+    "range_ns": [
+      1041390,
+      1058435
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 9017,
+    "range_ns": [
+      8893,
+      9596
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 8571,
+    "range_ns": [
+      8430,
+      8965
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 9140,
+    "range_ns": [
+      8549,
+      10118
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 39334,
+    "range_ns": [
+      38760,
+      47578
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 34883,
+    "range_ns": [
+      33535,
+      36389
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 33953,
+    "range_ns": [
+      33348,
+      61621
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 76619,
+    "range_ns": [
+      75479,
+      90812
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 51244,
+    "range_ns": [
+      51104,
+      51619
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 60489,
+    "range_ns": [
+      60114,
+      61984
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 514729,
+    "range_ns": [
+      501942,
+      537520
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 175010,
+    "range_ns": [
+      173823,
+      178250
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 289250,
+    "range_ns": [
+      286536,
+      313739
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 132916,
+    "range_ns": [
+      131600,
+      141958
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 98129,
+    "range_ns": [
+      97725,
+      102300
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 103050,
+    "range_ns": [
+      103045,
+      120108
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 689783,
+    "range_ns": [
+      688925,
+      706000
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 481837,
+    "range_ns": [
+      477062,
+      482258
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 565112,
+    "range_ns": [
+      561320,
+      588983
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 49066,
+    "range_ns": [
+      48172,
+      55847
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 37966,
+    "range_ns": [
+      37336,
+      38800
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 38911,
+    "range_ns": [
+      38900,
+      39819
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 319002,
+    "range_ns": [
+      305780,
+      554125
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 116383,
+    "range_ns": [
+      113211,
+      120591
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 189855,
+    "range_ns": [
+      188933,
+      225891
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 11858,
+    "range_ns": [
+      11770,
+      12552
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 11965,
+    "range_ns": [
+      11612,
+      12258
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 12028,
+    "range_ns": [
+      11537,
+      12829
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 49003,
+    "range_ns": [
+      47926,
+      51107
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 39118,
+    "range_ns": [
+      38648,
+      40170
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 40430,
+    "range_ns": [
+      40410,
+      41806
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 342428,
+    "range_ns": [
+      339152,
+      344567
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 367169,
+    "range_ns": [
+      361837,
+      370381
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 320993,
+    "range_ns": [
+      319419,
+      403134
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 1095129,
+    "range_ns": [
+      1058023,
+      1120722
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 957127,
+    "range_ns": [
+      936018,
+      960537
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 969803,
+    "range_ns": [
+      965585,
+      981118
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 1756010,
+    "range_ns": [
+      1752468,
+      1904052
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 1877937,
+    "range_ns": [
+      1741312,
+      1914073
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 1906166,
+    "range_ns": [
+      1790760,
+      2124573
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 8377843,
+    "range_ns": [
+      8203989,
+      8750395
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 8651000,
+    "range_ns": [
+      8307125,
+      8682093
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 8540906,
+    "range_ns": [
+      8126291,
+      8554156
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "erlang",
+    "variant": "baseline",
+    "median_ns": 524597,
+    "range_ns": [
+      514722,
+      534083
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "erlang",
+    "variant": "batched",
+    "median_ns": 559944,
+    "range_ns": [
+      499166,
+      594541
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "erlang",
+    "variant": "pair",
+    "median_ns": 539278,
+    "range_ns": [
+      492152,
+      548639
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "javascript",
+    "variant": "baseline",
+    "median_ns": 4505944,
+    "range_ns": [
+      4451180,
+      4508333
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "javascript",
+    "variant": "batched",
+    "median_ns": 4683347,
+    "range_ns": [
+      4583611,
+      5015986
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "javascript",
+    "variant": "pair",
+    "median_ns": 4520639,
+    "range_ns": [
+      4336083,
+      4593944
+    ]
+  }
+]

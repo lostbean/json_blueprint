@@ -98,6 +98,57 @@ pub fn int_codec_test() {
   |> should.equal(Ok(tree.IntSchema))
 }
 
+@target(erlang)
+pub fn int_codec_digit_boundary_is_symmetric_test() {
+  let c = codec.int()
+  let largest = 999_999_999_999_999_999_999_999
+  list.each([largest, -largest], fn(item) {
+    let assert Ok(encoded) = codec.encode(c, item)
+    codec.decode(c, encoded) |> should.equal(Ok(item))
+    let assert Ok(text) = codec.encode_json(c, item)
+    codec.decode_json(c, text) |> should.equal(Ok(item))
+  })
+  list.each([largest + 1, -largest - 1], fn(item) {
+    codec.encode(c, item)
+    |> should.equal(Error(EncodeError([], codec.ExpectedInt)))
+    codec.encode_json(c, item)
+    |> should.equal(Error(EncodeError([], codec.ExpectedInt)))
+    codec.decode(c, value.Number(int_num(item)))
+    |> should.equal(fail([], codec.ExpectedInt))
+  })
+}
+
+@target(javascript)
+pub fn int_codec_safe_integer_boundary_is_symmetric_test() {
+  let c = codec.int()
+  let largest = 9_007_199_254_740_991
+  list.each([largest, -largest], fn(item) {
+    let assert Ok(encoded) = codec.encode(c, item)
+    codec.decode(c, encoded) |> should.equal(Ok(item))
+    let assert Ok(text) = codec.encode_json(c, item)
+    codec.decode_json(c, text) |> should.equal(Ok(item))
+  })
+  list.each([largest + 1, -largest - 1], fn(item) {
+    codec.encode(c, item)
+    |> should.equal(Error(EncodeError([], codec.UnsafeInteger)))
+  })
+  list.each(["9007199254740992", "-9007199254740992"], fn(text) {
+    codec.decode_json(c, text) |> should.equal(fail([], codec.ExpectedInt))
+  })
+}
+
+@target(erlang)
+pub fn integer_between_retains_its_bound_derived_digit_limit_test() {
+  let largest = 1_000_000_000_000_000_000_000_000
+  let c = codec.integer_between(-largest, largest)
+  list.each([largest, -largest], fn(item) {
+    let assert Ok(encoded) = codec.encode(c, item)
+    codec.decode(c, encoded) |> should.equal(Ok(item))
+    let assert Ok(text) = codec.encode_json(c, item)
+    codec.decode_json(c, text) |> should.equal(Ok(item))
+  })
+}
+
 pub fn float_codec_rounds_to_the_nearest_float_test() {
   let c = codec.float()
   codec.decode(c, value.Number(num("0.1"))) |> should.equal(Ok(0.1))
@@ -819,10 +870,19 @@ pub fn decoder_bridges_to_gleam_json_test() {
 
 pub fn decode_json_reports_invalid_json_without_a_path_test() {
   let assert Error(error) = codec.decode_json(note_codec(), "{\"title\": ")
-  let assert DecodeError([], codec.InvalidJson(_)) = error
+  let assert DecodeError([], codec.InvalidJson(parse_error)) = error
   codec.is_limit_exceeded(error) |> should.be_false
-  codec.describe_decode_error(error)
-  |> should.equal("invalid JSON at line 1, column 11: unexpected end of input")
+  case parse_error {
+    value.ParseError(value.Location(0, 0, 0), value.NativeSyntax) ->
+      codec.describe_decode_error(error)
+      |> should.equal("invalid JSON: native parser rejected the document")
+    value.ParseError(value.Location(10, 1, 11), value.UnexpectedEndOfInput) ->
+      codec.describe_decode_error(error)
+      |> should.equal(
+        "invalid JSON at line 1, column 11: unexpected end of input",
+      )
+    _ -> should.fail()
+  }
 }
 
 pub fn describe_errors_omit_input_values_test() {
@@ -910,12 +970,12 @@ pub fn value_passes_any_json_through_unchanged_test() {
       codec.encode(c, raw) |> should.equal(Ok(raw))
     },
   )
-  // The parse limits still bound it.
+  // The parser byte bound still applies.
   let assert Error(error) =
     codec.decode_json_with_limits(
       c,
       "[[[1]]]",
-      value.default_limits() |> value.with_max_depth(2),
+      value.default_limits() |> value.with_max_bytes(2),
     )
   codec.is_limit_exceeded(error) |> should.be_true()
 }

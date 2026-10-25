@@ -1,0 +1,422 @@
+[
+  {
+    "fixture": "record",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 1467,
+    "vm_median_range_ns": [
+      1295,
+      1472
+    ],
+    "median_peak_rss_bytes": 70451200,
+    "peak_rss_range_bytes": [
+      70434816,
+      70598656
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 6477,
+    "vm_median_range_ns": [
+      6405,
+      6556
+    ],
+    "median_peak_rss_bytes": 70500352,
+    "peak_rss_range_bytes": [
+      70303744,
+      70631424
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 1090,
+    "vm_median_range_ns": [
+      1077,
+      1090
+    ],
+    "median_peak_rss_bytes": 52248576,
+    "peak_rss_range_bytes": [
+      52199424,
+      52494336
+    ]
+  },
+  {
+    "fixture": "record",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 28446,
+    "vm_median_range_ns": [
+      27972,
+      29918
+    ],
+    "median_peak_rss_bytes": 52297728,
+    "peak_rss_range_bytes": [
+      52199424,
+      52461568
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 72886,
+    "vm_median_range_ns": [
+      66522,
+      74018
+    ],
+    "median_peak_rss_bytes": 70533120,
+    "peak_rss_range_bytes": [
+      70320128,
+      70615040
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 277920,
+    "vm_median_range_ns": [
+      277325,
+      292704
+    ],
+    "median_peak_rss_bytes": 70369280,
+    "peak_rss_range_bytes": [
+      70352896,
+      70778880
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 22644,
+    "vm_median_range_ns": [
+      22477,
+      24568
+    ],
+    "median_peak_rss_bytes": 52117504,
+    "peak_rss_range_bytes": [
+      52019200,
+      52297728
+    ]
+  },
+  {
+    "fixture": "response_50",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 1244068,
+    "vm_median_range_ns": [
+      1241439,
+      1274757
+    ],
+    "median_peak_rss_bytes": 56115200,
+    "peak_rss_range_bytes": [
+      56049664,
+      56197120
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 2100,
+    "vm_median_range_ns": [
+      2077,
+      2101
+    ],
+    "median_peak_rss_bytes": 70631424,
+    "peak_rss_range_bytes": [
+      70533120,
+      70860800
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 9642,
+    "vm_median_range_ns": [
+      9607,
+      10211
+    ],
+    "median_peak_rss_bytes": 70631424,
+    "peak_rss_range_bytes": [
+      70303744,
+      70746112
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 1443,
+    "vm_median_range_ns": [
+      1441,
+      1638
+    ],
+    "median_peak_rss_bytes": 52166656,
+    "peak_rss_range_bytes": [
+      52133888,
+      52215808
+    ]
+  },
+  {
+    "fixture": "tagged_event",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 39377,
+    "vm_median_range_ns": [
+      38251,
+      39500
+    ],
+    "median_peak_rss_bytes": 52461568,
+    "peak_rss_range_bytes": [
+      52330496,
+      52527104
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 8093,
+    "vm_median_range_ns": [
+      8083,
+      8317
+    ],
+    "median_peak_rss_bytes": 70582272,
+    "peak_rss_range_bytes": [
+      70172672,
+      70647808
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 90572,
+    "vm_median_range_ns": [
+      89072,
+      92239
+    ],
+    "median_peak_rss_bytes": 70549504,
+    "peak_rss_range_bytes": [
+      70254592,
+      70631424
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 7755,
+    "vm_median_range_ns": [
+      6848,
+      7786
+    ],
+    "median_peak_rss_bytes": 52068352,
+    "peak_rss_range_bytes": [
+      52002816,
+      52740096
+    ]
+  },
+  {
+    "fixture": "text_plain",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 517572,
+    "vm_median_range_ns": [
+      502807,
+      525776
+    ],
+    "median_peak_rss_bytes": 55508992,
+    "peak_rss_range_bytes": [
+      55377920,
+      55918592
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 33091,
+    "vm_median_range_ns": [
+      32779,
+      33216
+    ],
+    "median_peak_rss_bytes": 70533120,
+    "peak_rss_range_bytes": [
+      70402048,
+      70615040
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 137187,
+    "vm_median_range_ns": [
+      132787,
+      140158
+    ],
+    "median_peak_rss_bytes": 70664192,
+    "peak_rss_range_bytes": [
+      70500352,
+      70959104
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 7487,
+    "vm_median_range_ns": [
+      7295,
+      8120
+    ],
+    "median_peak_rss_bytes": 52346880,
+    "peak_rss_range_bytes": [
+      52264960,
+      52428800
+    ]
+  },
+  {
+    "fixture": "text_escaped",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 732000,
+    "vm_median_range_ns": [
+      727966,
+      756791
+    ],
+    "median_peak_rss_bytes": 56639488,
+    "peak_rss_range_bytes": [
+      56557568,
+      56688640
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 27944,
+    "vm_median_range_ns": [
+      23975,
+      28472
+    ],
+    "median_peak_rss_bytes": 70516736,
+    "peak_rss_range_bytes": [
+      70402048,
+      70631424
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 52888,
+    "vm_median_range_ns": [
+      51894,
+      56722
+    ],
+    "median_peak_rss_bytes": 70516736,
+    "peak_rss_range_bytes": [
+      70434816,
+      70598656
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 3961,
+    "vm_median_range_ns": [
+      3877,
+      4450
+    ],
+    "median_peak_rss_bytes": 52166656,
+    "peak_rss_range_bytes": [
+      52101120,
+      52346880
+    ]
+  },
+  {
+    "fixture": "text_unicode",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 318522,
+    "vm_median_range_ns": [
+      309661,
+      349425
+    ],
+    "median_peak_rss_bytes": 54525952,
+    "peak_rss_range_bytes": [
+      54394880,
+      54558720
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 2488,
+    "vm_median_range_ns": [
+      2408,
+      2747
+    ],
+    "median_peak_rss_bytes": 70565888,
+    "peak_rss_range_bytes": [
+      70565888,
+      71303168
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 11692,
+    "vm_median_range_ns": [
+      11584,
+      12038
+    ],
+    "median_peak_rss_bytes": 70893568,
+    "peak_rss_range_bytes": [
+      70647808,
+      70893568
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 2286,
+    "vm_median_range_ns": [
+      1624,
+      2290
+    ],
+    "median_peak_rss_bytes": 52215808,
+    "peak_rss_range_bytes": [
+      51953664,
+      52510720
+    ]
+  },
+  {
+    "fixture": "schema_document",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 49106,
+    "vm_median_range_ns": [
+      48943,
+      49331
+    ],
+    "median_peak_rss_bytes": 52412416,
+    "peak_rss_range_bytes": [
+      52215808,
+      52592640
+    ]
+  }
+]

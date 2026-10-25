@@ -1,0 +1,100 @@
+[
+  {
+    "target": "erlang",
+    "fixture": "record",
+    "before_us": 6.477,
+    "after_us": 6.8,
+    "change_percent": 4.986876640419946
+  },
+  {
+    "target": "javascript",
+    "fixture": "record",
+    "before_us": 28.446,
+    "after_us": 25.565,
+    "change_percent": -10.127961752091686
+  },
+  {
+    "target": "erlang",
+    "fixture": "response_50",
+    "before_us": 277.92,
+    "after_us": 295.109,
+    "change_percent": 6.18487334484743
+  },
+  {
+    "target": "javascript",
+    "fixture": "response_50",
+    "before_us": 1244.068,
+    "after_us": 1094.738,
+    "change_percent": -12.003363160213109
+  },
+  {
+    "target": "erlang",
+    "fixture": "tagged_event",
+    "before_us": 9.642,
+    "after_us": 9.534,
+    "change_percent": -1.1200995644057299
+  },
+  {
+    "target": "javascript",
+    "fixture": "tagged_event",
+    "before_us": 39.377,
+    "after_us": 35.124,
+    "change_percent": -10.8007212332072
+  },
+  {
+    "target": "erlang",
+    "fixture": "text_plain",
+    "before_us": 90.572,
+    "after_us": 70.843,
+    "change_percent": -21.782670140882388
+  },
+  {
+    "target": "javascript",
+    "fixture": "text_plain",
+    "before_us": 517.572,
+    "after_us": 311.807,
+    "change_percent": -39.75582141228659
+  },
+  {
+    "target": "erlang",
+    "fixture": "text_escaped",
+    "before_us": 137.187,
+    "after_us": 121.458,
+    "change_percent": -11.46537208336067
+  },
+  {
+    "target": "javascript",
+    "fixture": "text_escaped",
+    "before_us": 732.0,
+    "after_us": 597.587,
+    "change_percent": -18.362431693989066
+  },
+  {
+    "target": "erlang",
+    "fixture": "text_unicode",
+    "before_us": 52.888,
+    "after_us": 46.161,
+    "change_percent": -12.719331417334745
+  },
+  {
+    "target": "javascript",
+    "fixture": "text_unicode",
+    "before_us": 318.522,
+    "after_us": 198.613,
+    "change_percent": -37.645437363824165
+  },
+  {
+    "target": "erlang",
+    "fixture": "schema_document",
+    "before_us": 11.692,
+    "after_us": 11.823,
+    "change_percent": 1.1204242216900528
+  },
+  {
+    "target": "javascript",
+    "fixture": "schema_document",
+    "before_us": 49.106,
+    "after_us": 41.226,
+    "change_percent": -16.04691891011282
+  }
+]

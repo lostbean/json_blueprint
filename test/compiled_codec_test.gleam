@@ -51,6 +51,37 @@ pub fn custom_codec_retains_the_known_schema_test() {
 
 // --- generated and runtime codecs agree ----------------------------------------
 
+@target(erlang)
+pub fn generated_integer_digit_boundary_matches_runtime_test() {
+  let runtime = materialize_fixtures.build_order_codec()
+  let largest = 999_999_999_999_999_999_999_999
+  list.each([largest, -largest], fn(count) {
+    let order =
+      materialize_fixtures.Order(..sample_order(), items: [#("item", count)])
+    let assert Ok(encoded) = order_codec.encode_order(order)
+    codec.encode(runtime, order) |> should.equal(Ok(encoded))
+    order_codec.decode_order(encoded) |> should.equal(Ok(order))
+    let assert Ok(text) = order_codec.encode_order_json(order)
+    codec.encode_json(runtime, order) |> should.equal(Ok(text))
+    order_codec.decode_order_json(text) |> should.equal(Ok(order))
+    order_codec.decode_order_json_native(text) |> should.equal(Ok(order))
+  })
+  list.each([largest + 1, -largest - 1], fn(count) {
+    let order =
+      materialize_fixtures.Order(..sample_order(), items: [#("item", count)])
+    let expected =
+      EncodeError(
+        [Field("items_\"list\""), Index(0), Index(1)],
+        codec.ExpectedInt,
+      )
+    codec.encode(runtime, order) |> should.equal(Error(expected))
+    order_codec.encode_order(order) |> should.equal(Error(expected))
+    order_codec.encode_order_json(order) |> should.equal(Error(expected))
+    codec.encode(order_codec.order_codec(), order)
+    |> should.equal(Error(expected))
+  })
+}
+
 pub fn generated_nested_codec_matches_runtime_codec_test() {
   let runtime = materialize_fixtures.build_order_codec()
   let generated = order_codec.order_codec()
@@ -557,6 +588,24 @@ pub fn generated_native_nested_integer_encoding_preserves_safety_errors_test() {
 }
 
 @target(erlang)
+pub fn generated_integer_range_projection_follows_wide_bounds_test() {
+  let assert Ok(bound) = number.parse("1e2000", number.limits(6, 1, 2000))
+  let assert Ok(maximum) = number.to_int(bound, 2001)
+  let c = codec.integer_between(-maximum, maximum)
+  list.each([-maximum, maximum], fn(item) {
+    let assert Ok(raw) = codec.encode(c, item)
+    generated.encode_integer_between(-maximum, maximum, item)
+    |> should.equal(Ok(raw))
+    generated.decode_integer_between(-maximum, maximum, raw)
+    |> should.equal(Ok(item))
+    let assert Ok(dynamic) =
+      json.parse(json.to_string(json.int(item)), decode.dynamic)
+    generated.decode_native_integer_between(-maximum, maximum, dynamic)
+    |> should.equal(Ok(item))
+  })
+}
+
+@target(erlang)
 pub fn native_integer_between_projects_integers_of_its_bounds_test() {
   // Bounds beyond 24 digits decode their whole range, as `codec.int()` does
   // not; strict and native decoding agree.
@@ -572,6 +621,12 @@ pub fn native_integer_between_projects_integers_of_its_bounds_test() {
   |> should.equal(Ok(large))
   generated.decode_native_integer_between(0, maximum, dynamic)
   |> should.equal(Ok(large))
+
+  generated.encode_integer_between(0, maximum, large)
+  |> should.equal(codec.encode(codec.integer_between(0, maximum), large))
+  let assert Ok(encoded) =
+    generated.encode_native_integer_between(0, maximum, large)
+  json.to_string(encoded) |> should.equal(text)
 
   // Beyond the bounds, both report the range rather than the digit count.
   let beyond = "10000000000000000000000000000000000000000"

@@ -186,10 +186,10 @@ pub fn public_decode_error_renderer_handles_paths_and_private_values_test() {
   let assert Error(error) =
     codec.decode_json(person_codec(), "{\"name\":\"Ada\",\"name\":\"x\"}")
   codec.describe_decode_error(error)
-  |> should.equal("invalid JSON at line 1, column 15: duplicate object key")
+  |> should.equal(duplicate_parse_message())
   let assert Error(error) = codec.decode_json(person_codec(), "{\"name\":")
   codec.describe_decode_error(error)
-  |> should.equal("invalid JSON at line 1, column 9: unexpected end of input")
+  |> should.equal(syntax_parse_message())
 }
 
 pub fn schema_json_exports_complete_document_test() {
@@ -321,4 +321,24 @@ pub fn record_duplicate_later_field_definition_test() {
 fn int_value(n: Int) -> value.Value {
   let assert Ok(v) = number.from_int(n)
   value.Number(v)
+}
+
+@target(erlang)
+fn duplicate_parse_message() -> String {
+  "invalid JSON: duplicate object key"
+}
+
+@target(javascript)
+fn duplicate_parse_message() -> String {
+  "invalid JSON at line 1, column 15: duplicate object key"
+}
+
+@target(erlang)
+fn syntax_parse_message() -> String {
+  "invalid JSON: native parser rejected the document"
+}
+
+@target(javascript)
+fn syntax_parse_message() -> String {
+  "invalid JSON at line 1, column 9: unexpected end of input"
 }

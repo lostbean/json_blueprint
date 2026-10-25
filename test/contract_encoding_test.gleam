@@ -82,7 +82,7 @@ pub fn value_codec_preserves_exact_numbers_and_member_order_test() {
   let valid = parsed("{\"note\":\"retained order\",\"amount\":1e400}")
   codec.encode(payload, valid) |> should.equal(Ok(valid))
   codec.encode_json(payload, valid)
-  |> should.equal(Ok("{\"note\":\"retained order\",\"amount\":1e400}"))
+  |> should.equal(Ok(value.to_string(valid)))
   codec.to_json(payload, valid)
   |> should.equal(
     Error(codec.EncodeError(

@@ -106,8 +106,6 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
   let p_limits =
     value.default_limits()
     |> value.with_max_bytes(100_000)
-    |> value.with_max_depth(32)
-    |> value.with_number_limits(num_limits)
 
   // 1. Number parse and canonicalize benchmark (7 tokens per batch)
   let number_tokens = [

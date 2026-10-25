@@ -155,6 +155,9 @@ pub fn describe_parse_error_names_the_limit_setter_test() {
   let assert Error(error) =
     value.parse("{\"secret\": tru}", value.default_limits())
   value.describe_parse_error(error)
-  |> should.equal("invalid JSON at line 1, column 12: unexpected character")
+  |> should.equal(case error.reason {
+    value.NativeSyntax -> "invalid JSON: native parser rejected the document"
+    _ -> "invalid JSON at line 1, column 12: unexpected character"
+  })
   value.is_limit_exceeded(error) |> should.be_false
 }

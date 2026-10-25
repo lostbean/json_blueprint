@@ -4,7 +4,7 @@
 #let body = [
   #section(title: "Foundation", lead: [One definition supplies typed conversion and an inspectable JSON contract.], body: [
     #goal(title: "Describe schema-aware data once")[Applications retain one #term("term-codec") for JSON conversion, schema publication, and schema-aware composition. Runtime schema documents produce contracts for wire validation.]
-    #goal(title: "Reject hostile input within explicit bounds")[Strict text admission retains exact numbers and duplicate-key evidence. Limits bound input bytes, nesting, value count, and numeric tokens.]
+    #goal(title: "Reject hostile input within explicit bounds")[Strict text admission retains exact numbers and duplicate-key evidence. A byte limit bounds admission; consumers own depth, value-count and numeric policies.]
     #goal(title: "Keep the published 1.x API available")[The frozen 1.x API remains available for its established wire formats and recursive types.]
     #invariant(title: "Number comparison preserves mathematical value", enforcement: "mechanism")[#term("term-exact-number") comparison and integrality never pass through Float. Native construction and projection check target representation limits.]
     #invariant(title: "A witness retains the value that was validated", enforcement: "mechanism")[A #term("term-validated-value") retains an immutable value and the accepting normalized schema. A replacement value requires another validation.]
@@ -13,13 +13,14 @@
     #principle(title: "Keep wire acceptance separate from native projection")[A schema may accept an exact value that a requested native type cannot represent. Callers distinguish schema rejection, parse rejection, and native conversion failure.]
     #principle(title: "Keep callback ownership explicit")[Caller mappings own their laws and application checks. A retained schema does not certify a callback's inverse, purity, or encoding behavior.]
     #points(
-      [Ownership and finite support are recorded in #adr(1). Number policy is recorded in #adr(2). Strict admission bounds are recorded in #adr(3).],
+      [Ownership and finite support are recorded in #adr(1). Number policy is recorded in #adr(2). Byte-only native admission supersedes #adr(3) in #adr(14).],
     )
   ])
 
   #pagebreak(weak: true)
   #pending-ledger(
     pending-entry(title: "Broader schema families need concrete contracts", kind: "build", since: "2026-09-20", adr: [#adr(1)])[String constraints, broader numeric and collection constraints, arbitrary alternatives, numeric enums, aliases, and recursive references are outside the profile. Their limits, annotation policies, and validation rules are undefined; see Unsupported schema families.],
+    pending-entry(title: "Consumer evolution policies need explicit contracts", kind: "ruling", since: "2026-10-25")[Prioritize optional unknown-field handling, dictionaries, basic string/list lengths, one-sided numeric bounds, configurable union envelopes and local recursive references. Before implementation, define accepted input versus emitted output, retention of extra fields, schema projection and reference identity. The current strict defaults and frozen legacy access remain in force; formal deprecation requires a supported migration for recursive data and established wire formats.],
     pending-entry(title: "Retain complete compatibility verification", kind: "verify", since: "2026-10-02", adr: [#adr(7)])[Published source, legacy wire, recursive references, error paths, numeric boundaries, and deliberate acceptance corrections need separate fixtures. Existing examples and frozen comparators do not prove complete 1.x compatibility.],
     pending-entry(title: "Keep numerical oracle scope separate from projection", kind: "verify", since: "2026-09-20", adr: [#adr(2)])[The finite schema manifest compares Boolean acceptance for its selected cases. Broader numerical evidence must compare exact schema acceptance separately from native overflow, safe-integer refusal, and intentional Float rounding.],
     pending-entry(title: "Check the legacy and error-path claims against code", kind: "verify", since: "2026-10-17")[The 1 MiB decode precheck, its configurable bound and the object-index cutoff match the source. The remaining provisions carried over from the retired 1.x guides are not yet checked against code: the Draft-07 label statements, error-path rendering, number-projection limits and the legacy wire envelopes. The migration examples and the schema oracle exercise part of them.],
@@ -91,7 +92,7 @@
     #points(
       [Value objects have no persistent identifiers, mutable state fields, commands that change them, or emitted domain events. There is no vacant or revoked state to model: replacement discards the previous value and requires fresh evidence.],
       [Sum types model Value, SchemaView, typed failures, and union construction. Products model errors with paths, properties, variants, parse locations, and generated source results. Numeric bounds and enum membership are refinements on accepted values.],
-      [Limits are immutable caller-authored settings. Their setters retain supplied values; nonpositive limits reject inputs according to the relevant bound rather than admitting an unbounded sentinel.],
+      [Limits are immutable caller-authored settings. The byte setter retains its supplied value; a nonpositive byte limit rejects every input.],
     )
   ])
 
@@ -124,35 +125,31 @@
     ]
     #subsection(title: "Strict document admission")[
       #points(
-        [Text parsing checks UTF-8 byte size before allocating the document tree. Byte parsing additionally reports the first invalid UTF-8 byte. A valid document has exactly one root value followed only by JSON whitespace; trailing content rejects.],
-        [Each scalar, array, and object counts once, including the root and object member values. Object names do not add another value count. Depth counts nested arrays and objects; depth zero permits scalar roots only.],
+        [Text parsing checks UTF-8 byte size before allocating the document tree. On JavaScript, a raw unpaired UTF-16 surrogate then fails with InvalidUnicodeScalar before UTF-8 conversion can replace it. Its location is the end of the valid prefix, measured in UTF-8 bytes and grapheme columns. Byte parsing additionally reports the first invalid UTF-8 byte. A valid document has exactly one root value followed only by JSON whitespace; trailing content rejects.],
+        [Erlang uses OTP JSON hooks to reject duplicate names and retain exact integer values and decimal tokens. Built-in codecs decode the native tree directly; custom Value callbacks convert only their subtree. JavaScript retains the portable exact parser.],
       )
       #md-table(3, (
         [Bound], [Default], [Change],
         [Input bytes], [1,048,576], [with_max_bytes],
-        [Container depth], [64], [with_max_depth],
-        [Values], [262,144], [with_max_elements],
-        [Number token bounds], [1,024 / 800 / 1,200], [with_number_limits],
       ))
       #points(
-        [Raising the byte limit does not raise the value limit. There is no streaming admission or request-wide time budget. The caller has already allocated input text; byte admission is a bound on further parsing, not on prior transport allocation.],
-        [String admission validates escapes, four-digit Unicode escapes, and surrogate pairing. Literal control characters, malformed escapes, and unterminated strings reject. Object duplicate detection compares decoded names, so escaped equivalent names collide.],
-        [A per-object dictionary tracks names before their values are admitted. Duplicate detection cannot be replaced by last-write-wins map construction. Arrays and objects retain input order, while parsed strings are copied so small retained slices do not hold the whole source binary.],
-        [ParseError contains a zero-based byte offset and one-based line/column. Lines recognize LF, CR, and CRLF; columns count grapheme clusters. Parse errors retain no input text or unknown key string.],
+        [There is no global depth, value-count or numeric-token admission bound, streaming admission or request-wide time budget. The caller has already allocated input text; byte admission is not a heap quota. Consumers own structural policy.],
+        [String admission validates escapes and surrogate pairing. Literal control characters, malformed escapes, and unterminated strings reject. Object duplicate detection compares decoded names, so escaped equivalent names collide.],
+        [Erlang object members follow native map order. JavaScript retains source order. Arrays retain input order. Value conversion copies strings so small retained values do not retain the complete source binary.],
+        [JavaScript ParseError locations retain zero-based byte offsets and one-based line/column. Erlang native syntax and duplicate errors have an unavailable location, represented by zeroes; their description does not invent a source position. Public parse errors retain no input text. Syntax validation completes before typed callbacks run.],
       )
       #behavior(title: "The parser refuses repeated names", level: "boundary", area: "Strict admission")[
         #given[A document repeats the same decoded member name in one object.]
         #when[The application parses the document.]
-        #then[Parsing fails at the repeated name with DuplicateObjectKey.]
-        #then[No parsed tree is returned.]
+        #then[Parsing fails with DuplicateObjectKey and returns no parsed tree.]
       ]
-      #behavior(title: "Value count is independently bounded", level: "boundary", area: "Strict admission")[
-        #given[The next value would exceed the configured value count.]
-        #when[The application parses a document within its byte bound.]
-        #then[Admission returns ElementLimitExceeded at the next value.]
+      #behavior(title: "Host text cannot silently replace malformed Unicode", level: "boundary", area: "Strict admission")[
+        #given[JavaScript input text contains a raw unpaired surrogate and is within its byte bound.]
+        #when[The application parses the text through the strict entry point.]
+        #then[Parsing fails with InvalidUnicodeScalar at the first unpaired surrogate without retaining source text in the error.]
       ]
       #points(
-        [#adr(3) records the independent admission bounds. Source: #lnk("../../../src/json/blueprint/value.gleam")[value parser]. #lnk("../../../test/bounded_parsing_test.gleam")[bounded parsing] and #lnk("../../../test/value_parse_test.gleam")[grammar cases] cover the admission boundary. Resource measurements remain operational guidance in README; they are not hard heap quotas.],
+        [#adr(14) records byte-only native admission and supersedes the independent limits in #adr(3). Source: #lnk("../../../src/json/blueprint/value.gleam")[value parser]. #lnk("../../../test/bounded_parsing_test.gleam")[admission tests] and #lnk("../../../test/value_parse_test.gleam")[grammar cases] cover the boundary. Benchmark observations are not hard heap quotas.],
       )
     ]
     #subsection(title: "Rendering and standard JSON bridges")[
@@ -172,7 +169,7 @@
       #md-table(3, (
         [Constructor], [Native and JSON shape], [Acceptance and encoding rule],
         [string / bool], [String / Bool], [Exact JSON type; placeholder empty string / false],
-        [int], [Native Int / mathematical integer], [Decode output at most 24 digits and target-safe; encode checks native safety],
+        [int], [Native Int / mathematical integer], [Both directions require at most 24 digits and target safety; a longer encoded integer returns ExpectedInt, an unsafe JavaScript integer returns UnsafeInteger],
         [float], [Float / number], [Decode nearest binary64, refuse overflow; encode shortest roundtrip decimal],
         [number], [Number / number], [Exact passthrough without native projection],
         [integer_between], [Int / bounded mathematical integer], [Inclusive safe-native bounds; projection digits derive from bounds],
@@ -193,6 +190,12 @@
         #given[A native Some value has an inner encoder that produces null.]
         #when[The application encodes it through nullable.]
         #then[Encoding returns NullInsideNullable instead of losing its native distinction.]
+      ]
+      #behavior(title: "Integer encoding preserves its decoding domain", level: "boundary", area: "Constructor acceptance")[
+        #given[A native integer exceeds the plain integer codec's digit domain.]
+        #when[The application encodes it through that codec.]
+        #then[Encoding refuses it rather than producing a value that the same codec cannot decode.]
+        #then[Explicit integer ranges retain their separate bound-derived digit domain.]
       ]
       #points(
         [Sources: #lnk("../../../src/json/blueprint/codec.gleam")[constructors], #lnk("../../../test/codec_test.gleam")[codec cases], and #lnk("../../../test/api_control_test.gleam")[public failure handling].],
@@ -325,7 +328,7 @@
         [A witness for the mathematical integer 1e30 can still fail codec.int native decoding due to its 24-digit projection bound or JavaScript safety. A witness for a finite exact number beyond binary64 can fail codec.float with FloatOutOfRange. Those outcomes do not invalidate the mathematical schema.],
         [contract.value_codec supplies Codec(Value) with the contract's schema. Encoding and decoding validate against that same finite schema. Successful conversion returns the supplied Value unchanged, retaining object order and exact numbers. A failure retains the validation path and Reason in the operation's EncodeError or DecodeError. Enclosing record and collection codecs prepend their Field and Index paths.],
         [This adapter validates structure and supported value constraints on each call without projecting exact numbers into native types. Typed and generated codecs retain their own encoding checks; they do not gain a separate schema-validation pass. Schema acceptance does not certify caller callbacks or business policy. #adr(6) records the scope and migration cost.],
-        [Direct validate/load have no independent depth, width, or time guard. Values supplied through strict parsing inherit those parse bounds; manually assembled values do not. Consumers choose bounded construction/admission where their threat model requires it.],
+        [Direct validate/load have no independent depth, width, or time guard. Parsed text has a byte-admission bound, which is not a heap quota; manually assembled values carry no admission proof. Consumers choose bounded construction/admission where their threat model requires it.],
         [Object validation searches names with string-specific comparisons up to 40 input members and builds a temporary dictionary above that count. A direct check of the first 32 members rejects an early name failure before the dictionary is built. Accepted values, member order, and first-error paths do not depend on the cutoff, and the dictionary is discarded after each validation. #adr(9) records the trade-off.],
       )
       #behavior(title: "The dynamic codec enforces its contract when encoding", level: "boundary", area: "Value encoding")[
@@ -380,12 +383,13 @@
         [The frozen manifest holds the finite cases in named families. Duplicate-key evidence is checked before native export can erase it. Exact-number kernel tests and target float-bit tests remain separate from this Boolean finite corpus. The retained 62-case Erlang arithmetic oracle executes the public number API and independently recomputes its results with Python Decimal and Fraction; both-target unit tests retain native-integer differences.],
         [Constructor law tests cover admitted native encode/decode and valid re-encoding where applicable. The contract-backed Value adapter enforces finite schema acceptance in both directions. Custom mapping and native projection constraints require their own explicit law scope.],
         [Hostile tests exercise parser grammar, resource bounds, duplicate keys, malformed/unsupported schemas, and deterministic generated inputs. Wide collection traversal uses tail-recursive paths where the implementation supplies them; caller-constructed unbounded trees retain no guaranteed stack bound.],
+        [The pinned JSONTestSuite byte corpus runs on both targets without network access. Two upstream-valid duplicate-name documents are explicit strict-policy refusals; each implementation-defined fixture has a declared result. Deterministic generated documents and mutations compare acceptance and exact rendered meaning with Python JSON decoding using Decimal. Successful byte admission also agrees with text admission and parse/render/parse. This bounded corpus is not exhaustive fuzzing or general conformance certification.],
         [Sources: #lnk("../../../test/schema_check.py")[independent checker], #lnk("../../../test/schema_manifest.json")[frozen manifest], #lnk("../../../test/schema_oracle_test.gleam")[runtime cases], and #lnk("../../../test/hostile_test.gleam")[hostile cases]. #lnk("../../ORACLE.md")[The oracle document] pins the references, states reproducible commands and evidence limits; #adr(2) records the source attribution.],
       )
     ]
     #subsection(title: "Native host boundaries")[
       #points(
-        [Erlang/OTP and Node targets exercise the same public contracts with explicit safe-integer differences. Number FFI owns host byte handling, integer admission, binary64 parts, exact decimal/binary comparison, and exact decimal expansion. JSON FFI owns bounded byte checks and copied strings; internal dynamic FFI preserves legacy/native decoder conversion.],
+        [Erlang/OTP and Node targets exercise the common public contracts with explicit safe-integer, object-order, parse-location and runtime-capacity differences. Number FFI owns host byte handling, integer admission, binary64 parts, exact decimal/binary comparison, and exact decimal expansion. JSON FFI owns bounded byte checks, JavaScript host-string scalar validation and copied strings; internal dynamic FFI preserves legacy/native decoder conversion.],
         [FFI cannot trust an external host caller's Gleam type annotation. JavaScript adversarial tests inject nonfinite, fractional, unsafe, and previously rounded Int values. Native function name/arity changes need explicit upgrade audits because foreign callers bypass Gleam compiler checks.],
         [Sources: #lnk("../../../src/json_number_ffi.erl")[Erlang number FFI], #lnk("../../../src/json_number_ffi.mjs")[JavaScript number FFI], #lnk("../../../src/json_blueprint_ffi.erl")[Erlang JSON FFI], and #lnk("../../../src/json_blueprint_ffi.mjs")[JavaScript JSON FFI].],
       )
@@ -396,7 +400,7 @@
   #section(title: "End-to-end walkthrough", lead: [A caller retains one User codec, admits text, publishes its schema, and can validate runtime data before native conversion.], body: [
     #points(
       [User has name:String, age:Int bounded zero through 150, optional email:String, and Role encoded as admin/member. The record builder ends in User(name:, age:, email:, role:) and supplies native getters for each field.],
-      [The input {"name":"Ada","age":36,"role":"admin"} passes byte/depth/value/number admission, retains exact age, and decodes email as None. Encoding omits email. Schema publication includes closed properties, required name/age/role, exact age bounds, and the enum labels.],
+      [The input {"name":"Ada","age":36,"role":"admin"} passes byte admission, retains exact age, and decodes email as None. Encoding omits email. Schema publication includes closed properties, required name/age/role, exact age bounds, and the enum labels.],
     )
     #sequence(title: "Validation precedes native conversion", caption: [The sequence is synchronous. Callback behavior belongs to the retained native codec; no process or transport is implied.], participants: (
       (id: "app", label: "Application", shape: "actor"),

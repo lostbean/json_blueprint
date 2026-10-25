@@ -18,6 +18,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/order
 import gleam/result
+import gleam/string
 import json/blueprint/codec.{
   type DecodeError, type EncodeError, DecodeError, EncodeError, Field, Index,
 }
@@ -97,6 +98,23 @@ pub fn decode_string(raw: Value) -> Result(String, DecodeError) {
 }
 
 pub fn encode_int(item: Int) -> Result(Value, EncodeError) {
+  use encoded <- result.try(encode_safe_int(item))
+  use Nil <- result.map(check_int_digits(item))
+  encoded
+}
+
+fn check_int_digits(item: Int) -> Result(Nil, EncodeError) {
+  case digit_count(item) <= 24 {
+    True -> Ok(Nil)
+    False -> refuse(codec.ExpectedInt)
+  }
+}
+
+fn digit_count(item: Int) -> Int {
+  string.length(int.to_string(int.absolute_value(item)))
+}
+
+fn encode_safe_int(item: Int) -> Result(Value, EncodeError) {
   case number.from_int(item) {
     Ok(parsed) -> Ok(value.Number(parsed))
     Error(_) -> refuse(codec.UnsafeInteger)
@@ -141,7 +159,7 @@ pub fn encode_integer_between(
   item: Int,
 ) -> Result(Value, EncodeError) {
   case item >= minimum && item <= maximum {
-    True -> encode_int(item)
+    True -> encode_safe_int(item)
     False -> refuse(codec.IntegerOutsideRange(minimum, maximum))
   }
 }
@@ -165,7 +183,10 @@ pub fn decode_integer_between(
             && number.compare(item, upper) != order.Gt
           {
             True ->
-              number.to_int(item, 2000)
+              number.to_int(
+                item,
+                int.max(digit_count(minimum), digit_count(maximum)),
+              )
               |> result.replace_error(DecodeError([], codec.ExpectedInt))
             False -> fail(codec.IntegerOutsideRange(minimum, maximum))
           }
@@ -370,6 +391,12 @@ pub fn decode_mapped(
 // --- gleam/json ----------------------------------------------------------------
 
 pub fn encode_native_int(item: Int) -> Result(json.Json, EncodeError) {
+  use encoded <- result.try(encode_native_safe_int(item))
+  use Nil <- result.map(check_int_digits(item))
+  encoded
+}
+
+fn encode_native_safe_int(item: Int) -> Result(json.Json, EncodeError) {
   case number.from_int(item) {
     Ok(_) -> Ok(json.int(item))
     Error(_) -> refuse(codec.UnsafeInteger)
@@ -382,7 +409,7 @@ pub fn encode_native_integer_between(
   item: Int,
 ) -> Result(json.Json, EncodeError) {
   case item >= minimum && item <= maximum {
-    True -> encode_native_int(item)
+    True -> encode_native_safe_int(item)
     False -> refuse(codec.IntegerOutsideRange(minimum, maximum))
   }
 }

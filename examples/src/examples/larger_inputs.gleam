@@ -1,8 +1,5 @@
-//// Larger inputs.
-////
-//// The defaults admit 1 MiB of text, nesting depth 64 and 262,144 values.
-//// Raise a limit for a known-large document with the `value.with_*` setters;
-//// raising the byte limit does not raise the value limit.
+//// Larger inputs. Raise the byte limit for a known-large document.
+//// Consumers own structural and application-specific admission policies.
 
 import examples/record.{Admin, User, user_codec}
 import gleam/option
@@ -15,7 +12,6 @@ pub fn decode_many(
   let limits =
     value.default_limits()
     |> value.with_max_bytes(8 * 1024 * 1024)
-    |> value.with_max_elements(2_000_000)
   codec.decode_json_with_limits(codec.list(user_codec()), text, limits)
 }
 

@@ -1,0 +1,3698 @@
+[
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      80,
+      115,
+      110,
+      47,
+      120
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      83,
+      123,
+      112,
+      59,
+      123
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      82,
+      133,
+      128,
+      52,
+      117
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70451200
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70598656
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70238208
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      115,
+      167,
+      93,
+      163,
+      88
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      109,
+      161,
+      92,
+      149,
+      92
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      116,
+      158,
+      95,
+      146,
+      93
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70172672
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 69959680
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70008832
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      661,
+      1066,
+      695,
+      596,
+      689
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      641,
+      928,
+      637,
+      449,
+      404
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      627,
+      919,
+      636,
+      459,
+      389
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51904512
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52068352
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52051968
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      2014,
+      1795,
+      1263,
+      3725,
+      794
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1832,
+      1778,
+      1446,
+      2183,
+      836
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      2047,
+      1976,
+      1344,
+      2466,
+      829
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52133888
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52346880
+  },
+  {
+    "fixture": "baseline_null",
+    "bytes": 4,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52199424
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      462,
+      365,
+      318,
+      383,
+      315
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      463,
+      366,
+      317,
+      376,
+      313
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      447,
+      387,
+      372,
+      427,
+      364
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70303744
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70336512
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70352896
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1658,
+      1730,
+      1459,
+      1328,
+      1295
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1375,
+      1383,
+      1296,
+      1330,
+      1292
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1344,
+      1383,
+      1293,
+      1304,
+      1286
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70107136
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70320128
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70418432
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      810,
+      998,
+      760,
+      594,
+      477
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      803,
+      1015,
+      743,
+      523,
+      497
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1048,
+      1089,
+      802,
+      517,
+      475
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51920896
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51691520
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52264960
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      14980,
+      10587,
+      8302,
+      8281,
+      6999
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      12606,
+      10491,
+      8165,
+      8345,
+      7617
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      13075,
+      10141,
+      8105,
+      8192,
+      7732
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52592640
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52248576
+  },
+  {
+    "fixture": "small_record",
+    "bytes": 36,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51855360
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1454,
+      1430,
+      1452,
+      1488,
+      1358
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1450,
+      1490,
+      1432,
+      1490,
+      1369
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1467,
+      1443,
+      1449,
+      1492,
+      1369
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70762496
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70533120
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70352896
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      6151,
+      6124,
+      6119,
+      6063,
+      6179
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      6317,
+      6299,
+      6100,
+      6087,
+      6138
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      5642,
+      5582,
+      5964,
+      5846,
+      5506
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70172672
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70336512
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70483968
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      984,
+      1083,
+      890,
+      682,
+      622
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      970,
+      1334,
+      843,
+      666,
+      647
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      1000,
+      1173,
+      881,
+      672,
+      639
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52494336
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51871744
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52019200
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      22683,
+      23330,
+      21623,
+      19913,
+      21996
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      22285,
+      23066,
+      21731,
+      20312,
+      20960
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 200,
+    "batch_ns_per_op": [
+      22577,
+      23183,
+      21882,
+      20203,
+      20790
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52297728
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52264960
+  },
+  {
+    "fixture": "object_10",
+    "bytes": 71,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52281344
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      13344,
+      15248,
+      14710,
+      14510,
+      14410
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      13236,
+      13327,
+      13047,
+      14209,
+      13328
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      15456,
+      13634,
+      12961,
+      13170,
+      13328
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70238208
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70516736
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70352896
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      136092,
+      138621,
+      141808,
+      142156,
+      131582
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      75607,
+      71751,
+      67057,
+      64648,
+      70279
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      68620,
+      68707,
+      67622,
+      78410,
+      80336
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70139904
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70451200
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70467584
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      3160,
+      3126,
+      3190,
+      3438,
+      2933
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      3013,
+      3029,
+      3044,
+      3529,
+      4366
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      2872,
+      2839,
+      2989,
+      3497,
+      2650
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51904512
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51920896
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52101120
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      197470,
+      183898,
+      184921,
+      184384,
+      187685
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      198199,
+      188340,
+      181557,
+      187839,
+      188748
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 113,
+    "batch_ns_per_op": [
+      200440,
+      187822,
+      187773,
+      185500,
+      192220
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52740096
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52920320
+  },
+  {
+    "fixture": "object_100",
+    "bytes": 881,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52936704
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      86719,
+      83794,
+      82525,
+      77828,
+      78493
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      81555,
+      80321,
+      83766,
+      78719,
+      77206
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      86879,
+      83921,
+      85041,
+      82185,
+      86919
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70320128
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70942720
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70713344
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      322530,
+      342155,
+      315669,
+      332643,
+      350354
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      356212,
+      358293,
+      348629,
+      349034,
+      335004
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      342398,
+      348669,
+      313178,
+      321495,
+      323027
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70418432
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70057984
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70090752
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      47398,
+      46752,
+      51303,
+      47333,
+      48497
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      47490,
+      47069,
+      50344,
+      46388,
+      46419
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      46189,
+      44335,
+      50057,
+      46576,
+      47013
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52543488
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51986432
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51970048
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      1160157,
+      1013988,
+      1018988,
+      1007851,
+      1235326
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      1148930,
+      1054043,
+      1017275,
+      1003018,
+      1122523
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 18,
+    "batch_ns_per_op": [
+      1150812,
+      1029490,
+      1008407,
+      1002219,
+      1129032
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 56541184
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 56655872
+  },
+  {
+    "fixture": "object_500",
+    "bytes": 5281,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 56721408
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      316218,
+      315343,
+      312541,
+      310083,
+      318333
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      314635,
+      316083,
+      311229,
+      315604,
+      293479
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      281510,
+      280010,
+      283291,
+      282427,
+      298312
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70320128
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70238208
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70090752
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      1859875,
+      1695354,
+      1772937,
+      1726083,
+      1540052
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      2100989,
+      2171656,
+      1999833,
+      1785073,
+      1563635
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      1840010,
+      1641479,
+      1784750,
+      1848218,
+      1697083
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 72040448
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 72220672
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 71843840
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      69573,
+      55833,
+      56250,
+      53875,
+      53573
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      69072,
+      56927,
+      53583,
+      52989,
+      53354
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      69364,
+      56000,
+      53364,
+      53718,
+      53666
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 51920896
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52183040
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52019200
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      10090906,
+      7418802,
+      8228229,
+      8825635,
+      8548250
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      8993083,
+      7373114,
+      7566916,
+      8101552,
+      7749291
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 4,
+    "batch_ns_per_op": [
+      8599531,
+      7745104,
+      7490364,
+      8283864,
+      9028583
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 63012864
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 63045632
+  },
+  {
+    "fixture": "dense_10000",
+    "bytes": 20001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 63094784
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      17968916,
+      13018291,
+      13725000,
+      16845209,
+      13881625
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      9371000,
+      6985958,
+      7755292,
+      7776042,
+      7262834
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      8726667,
+      6394708,
+      7205334,
+      7971042,
+      7501833
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 92946432
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 92667904
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 92930048
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      234252000,
+      212937667,
+      231153042,
+      211973875,
+      232457875
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      241960417,
+      213847417,
+      235273041,
+      216348667,
+      238000459
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      238745458,
+      231971542,
+      239129458,
+      220337500,
+      236809958
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 171114496
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 171360256
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 171753472
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1473791,
+      1491583,
+      1474417,
+      1469125,
+      1477458
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2061208,
+      1583625,
+      1518458,
+      1532291,
+      1524083
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1494125,
+      1436958,
+      1464500,
+      1443333,
+      1469875
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 56688640
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 56786944
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 57065472
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      265235084,
+      278617166,
+      309556209,
+      253430333,
+      256492042
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      267434542,
+      287736958,
+      316869917,
+      256865917,
+      257313209
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      250510459,
+      277936459,
+      315924792,
+      252485084,
+      257946042
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 253624320
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 253476864
+  },
+  {
+    "fixture": "dense_value_limit",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 253476864
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      197430,
+      196444,
+      192638,
+      200819,
+      204958
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      184389,
+      199958,
+      191027,
+      199250,
+      199569
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      229361,
+      211555,
+      205500,
+      213264,
+      211277
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70254592
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70320128
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70385664
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      548972,
+      556805,
+      546555,
+      539875,
+      533055
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      552111,
+      557666,
+      581097,
+      632541,
+      529958
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      536472,
+      546805,
+      539166,
+      524861,
+      538666
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70107136
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70254592
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70254592
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      42513,
+      35916,
+      39125,
+      38458,
+      32958
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      33055,
+      34430,
+      37180,
+      32041,
+      32375
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      36333,
+      37611,
+      38513,
+      37083,
+      35291
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52477952
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52150272
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52051968
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      5054722,
+      4527722,
+      4302180,
+      4289541,
+      4341222
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      5027069,
+      4592944,
+      4282236,
+      4273514,
+      4304527
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 3,
+    "batch_ns_per_op": [
+      5013361,
+      4528583,
+      4266708,
+      4275125,
+      4277986
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 57147392
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 57360384
+  },
+  {
+    "fixture": "escaped_unicode",
+    "bytes": 25301,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 57196544
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      137475,
+      142050,
+      139591,
+      138125,
+      145675
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      122308,
+      121808,
+      120750,
+      126391,
+      134016
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      141966,
+      144700,
+      139983,
+      138483,
+      148316
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70123520
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70336512
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70729728
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      800416,
+      849291,
+      914966,
+      856100,
+      875941
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      933100,
+      862391,
+      753600,
+      888041,
+      884616
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      814458,
+      828400,
+      908550,
+      751550,
+      740941
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70533120
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70090752
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70336512
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      32425,
+      27583,
+      26925,
+      26725,
+      26900
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      30933,
+      28208,
+      27683,
+      27533,
+      27100
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      30900,
+      29058,
+      28516,
+      28333,
+      28475
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52068352
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52658176
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 52133888
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      4668808,
+      4184216,
+      4241791,
+      4074158,
+      3824916
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      4713366,
+      4244275,
+      4241750,
+      4100825,
+      4062641
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 5,
+    "batch_ns_per_op": [
+      4638725,
+      4499216,
+      4239725,
+      4144625,
+      4004475
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 61571072
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 61259776
+  },
+  {
+    "fixture": "decimals_1000",
+    "bytes": 17001,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 61440000
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1666,
+      375,
+      291,
+      208,
+      2416
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1750,
+      459,
+      250,
+      208,
+      2292
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1041,
+      292,
+      250,
+      250,
+      2791
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70221824
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70107136
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 70516736
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1833,
+      292,
+      166,
+      167,
+      2709
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      1833,
+      375,
+      208,
+      166,
+      2333
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2000,
+      292,
+      167,
+      166,
+      2208
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 75726848
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 76038144
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 75710464
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      10208,
+      8167,
+      10500,
+      5833,
+      7458
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      10667,
+      8542,
+      9791,
+      6083,
+      7792
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      11041,
+      8167,
+      9542,
+      6208,
+      7959
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 53329920
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 53723136
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 53116928
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2152875,
+      2138041,
+      2139042,
+      2141667,
+      2165584
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2206959,
+      2181000,
+      2213292,
+      2191667,
+      2184167
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2175125,
+      2141500,
+      2168666,
+      2176458,
+      2178417
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 53313536
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 54034432
+  },
+  {
+    "fixture": "reject_early",
+    "bytes": 524287,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 53149696
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      10566666,
+      7815458,
+      7493084,
+      7442416,
+      8222542
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      10077625,
+      7932125,
+      7595167,
+      7208208,
+      7316000
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      9901834,
+      7645500,
+      7071666,
+      7499208,
+      7827542
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 84885504
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 84705280
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 85065728
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      205994958,
+      209021167,
+      215668125,
+      206423833,
+      220558917
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      227431625,
+      220668208,
+      222674834,
+      207666750,
+      221936875
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      229613083,
+      259929584,
+      258678792,
+      233500542,
+      247936084
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 171212800
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 171098112
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "erlang",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 171573248
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2478542,
+      2471416,
+      2474250,
+      2509417,
+      2608834
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2323709,
+      2710042,
+      2339584,
+      2358417,
+      2363292
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      2227042,
+      2241500,
+      2242500,
+      2183959,
+      2323916
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 59949056
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 59949056
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "native",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 60096512
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      284164542,
+      282266958,
+      308619625,
+      284629042,
+      284902208
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      277445541,
+      287926708,
+      290336958,
+      296742708,
+      279525375
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "timing",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": [
+      276797334,
+      275083084,
+      275225500,
+      274865417,
+      277472541
+    ],
+    "peak_rss_bytes": null
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 1,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 249888768
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 2,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 251281408
+  },
+  {
+    "fixture": "reject_late",
+    "bytes": 524289,
+    "target": "javascript",
+    "backend": "strict",
+    "mode": "memory",
+    "trial": 3,
+    "iterations": 1,
+    "batch_ns_per_op": null,
+    "peak_rss_bytes": 251068416
+  }
+]

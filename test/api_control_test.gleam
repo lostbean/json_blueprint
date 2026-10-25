@@ -88,17 +88,9 @@ pub fn explicit_limits_and_exact_float_defaults_test() {
   |> should.equal(Ok(largest))
 
   let assert Ok(num) = number.from_float_exact(0.1)
-  let tight_numbers =
-    number.limits(
-      max_token_bytes: 8,
-      max_significant_digits: 4,
-      max_exponent: 10,
-    )
   let tight =
     value.default_limits()
     |> value.with_max_bytes(8)
-    |> value.with_max_depth(2)
-    |> value.with_number_limits(tight_numbers)
   let assert Error(error) =
     codec.decode_json_with_limits(codec.number(), number.to_string(num), tight)
   codec.is_limit_exceeded(error) |> should.be_true

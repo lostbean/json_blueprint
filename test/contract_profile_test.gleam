@@ -76,7 +76,7 @@ pub fn supported_closed_object_preserves_native_decoding_and_rejection_test() {
     use name <- codec.field("name", codec.string(), get: fn(r) { r.name })
     codec.success(Request(name))
   }
-  let limits = value.default_limits() |> value.with_max_depth(8)
+  let limits = value.default_limits()
   let assert Ok(remote) =
     contract.parse(
       document(

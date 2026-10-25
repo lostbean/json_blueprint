@@ -50,7 +50,7 @@
         [Package tests], [Compilation with warnings as errors and the test suite on Erlang and JavaScript for the runtime and generators in the root package],
         [Usage examples], [The examples package builds with warnings as errors, runs its tests on Erlang and JavaScript, and runs once; every usage topic and the legacy and migration forms are compiled code],
         [Schema consumer], [Fresh generation in disposable packages, tests on both targets, and an isolated production build without development dependencies],
-        [Independent oracles], [A Python checker compares emitted schemas, decoders and contracts with a Draft 2020-12 validator; a second checker covers retained profile diagnostics. #lnk("../ORACLE.md")[The oracle document] pins the references and states the limits of the comparison],
+        [Independent oracles], [Python checkers compare schemas with a Draft 2020-12 validator, exact arithmetic with Decimal/Fraction, and both-target parsing with a pinned upstream corpus and generated cases. #lnk("../ORACLE.md")[The oracle document] pins the references and states the limits of each comparison],
       ))
       #points(
         [The package gate removes each package's build output first, so an obsolete compiled module cannot hide a missing source module. Runtime logs are evidence and never substitute for compiler diagnostics.],

@@ -1,0 +1,131 @@
+warning: Git tree '/Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint' is dirty
+Gleam magic
+== json_blueprint
+  Compiling json_blueprint
+   Compiled in 0.58s
+  Compiling json_blueprint
+   Compiled in 0.18s
+   Compiled in 0.20s
+    Running json_blueprint_test.main
+.............................................................................................................................................................................................................................................................................................................
+301 passed, no failures
+   Compiled in 0.03s
+    Running json_blueprint_test.main
+.............................................................................................................................................................................................................................................................................................................
+301 passed, no failures
+Downloading packages
+ Downloaded 4 packages in 0.01s
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+   Compiled in 0.83s
+    Running compiled_codec_runner.main
+Generated test/generated/order_codec.gleam
+Generated test/generated/option_codec.gleam
+  Compiling json_blueprint
+   Compiled in 0.31s
+    Running schema_codegen_runner.main
+  Compiling json_blueprint
+   Compiled in 0.21s
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+   Compiled in 0.23s
+== examples
+  Resolving versions
+Downloading packages
+ Downloaded 4 packages in 0.05s
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+  Compiling json_blueprint_examples
+   Compiled in 0.95s
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+  Compiling json_blueprint_examples
+   Compiled in 0.13s
+   Compiled in 0.20s
+    Running json_blueprint_examples_test.main
+........................
+24 passed, no failures
+   Compiled in 0.02s
+    Running json_blueprint_examples_test.main
+........................
+24 passed, no failures
+   Compiled in 0.19s
+    Running json_blueprint_examples.main
+  Resolving versions
+Downloading packages
+ Downloaded 3 packages in 0.02s
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling json_blueprint
+  Compiling schema_order_generate
+   Compiled in 0.68s
+   Compiled in 0.20s
+    Running generate_order.main
+Generated commerce/order.gleam
+Generated projection/numbers.gleam
+  Resolving versions
+Downloading packages
+ Downloaded 4 packages in 0.03s
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+  Compiling schema_order_consumer
+   Compiled in 0.73s
+  Resolving versions
+   Compiled in 0.22s
+    Running schema_order_consumer_test.main
+..........
+10 passed, no failures
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling gleeunit
+  Compiling json_blueprint
+  Compiling schema_order_consumer
+   Compiled in 0.13s
+   Compiled in 0.02s
+    Running schema_order_consumer_test.main
+..........
+10 passed, no failures
+  Resolving versions
+Downloading packages
+ Downloaded 3 packages in 0.02s
+      Added gleam_crypto v1.6.0
+      Added gleam_json v3.1.0
+      Added gleam_stdlib v1.0.5
+      Added json_blueprint v2.0.0
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling json_blueprint
+  Compiling schema_order_consumer
+   Compiled in 0.71s
+  Resolving versions
+  Compiling gleam_stdlib
+  Compiling gleam_crypto
+  Compiling gleam_json
+  Compiling json_blueprint
+  Compiling schema_order_consumer
+   Compiled in 0.13s
+PASS: all 85 schema/decoder/contract cases agree with Draft202012Validator
+50 schema-profile fixtures checked against Draft 2020-12
+PASS: 62 independent exact-number cases
+PASS: erlang: 318 upstream + 901 generated parser cases (seed 20261025)
+PASS: javascript: 318 upstream + 901 generated parser cases (seed 20261025)
+erlang {'correctness': True}
+javascript {'correctness': True}

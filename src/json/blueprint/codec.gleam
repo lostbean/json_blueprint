@@ -1,5 +1,5 @@
 //// Bidirectional JSON codecs: one `Codec(a)` encodes a Gleam value, decodes
-//// JSON text strictly, and describes the JSON as a Draft 2020-12 schema.
+//// JSON text, and describes the JSON as a Draft 2020-12 schema.
 ////
 //// Describe a record once with `field`, `optional_field` and `success`, then
 //// use it in both directions:
@@ -58,8 +58,11 @@
 //// fields reports its path when the dependent field's codec is built from
 //// the fields before it; see `try_map`.
 ////
-//// `decode_json` parses with `value.default_limits()`: 1 MiB of text, depth
-//// 64 and 262,144 values; `decode_json_with_limits` takes other limits.
+//// `decode_json` applies a 1 MiB byte bound and rejects duplicate keys.
+//// `decode_json_with_limits` takes a different byte bound. Erlang decodes
+//// built-in codecs directly from the native parse tree; custom codecs and
+//// `value()` materialize their requested `Value` subtree. JavaScript uses
+//// the portable parser. Neither path applies a depth or value-count limit.
 //// `to_json` and `decoder` bridge to `gleam/json` and
 //// `gleam/dynamic/decode`.
 ////
@@ -119,6 +122,7 @@ import gleam/order
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import json/blueprint/internal/native
 import json/blueprint/internal/schema_tree.{type Tree} as tree
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
@@ -365,6 +369,7 @@ pub opaque type Codec(a) {
   Codec(
     encode: fn(a) -> Result(Value, EncodeError),
     decode: fn(Value) -> Result(a, DecodeError),
+    native_decode: fn(native.Raw) -> Result(a, DecodeError),
     // The schema, `None` when unknown, or the first definition mistake.
     // Computed on demand, so record codecs built inside a decode stay cheap.
     definition: fn() -> Result(Option(Tree), DefinitionError),
@@ -381,6 +386,7 @@ type Fields(a) {
     encode: fn(a) -> Result(List(#(String, Value)), EncodeError),
     // Decode from the members, and count the members used.
     decode: fn(List(#(String, Value))) -> Result(#(a, Int), DecodeError),
+    native_decode: fn(native.Raw) -> Result(#(a, Int), DecodeError),
     names: fn() -> List(String),
     properties: fn() -> Result(List(Property), DefinitionError),
   )
@@ -440,22 +446,35 @@ pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
   encode(codec, item) |> result.map(value.to_string)
 }
 
-/// Parse JSON text strictly within `value.default_limits()` and decode it.
-/// Duplicate keys are rejected and numbers stay exact. A parse failure is
+/// Parse JSON text within the default byte bound and decode it.
+/// Duplicate keys are rejected; numeric projection follows the selected codec.
+/// A parse failure is
 /// `DecodeError([], InvalidJson(error))`.
 pub fn decode_json(codec: Codec(a), text: String) -> Result(a, DecodeError) {
   decode_json_with_limits(codec, text, value.default_limits())
 }
 
-/// Like `decode_json`, within other limits.
+/// Like `decode_json`, with a caller-selected byte bound.
 pub fn decode_json_with_limits(
   codec: Codec(a),
   text: String,
   limits: value.Limits,
 ) -> Result(a, DecodeError) {
-  case value.parse(text, limits) {
-    Error(error) -> Error(DecodeError([], InvalidJson(error)))
-    Ok(raw) -> codec.decode(raw)
+  case native.supported() {
+    True -> {
+      use raw <- result.try(
+        value.parse_native(text, limits)
+        |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) }),
+      )
+      codec.native_decode(raw)
+    }
+    False -> {
+      use raw <- result.try(
+        value.parse(text, limits)
+        |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) }),
+      )
+      codec.decode(raw)
+    }
   }
 }
 
@@ -563,10 +582,18 @@ pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
 fn leaf(
   encode: fn(a) -> Result(Value, EncodeError),
   decode: fn(Value) -> Result(a, DecodeError),
+  native_decode: fn(native.Raw) -> Result(a, DecodeError),
   schema: Tree,
   placeholder: a,
 ) -> Codec(a) {
-  Codec(encode, decode, fn() { Ok(Some(schema)) }, fn() { placeholder }, None)
+  Codec(
+    encode,
+    decode,
+    native_decode,
+    fn() { Ok(Some(schema)) },
+    fn() { placeholder },
+    None,
+  )
 }
 
 fn fail(reason: Reason) -> Result(a, DecodeError) {
@@ -587,6 +614,10 @@ pub fn string() -> Codec(String) {
         _ -> fail(ExpectedString)
       }
     },
+    fn(raw) {
+      native.string(raw)
+      |> result.replace_error(DecodeError([], ExpectedString))
+    },
     tree.StringSchema,
     "",
   )
@@ -597,9 +628,25 @@ pub fn string() -> Codec(String) {
 /// Decoding accepts any exact integer spelling, such as `12`, `12.0` or
 /// `1.2e1`, of at most 24 digits. A longer integer, a fraction, or on
 /// JavaScript an integer outside ±9,007,199,254,740,991 fails with
-/// `ExpectedInt`; use `number()` for larger values.
+/// `ExpectedInt`; use `number()` for larger values. Encoding also refuses
+/// integers longer than 24 digits with `ExpectedInt`; unsafe JavaScript
+/// integers fail with `UnsafeInteger`.
 pub fn int() -> Codec(Int) {
-  leaf(encode_int, decode_int, tree.IntSchema, 0)
+  leaf(
+    fn(item) {
+      use encoded <- result.try(encode_int(item))
+      case digit_count(item) <= 24 {
+        True -> Ok(encoded)
+        False -> refuse(ExpectedInt)
+      }
+    },
+    decode_int,
+    fn(raw) {
+      native.int(raw) |> result.replace_error(DecodeError([], ExpectedInt))
+    },
+    tree.IntSchema,
+    0,
+  )
 }
 
 fn encode_int(item: Int) -> Result(Value, EncodeError) {
@@ -644,6 +691,13 @@ pub fn float() -> Codec(Float) {
         _ -> fail(ExpectedNumber)
       }
     },
+    fn(raw) {
+      case native.float(raw) {
+        Ok(item) -> Ok(item)
+        Error(native.NotNumber) -> fail(ExpectedNumber)
+        Error(native.Unrepresentable) -> fail(FloatOutOfRange)
+      }
+    },
     tree.NumberSchema,
     0.0,
   )
@@ -659,6 +713,7 @@ pub fn number() -> Codec(Number) {
         _ -> fail(ExpectedNumber)
       }
     },
+    native_number,
     tree.NumberSchema,
     zero(),
   )
@@ -667,6 +722,15 @@ pub fn number() -> Codec(Number) {
 fn zero() -> Number {
   let assert Ok(found) = number.from_int(0)
   found
+}
+
+fn native_number(raw: native.Raw) -> Result(Number, DecodeError) {
+  native.number(raw) |> result.replace_error(DecodeError([], ExpectedNumber))
+}
+
+fn native_value(raw: native.Raw) -> Result(Value, DecodeError) {
+  value.from_native(raw)
+  |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) })
 }
 
 /// A JSON boolean.
@@ -678,6 +742,9 @@ pub fn bool() -> Codec(Bool) {
         value.Bool(item) -> Ok(item)
         _ -> fail(ExpectedBool)
       }
+    },
+    fn(raw) {
+      native.bool(raw) |> result.replace_error(DecodeError([], ExpectedBool))
     },
     tree.BoolSchema,
     False,
@@ -694,7 +761,7 @@ pub fn bool() -> Codec(Bool) {
 /// as `{}`. When a narrower schema for the value is known, use
 /// `contract.value_codec`, which validates the value on encoding and decoding.
 pub fn value() -> Codec(Value) {
-  leaf(Ok, Ok, tree.AnySchema, value.Null)
+  leaf(Ok, Ok, native_value, tree.AnySchema, value.Null)
 }
 
 // --- refinements -------------------------------------------------------------
@@ -737,6 +804,22 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
               }
           }
         _ -> fail(ExpectedInt)
+      }
+    },
+    native_decode: fn(raw) {
+      ensure(defect)
+      use item <- result.try(
+        native.number(raw) |> result.replace_error(DecodeError([], ExpectedInt)),
+      )
+      case number.is_integer(item) {
+        False -> fail(ExpectedInt)
+        True ->
+          case within(item, lower, upper) {
+            False -> fail(IntegerOutsideRange(minimum, maximum))
+            True ->
+              number.to_int(item, digits)
+              |> result.replace_error(DecodeError([], ExpectedInt))
+          }
       }
     },
     definition: fn() {
@@ -785,6 +868,14 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
         _ -> fail(ExpectedNumber)
       }
     },
+    native_decode: fn(raw) {
+      ensure(defect)
+      use item <- result.try(native_number(raw))
+      case within(item, minimum, maximum) {
+        True -> Ok(item)
+        False -> fail(NumberOutsideRange(minimum, maximum))
+      }
+    },
     definition: fn() {
       case defect {
         Some(error) -> Error(error)
@@ -824,6 +915,15 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
           }
         _ -> fail(ExpectedString)
       }
+    },
+    native_decode: fn(raw) {
+      ensure(defect)
+      use label <- result.try(
+        native.string(raw)
+        |> result.replace_error(DecodeError([], ExpectedString)),
+      )
+      list.key_find(variants, label)
+      |> result.replace_error(DecodeError([], UnknownEnumLabel))
     },
     definition: fn() {
       case defect {
@@ -897,6 +997,13 @@ pub fn list(of item: Codec(a)) -> Codec(List(a)) {
         _ -> fail(ExpectedArray)
       }
     },
+    native_decode: fn(raw) {
+      native.array_decode(
+        raw,
+        fn(raw, index) { item.native_decode(raw) |> at_decode(Index(index)) },
+        DecodeError([], ExpectedArray),
+      )
+    },
     definition: fn() { item.definition() |> map_schema(tree.ListSchema) },
     placeholder: fn() { [] },
     fields: None,
@@ -938,6 +1045,21 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
         _ -> fail(ExpectedArray)
       }
     },
+    native_decode: fn(raw) {
+      case native.array_items(raw) {
+        Ok([first, second]) -> {
+          use first <- result.try(
+            left.native_decode(first) |> at_decode(Index(0)),
+          )
+          use second <- result.try(
+            right.native_decode(second) |> at_decode(Index(1)),
+          )
+          Ok(#(first, second))
+        }
+        Ok(items) -> fail(WrongLength(2, list.length(items)))
+        Error(Nil) -> fail(ExpectedArray)
+      }
+    },
     definition: fn() {
       use first <- result.try(left.definition())
       use second <- result.map(right.definition())
@@ -970,6 +1092,12 @@ pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
       case raw {
         value.Null -> Ok(None)
         _ -> inner.decode(raw) |> result.map(Some)
+      }
+    },
+    native_decode: fn(raw) {
+      case native.is_null(raw) {
+        True -> Ok(None)
+        False -> inner.native_decode(raw) |> result.map(Some)
       }
     },
     definition: fn() { inner.definition() |> map_schema(tree.NullableSchema) },
@@ -1044,6 +1172,18 @@ pub fn field(
           }
         }
       },
+      native_decode: fn(members) {
+        case native.field(members, name) {
+          Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
+          Ok(raw) -> {
+            use item <- result.try(
+              codec.native_decode(raw) |> at_decode(Field(name)),
+            )
+            use #(record, used) <- result.map(rest(item).native_decode(members))
+            #(record, used + 1)
+          }
+        }
+      },
       names: fn() { prepend_name(name, rest(codec.placeholder()).names()) },
       properties: fn() {
         use found <- result.try(codec.definition())
@@ -1096,6 +1236,20 @@ pub fn optional_field(
           }
         }
       },
+      native_decode: fn(members) {
+        case native.field(members, name) {
+          Error(Nil) -> rest(None).native_decode(members)
+          Ok(raw) -> {
+            use item <- result.try(
+              codec.native_decode(raw) |> at_decode(Field(name)),
+            )
+            use #(record, used) <- result.map(rest(Some(item)).native_decode(
+              members,
+            ))
+            #(record, used + 1)
+          }
+        }
+      },
       names: fn() { prepend_name(name, rest(None).names()) },
       properties: fn() {
         use found <- result.try(codec.definition())
@@ -1112,6 +1266,7 @@ pub fn success(value: r) -> Codec(r) {
     Fields(
       encode: fn(_) { Ok([]) },
       decode: fn(_) { Ok(#(value, 0)) },
+      native_decode: fn(_) { Ok(#(value, 0)) },
       names: fn() { [] },
       properties: fn() { Ok([]) },
     ),
@@ -1180,6 +1335,20 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
         _ -> fail(ExpectedObject)
       }
     },
+    native_decode: fn(raw) {
+      case native.keys(raw) {
+        Error(Nil) -> fail(ExpectedObject)
+        Ok(names) -> {
+          use #(record, used) <- result.try(fields.native_decode(raw))
+          case used == list.length(names) {
+            True -> Ok(record)
+            False ->
+              check_native_members(names, fields.names())
+              |> result.replace(record)
+          }
+        }
+      }
+    },
     definition: fn() {
       use properties <- result.map(fields.properties())
       properties
@@ -1214,6 +1383,20 @@ fn check_members(
   }
 }
 
+fn check_native_members(
+  names: List(String),
+  allowed: List(String),
+) -> Result(Nil, DecodeError) {
+  case names {
+    [] -> Ok(Nil)
+    [name, ..rest] ->
+      case list.contains(allowed, name) {
+        True -> check_native_members(rest, allowed)
+        False -> Error(DecodeError([Field(name)], UnknownField))
+      }
+  }
+}
+
 // --- unions ------------------------------------------------------------------
 
 /// The variants of a union under construction; see `union`.
@@ -1230,6 +1413,7 @@ type Variant(t) {
     tag: String,
     has_payload: Bool,
     decode: fn(Value) -> Result(t, DecodeError),
+    native_decode: fn(native.Raw) -> Result(t, DecodeError),
     definition: fn() -> Result(Option(Tree), DefinitionError),
     placeholder: fn() -> t,
   )
@@ -1283,6 +1467,10 @@ pub fn union(variants: Union(t)) -> Codec(t) {
       ensure(defect)
       decode_union(variants.variants, raw)
     },
+    native_decode: fn(raw) {
+      ensure(defect)
+      decode_native_union(variants.variants, raw)
+    },
     definition: fn() {
       case defect {
         Some(error) -> Error(error)
@@ -1314,6 +1502,9 @@ pub fn variant(
       tag:,
       has_payload: True,
       decode: fn(raw) { payload.decode(raw) |> result.map(construct) },
+      native_decode: fn(raw) {
+        payload.native_decode(raw) |> result.map(construct)
+      },
       definition: payload.definition,
       placeholder: fn() { construct(payload.placeholder()) },
     ),
@@ -1334,6 +1525,7 @@ pub fn unit_variant(
       tag:,
       has_payload: False,
       decode: fn(_) { Ok(item) },
+      native_decode: fn(_) { Ok(item) },
       definition: fn() { Ok(None) },
       placeholder: fn() { item },
     ),
@@ -1411,6 +1603,35 @@ fn decode_union(
 
 // --- mapping -----------------------------------------------------------------
 
+fn decode_native_union(
+  variants: List(Variant(t)),
+  raw: native.Raw,
+) -> Result(t, DecodeError) {
+  use names <- result.try(
+    native.keys(raw) |> result.replace_error(DecodeError([], ExpectedObject)),
+  )
+  use Nil <- result.try(check_native_members(names, ["tag", "value"]))
+  use tag_raw <- result.try(
+    native.field(raw, "tag")
+    |> result.replace_error(DecodeError([Field("tag")], MissingField)),
+  )
+  use tag <- result.try(
+    native.string(tag_raw)
+    |> result.replace_error(DecodeError([Field("tag")], ExpectedString)),
+  )
+  use variant <- result.try(
+    list.find(variants, fn(variant) { variant.tag == tag })
+    |> result.replace_error(DecodeError([Field("tag")], UnknownTag)),
+  )
+  case variant.has_payload, native.field(raw, "value") {
+    True, Ok(payload) ->
+      variant.native_decode(payload) |> at_decode(Field("value"))
+    True, Error(Nil) -> Error(DecodeError([Field("value")], MissingField))
+    False, Ok(_) -> Error(DecodeError([Field("value")], UnknownField))
+    False, Error(Nil) -> variant.native_decode(raw)
+  }
+}
+
 /// Convert a codec to another type with total conversions in both
 /// directions, such as `map(codec.string(), decode: Email, encode: fn(e) {
 /// e.address })`. The schema is unchanged.
@@ -1422,6 +1643,7 @@ pub fn map(
   Codec(
     encode: fn(item) { codec.encode(to(item)) },
     decode: fn(raw) { codec.decode(raw) |> result.map(from) },
+    native_decode: fn(raw) { codec.native_decode(raw) |> result.map(from) },
     definition: codec.definition,
     placeholder: fn() { from(codec.placeholder()) },
     fields: None,
@@ -1467,6 +1689,11 @@ pub fn try_map(
       from(inner)
       |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
     },
+    native_decode: fn(raw) {
+      use inner <- result.try(codec.native_decode(raw))
+      from(inner)
+      |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
+    },
     definition: codec.definition,
     placeholder: fn() { placeholder },
     fields: None,
@@ -1490,6 +1717,10 @@ pub fn custom(
   Codec(
     encode:,
     decode:,
+    native_decode: fn(raw) {
+      use raw <- result.try(native_value(raw))
+      decode(raw)
+    },
     definition: fn() {
       case schema {
         None -> Ok(None)

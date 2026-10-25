@@ -38,46 +38,22 @@ pub fn runtime_json_operations_preserve_arbitrary_numbers_test() {
 }
 
 pub fn runtime_json_decode_preserves_parser_and_codec_errors_test() {
+  let assert Error(parse_error) = value.parse("{", value.default_limits())
   codec.decode_json(codec.string(), "{")
-  |> should.equal(
-    Error(DecodeError(
-      [],
-      codec.InvalidJson(value.ParseError(
-        value.Location(1, 1, 2),
-        value.UnexpectedEndOfInput,
-      )),
-    )),
-  )
+  |> should.equal(Error(DecodeError([], codec.InvalidJson(parse_error))))
 
   codec.decode_json(codec.string(), "1")
   |> should.equal(Error(DecodeError([], codec.ExpectedString)))
 
-  codec.decode_json(
-    materialize_fixtures.build_order_codec(),
-    "{\"order_id\":1,\"order_id\":2}",
-  )
-  |> should.equal(
-    Error(DecodeError(
-      [],
-      codec.InvalidJson(value.ParseError(
-        value.Location(14, 1, 15),
-        value.DuplicateObjectKey,
-      )),
-    )),
-  )
+  let source = "{\"order_id\":1,\"order_id\":2}"
+  let assert Error(duplicate) = value.parse(source, value.default_limits())
+  codec.decode_json(materialize_fixtures.build_order_codec(), source)
+  |> should.equal(Error(DecodeError([], codec.InvalidJson(duplicate))))
 }
 
-pub fn runtime_json_decode_preserves_number_parser_limits_test() {
-  let assert Error(error) = codec.decode_json(codec.number(), "1e1201")
-  error
-  |> should.equal(DecodeError(
-    [],
-    codec.InvalidJson(value.ParseError(
-      value.Location(0, 1, 1),
-      value.InvalidNumber(number.ExponentOutOfRange),
-    )),
-  ))
-  codec.is_limit_exceeded(error) |> should.be_true
+pub fn runtime_json_decode_has_no_global_number_admission_limit_test() {
+  let assert Ok(actual) = codec.decode_json(codec.number(), "1e1201")
+  number.to_string(actual) |> should.equal("1e1201")
 }
 
 pub fn custom_codec_json_operations_use_its_value_functions_test() {

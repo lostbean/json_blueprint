@@ -1,7 +1,6 @@
 //// The strict parser behind `value.parse` and `value.parse_bits`.
 
 import gleam/bit_array
-import gleam/int
 import gleam/list
 import gleam/string
 import gleeunit/should
@@ -11,8 +10,6 @@ import json/blueprint/value
 fn test_limits() -> value.Limits {
   value.default_limits()
   |> value.with_max_bytes(10_000)
-  |> value.with_max_depth(16)
-  |> value.with_number_limits(number.limits(1024, 100, 1000))
 }
 
 pub fn limits_below_one_fail_closed_test() {
@@ -21,11 +18,6 @@ pub fn limits_below_one_fail_closed_test() {
   |> should.equal(
     Error(value.ParseError(value.Location(0, 1, 1), value.ByteLimitExceeded(0))),
   )
-  value.parse("null", limits |> value.with_max_depth(0)) |> should.be_ok
-  let assert Error(value.ParseError(_, value.DepthLimitExceeded(0))) =
-    value.parse("[]", limits |> value.with_max_depth(0))
-  let assert Error(value.ParseError(_, value.ElementLimitExceeded(0))) =
-    value.parse("null", limits |> value.with_max_elements(0))
 }
 
 pub fn parse_primitives_test() {
@@ -93,15 +85,17 @@ pub fn parse_arrays_and_objects_test() {
     value.Object(pairs) -> {
       let assert Ok(expected_age) = number.from_int(30)
       pairs
+      |> list.sort(fn(left, right) { string.compare(left.0, right.0) })
       |> should.equal([
-        #("name", value.String("Alice")),
         #("age", value.Number(expected_age)),
+        #("name", value.String("Alice")),
       ])
     }
     _ -> panic as "expected object"
   }
 }
 
+@target(javascript)
 pub fn duplicate_object_key_rejected_test() {
   let limits = test_limits()
 
@@ -123,12 +117,9 @@ pub fn byte_limit_enforced_test() {
   }
 }
 
-pub fn depth_limit_enforced_test() {
-  let limits = test_limits() |> value.with_max_depth(2)
-  case value.parse("[[[1]]]", limits) {
-    Error(value.ParseError(_, value.DepthLimitExceeded(2))) -> Nil
-    _ -> panic as "expected depth limit error"
-  }
+pub fn nesting_is_not_capped_by_parse_limits_test() {
+  let source = string.repeat("[", 100) <> "0" <> string.repeat("]", 100)
+  value.parse(source, test_limits()) |> should.be_ok
 }
 
 pub fn invalid_utf8_detected_test() {
@@ -192,6 +183,7 @@ pub fn invalid_utf8_cr_lf_crlf_locations_test() {
   }
 }
 
+@target(javascript)
 pub fn standalone_cr_whitespace_and_error_location_test() {
   let limits = test_limits()
 
@@ -212,6 +204,7 @@ pub fn standalone_cr_whitespace_and_error_location_test() {
   }
 }
 
+@target(javascript)
 pub fn hostile_syntax_errors_test() {
   let limits = test_limits()
 
@@ -246,13 +239,14 @@ pub fn hostile_syntax_errors_test() {
   }
 }
 
+@target(javascript)
 pub fn wide_object_resource_and_duplicate_boundary_test() {
   let limits = test_limits() |> value.with_max_bytes(10_000_000)
 
   // 1. Build a wide object with 2,000 distinct members
   let entries =
     list.index_map(list.repeat(Nil, 2000), fn(_, i) {
-      let idx = int.to_string(i + 1)
+      let idx = string.inspect(i + 1)
       "\"k" <> idx <> "\": " <> idx
     })
   let wide_valid = "{" <> string.join(entries, ", ") <> "}"
@@ -272,4 +266,95 @@ pub fn wide_object_resource_and_duplicate_boundary_test() {
     }
     _ -> panic as "expected duplicate key error for wide object"
   }
+}
+
+@target(javascript)
+pub fn string_runs_preserve_values_and_failure_locations_test() {
+  let limits = value.default_limits()
+  list.each(
+    list.index_map(list.repeat(Nil, 41), fn(_, index) { index }),
+    fn(length) {
+      let prefix = string.repeat("x", length)
+      list.each(
+        [
+          #("", ""),
+          #("plain text", "plain text"),
+          #("Olá 世界 👋🏽", "Olá 世界 👋🏽"),
+          #("\\nnext\\tline", "\nnext\tline"),
+          #("\\\"quote\\\\slash", "\"quote\\slash"),
+          #("\\uD83D\\uDE80", "🚀"),
+        ],
+        fn(pair) {
+          let source = "\"" <> prefix <> pair.0 <> "\""
+          let expected = Ok(value.String(prefix <> pair.1))
+          value.parse(source, limits) |> should.equal(expected)
+          value.parse_bits(bit_array.from_string(source), limits)
+          |> should.equal(expected)
+        },
+      )
+      list.each(["\n", "\r", "\t"], fn(control) {
+        let source = "\"" <> prefix <> control <> "\""
+        let expected =
+          Error(value.ParseError(
+            value.Location(length + 1, 1, length + 2),
+            value.UnexpectedCharacter,
+          ))
+        value.parse(source, limits) |> should.equal(expected)
+        value.parse_bits(bit_array.from_string(source), limits)
+        |> should.equal(expected)
+      })
+      value.parse("\"" <> prefix <> "\\q\"", limits)
+      |> should.equal(
+        Error(value.ParseError(
+          value.Location(length + 1, 1, length + 2),
+          value.InvalidEscape,
+        )),
+      )
+      value.parse("\"" <> prefix, limits)
+      |> should.equal(
+        Error(value.ParseError(
+          value.Location(0, 1, 1),
+          value.UnterminatedString,
+        )),
+      )
+    },
+  )
+}
+
+@target(erlang)
+pub fn native_parse_diagnostics_are_explicitly_unlocated_test() {
+  value.parse("[1,?]", test_limits())
+  |> should.equal(
+    Error(value.ParseError(value.Location(0, 0, 0), value.NativeSyntax)),
+  )
+  let assert Error(error) = value.parse("{\"a\":1,\"a\":2}", test_limits())
+  error
+  |> should.equal(value.ParseError(
+    value.Location(0, 0, 0),
+    value.DuplicateObjectKey,
+  ))
+  value.describe_parse_error(error)
+  |> should.equal("invalid JSON: duplicate object key")
+  value.is_limit_exceeded(error) |> should.be_false
+}
+
+pub fn duplicate_escaped_names_reject_on_both_backends_test() {
+  let assert Error(value.ParseError(_, value.DuplicateObjectKey)) =
+    value.parse("{\"a\":1,\"\\u0061\":2}", test_limits())
+  Nil
+}
+
+@target(javascript)
+pub fn portable_parser_reports_host_stack_capacity_test() {
+  let opens = string.repeat("[", 20_000)
+  list.each([opens, opens <> "0" <> string.repeat("]", 20_000)], fn(source) {
+    let expected =
+      Error(value.ParseError(
+        value.Location(0, 0, 0),
+        value.RuntimeCapacityExceeded,
+      ))
+    value.parse(source, value.default_limits()) |> should.equal(expected)
+    value.parse_bits(bit_array.from_string(source), value.default_limits())
+    |> should.equal(expected)
+  })
 }

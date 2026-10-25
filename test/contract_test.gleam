@@ -764,10 +764,10 @@ pub fn value_codec_validates_on_decode_test() {
   let good = object([#("limit", int_value(3))])
 
   codec.decode(payload, good) |> should.equal(Ok(good))
+  let assert Ok(parsed) =
+    value.parse("{\"note\":\"n\",\"limit\":10}", value.default_limits())
   codec.decode_json(payload, "{\"note\":\"n\",\"limit\":10}")
-  |> should.equal(
-    Ok(object([#("note", value.String("n")), #("limit", int_value(10))])),
-  )
+  |> should.equal(Ok(parsed))
 
   codec.decode(payload, object([#("limit", int_value(0))]))
   |> should.equal(

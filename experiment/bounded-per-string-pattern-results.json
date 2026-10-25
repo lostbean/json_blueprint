@@ -1,0 +1,1932 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "runs": [
+    {
+      "target": "erlang",
+      "fixture": "small_record",
+      "backend": "strict",
+      "bytes": 44,
+      "median_ns": 1939,
+      "samples_ns": [
+        1958,
+        1756,
+        1863,
+        1762,
+        1863,
+        2255,
+        1939,
+        2226,
+        2003,
+        2106,
+        1852,
+        1803,
+        1965,
+        1855,
+        1939
+      ],
+      "memory": [
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44338865,
+          "peak_rss": 71122944
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44338841,
+          "peak_rss": 71172096
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44338921,
+          "peak_rss": 71286784
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "small_record",
+      "backend": "native",
+      "bytes": 44,
+      "median_ns": 967,
+      "samples_ns": [
+        1020,
+        1031,
+        952,
+        925,
+        949,
+        971,
+        1085,
+        998,
+        967,
+        988,
+        943,
+        1021,
+        938,
+        952,
+        950
+      ],
+      "memory": [
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44450811,
+          "peak_rss": 71155712
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44450835,
+          "peak_rss": 71188480
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44450891,
+          "peak_rss": 70991872
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "small_record",
+      "backend": "lossless",
+      "bytes": 44,
+      "median_ns": 1083,
+      "samples_ns": [
+        1063,
+        1047,
+        1050,
+        1037,
+        1083,
+        1203,
+        1189,
+        1168,
+        1130,
+        1178,
+        1168,
+        1178,
+        1024,
+        931,
+        988
+      ],
+      "memory": [
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44468299,
+          "peak_rss": 71024640
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44468283,
+          "peak_rss": 71467008
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44468203,
+          "peak_rss": 71237632
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "small_record",
+      "backend": "bounded",
+      "bytes": 44,
+      "median_ns": 3576,
+      "samples_ns": [
+        3344,
+        3446,
+        3477,
+        3526,
+        3591,
+        3339,
+        3576,
+        3652,
+        3507,
+        3625,
+        4274,
+        3583,
+        3653,
+        3350,
+        3720
+      ],
+      "memory": [
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44401006,
+          "peak_rss": 71204864
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44400918,
+          "peak_rss": 71090176
+        },
+        {
+          "process_bytes": 2872,
+          "vm_bytes": 44401102,
+          "peak_rss": 71090176
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "records_50",
+      "backend": "strict",
+      "bytes": 2291,
+      "median_ns": 97825,
+      "samples_ns": [
+        92129,
+        95806,
+        97116,
+        97825,
+        97579,
+        97836,
+        98721,
+        101524,
+        97747,
+        87754,
+        98701,
+        97918,
+        92172,
+        100785,
+        101022
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44343049,
+          "peak_rss": 71139328
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44342937,
+          "peak_rss": 71024640
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44413153,
+          "peak_rss": 71385088
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "records_50",
+      "backend": "native",
+      "bytes": 2291,
+      "median_ns": 46020,
+      "samples_ns": [
+        46246,
+        47831,
+        46020,
+        43328,
+        47760,
+        43951,
+        43590,
+        41784,
+        50448,
+        46489,
+        48329,
+        49079,
+        45008,
+        43903,
+        45786
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44455195,
+          "peak_rss": 71122944
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44454987,
+          "peak_rss": 71401472
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44455059,
+          "peak_rss": 70975488
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "records_50",
+      "backend": "lossless",
+      "bytes": 2291,
+      "median_ns": 52412,
+      "samples_ns": [
+        53102,
+        48934,
+        51655,
+        53303,
+        52412,
+        53080,
+        53120,
+        52660,
+        52875,
+        53699,
+        49897,
+        45986,
+        49135,
+        49894,
+        51015
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44472499,
+          "peak_rss": 71188480
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44472363,
+          "peak_rss": 71499776
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44472731,
+          "peak_rss": 71335936
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "records_50",
+      "backend": "bounded",
+      "bytes": 2291,
+      "median_ns": 170613,
+      "samples_ns": [
+        166972,
+        164536,
+        171743,
+        172050,
+        171196,
+        173501,
+        169811,
+        170490,
+        171343,
+        171679,
+        162705,
+        174886,
+        167861,
+        169368,
+        170613
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44405222,
+          "peak_rss": 71335936
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44405126,
+          "peak_rss": 71041024
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44405406,
+          "peak_rss": 71548928
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "response_50",
+      "backend": "strict",
+      "bytes": 2301,
+      "median_ns": 95484,
+      "samples_ns": [
+        91019,
+        88136,
+        93112,
+        100240,
+        95736,
+        95892,
+        104241,
+        126655,
+        109578,
+        130182,
+        89063,
+        92796,
+        90802,
+        95403,
+        95484
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44343001,
+          "peak_rss": 71155712
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44342937,
+          "peak_rss": 71532544
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44413585,
+          "peak_rss": 71434240
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "response_50",
+      "backend": "native",
+      "bytes": 2301,
+      "median_ns": 45912,
+      "samples_ns": [
+        46170,
+        46571,
+        52215,
+        48388,
+        44099,
+        46027,
+        41223,
+        45598,
+        46024,
+        46287,
+        45912,
+        43374,
+        39789,
+        40811,
+        40583
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44402211,
+          "peak_rss": 71499776
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44454867,
+          "peak_rss": 71172096
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44455019,
+          "peak_rss": 71090176
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "response_50",
+      "backend": "lossless",
+      "bytes": 2301,
+      "median_ns": 52233,
+      "samples_ns": [
+        52122,
+        51684,
+        53061,
+        52702,
+        53489,
+        53922,
+        54001,
+        53952,
+        47646,
+        50251,
+        52233,
+        45735,
+        48083,
+        47315,
+        53075
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44472403,
+          "peak_rss": 71139328
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44472443,
+          "peak_rss": 70828032
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44472299,
+          "peak_rss": 71204864
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "response_50",
+      "backend": "bounded",
+      "bytes": 2301,
+      "median_ns": 164803,
+      "samples_ns": [
+        168990,
+        169476,
+        169090,
+        168133,
+        160177,
+        164803,
+        164355,
+        163861,
+        165373,
+        169824,
+        169605,
+        164014,
+        162768,
+        162551,
+        163398
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44405190,
+          "peak_rss": 71090176
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44405582,
+          "peak_rss": 71385088
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44405134,
+          "peak_rss": 70893568
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_10000",
+      "backend": "strict",
+      "bytes": 20001,
+      "median_ns": 2198648,
+      "samples_ns": [
+        2106745,
+        2292338,
+        2182314,
+        2219865,
+        2076189,
+        2215597,
+        2242782,
+        2265476,
+        2230310,
+        2079680,
+        2163064,
+        2270481,
+        2126338,
+        2177342,
+        2198648
+      ],
+      "memory": [
+        {
+          "process_bytes": 230528,
+          "vm_bytes": 44487734,
+          "peak_rss": 73908224
+        },
+        {
+          "process_bytes": 230528,
+          "vm_bytes": 44487638,
+          "peak_rss": 73728000
+        },
+        {
+          "process_bytes": 230528,
+          "vm_bytes": 44487678,
+          "peak_rss": 73596928
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_10000",
+      "backend": "native",
+      "bytes": 20001,
+      "median_ns": 865384,
+      "samples_ns": [
+        837222,
+        863027,
+        856106,
+        862268,
+        865384,
+        870990,
+        886736,
+        851740,
+        910037,
+        921722,
+        880027,
+        836500,
+        851939,
+        884912,
+        892226
+      ],
+      "memory": [
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44554759,
+          "peak_rss": 71729152
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44554767,
+          "peak_rss": 72105984
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44554767,
+          "peak_rss": 71581696
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_10000",
+      "backend": "lossless",
+      "bytes": 20001,
+      "median_ns": 1095472,
+      "samples_ns": [
+        1164074,
+        1055532,
+        1058513,
+        1066444,
+        1095472,
+        1117226,
+        1077416,
+        1080884,
+        1073254,
+        1109722,
+        1269087,
+        1226472,
+        1087254,
+        1243833,
+        1124574
+      ],
+      "memory": [
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44451228,
+          "peak_rss": 72400896
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44452012,
+          "peak_rss": 72286208
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44451980,
+          "peak_rss": 72499200
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_10000",
+      "backend": "bounded",
+      "bytes": 20001,
+      "median_ns": 1988213,
+      "samples_ns": [
+        2103120,
+        1979884,
+        1992537,
+        1990643,
+        2032518,
+        1829236,
+        1826486,
+        1829509,
+        1987435,
+        2232944,
+        2036847,
+        1866902,
+        1867541,
+        1988213,
+        2049296
+      ],
+      "memory": [
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44472495,
+          "peak_rss": 72040448
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44472623,
+          "peak_rss": 71974912
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44472631,
+          "peak_rss": 71958528
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_limit",
+      "backend": "strict",
+      "bytes": 524287,
+      "median_ns": 225742084,
+      "samples_ns": [
+        206275541,
+        229011000,
+        222455041,
+        216591166,
+        214878250,
+        208120042,
+        232163500,
+        226748291,
+        225742084,
+        213204167,
+        208243125,
+        239471459,
+        239068625,
+        233427042,
+        230508625
+      ],
+      "memory": [
+        {
+          "process_bytes": 6665216,
+          "vm_bytes": 51431038,
+          "peak_rss": 190709760
+        },
+        {
+          "process_bytes": 6665216,
+          "vm_bytes": 51431038,
+          "peak_rss": 190529536
+        },
+        {
+          "process_bytes": 6665216,
+          "vm_bytes": 51430974,
+          "peak_rss": 190808064
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_limit",
+      "backend": "native",
+      "bytes": 524287,
+      "median_ns": 25923709,
+      "samples_ns": [
+        29426542,
+        26772917,
+        25615958,
+        23799625,
+        22607250,
+        29181333,
+        29723625,
+        29461000,
+        25629709,
+        24548333,
+        28422084,
+        26740292,
+        25923709,
+        23844875,
+        21952625
+      ],
+      "memory": [
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51498271,
+          "peak_rss": 107102208
+        },
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51498263,
+          "peak_rss": 106708992
+        },
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51498207,
+          "peak_rss": 106921984
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_limit",
+      "backend": "lossless",
+      "bytes": 524287,
+      "median_ns": 39193041,
+      "samples_ns": [
+        42415417,
+        39625750,
+        39788291,
+        32107209,
+        38165750,
+        41126791,
+        37307292,
+        39193041,
+        31565625,
+        39155500,
+        42526208,
+        37960708,
+        40881958,
+        32996417,
+        39378708
+      ],
+      "memory": [
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51394660,
+          "peak_rss": 113491968
+        },
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51395276,
+          "peak_rss": 112820224
+        },
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51395308,
+          "peak_rss": 112721920
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "ints_limit",
+      "backend": "bounded",
+      "bytes": 524287,
+      "median_ns": 98325792,
+      "samples_ns": [
+        71030375,
+        150409250,
+        98325792,
+        99762458,
+        97373958,
+        70822000,
+        96444166,
+        93979166,
+        96957917,
+        98330291,
+        72956666,
+        102357625,
+        100313042,
+        101494750,
+        101108167
+      ],
+      "memory": [
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51415991,
+          "peak_rss": 112738304
+        },
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51416039,
+          "peak_rss": 112902144
+        },
+        {
+          "process_bytes": 6665232,
+          "vm_bytes": 51415927,
+          "peak_rss": 112721920
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "nested_100x100",
+      "backend": "strict",
+      "bytes": 20201,
+      "median_ns": 2212379,
+      "samples_ns": [
+        2212379,
+        2285375,
+        2182240,
+        2249467,
+        2232500,
+        2158213,
+        2073578,
+        2193291,
+        2109638,
+        2123828,
+        2330939,
+        2194791,
+        2257717,
+        2314463,
+        2330138
+      ],
+      "memory": [
+        {
+          "process_bytes": 230528,
+          "vm_bytes": 44487806,
+          "peak_rss": 73908224
+        },
+        {
+          "process_bytes": 230528,
+          "vm_bytes": 44487870,
+          "peak_rss": 73760768
+        },
+        {
+          "process_bytes": 230528,
+          "vm_bytes": 44487822,
+          "peak_rss": 73383936
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "nested_100x100",
+      "backend": "native",
+      "bytes": 20201,
+      "median_ns": 834976,
+      "samples_ns": [
+        832365,
+        839407,
+        776236,
+        831453,
+        801236,
+        799398,
+        811708,
+        834976,
+        815842,
+        842810,
+        872666,
+        837986,
+        865333,
+        863449,
+        837097
+      ],
+      "memory": [
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44555079,
+          "peak_rss": 71286784
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44555247,
+          "peak_rss": 71155712
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44554791,
+          "peak_rss": 71499776
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "nested_100x100",
+      "backend": "lossless",
+      "bytes": 20201,
+      "median_ns": 1069490,
+      "samples_ns": [
+        1040296,
+        1108495,
+        1043342,
+        1083893,
+        1085291,
+        1141713,
+        1101375,
+        1053046,
+        1113296,
+        1467861,
+        1069490,
+        1040620,
+        1020731,
+        1061949,
+        1060319
+      ],
+      "memory": [
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44452116,
+          "peak_rss": 71385088
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44452132,
+          "peak_rss": 71270400
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44452180,
+          "peak_rss": 71270400
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "nested_100x100",
+      "backend": "bounded",
+      "bytes": 20201,
+      "median_ns": 1831953,
+      "samples_ns": [
+        1866717,
+        1808504,
+        1831953,
+        1760587,
+        1768643,
+        1757796,
+        1749425,
+        1906606,
+        1852569,
+        1776111,
+        1859578,
+        1779439,
+        1897236,
+        1976347,
+        1836050
+      ],
+      "memory": [
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44472799,
+          "peak_rss": 71499776
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44442855,
+          "peak_rss": 71483392
+        },
+        {
+          "process_bytes": 230544,
+          "vm_bytes": 44472823,
+          "peak_rss": 71139328
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "strict",
+      "bytes": 20001,
+      "median_ns": 3425134,
+      "samples_ns": [
+        3602740,
+        3560000,
+        3494194,
+        3451041,
+        3457152,
+        3425134,
+        3260828,
+        3308000,
+        3439472,
+        3503097,
+        3328842,
+        3266527,
+        3295958,
+        3329495,
+        3377361
+      ],
+      "memory": [
+        {
+          "process_bytes": 55184,
+          "vm_bytes": 44385369,
+          "peak_rss": 71057408
+        },
+        {
+          "process_bytes": 55184,
+          "vm_bytes": 44385313,
+          "peak_rss": 71352320
+        },
+        {
+          "process_bytes": 55184,
+          "vm_bytes": 44385361,
+          "peak_rss": 71499776
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "native",
+      "bytes": 20001,
+      "median_ns": 219148,
+      "samples_ns": [
+        238615,
+        225310,
+        229194,
+        235926,
+        228453,
+        193555,
+        192379,
+        198462,
+        202722,
+        200250,
+        210305,
+        211490,
+        219148,
+        225851,
+        220713
+      ],
+      "memory": [
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44379655,
+          "peak_rss": 70893568
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44379727,
+          "peak_rss": 70811648
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44379543,
+          "peak_rss": 70975488
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "lossless",
+      "bytes": 20001,
+      "median_ns": 255277,
+      "samples_ns": [
+        260592,
+        263041,
+        266888,
+        253338,
+        246574,
+        255277,
+        246162,
+        252588,
+        245620,
+        261407,
+        261708,
+        271495,
+        252472,
+        260217,
+        250606
+      ],
+      "memory": [
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44276700,
+          "peak_rss": 71188480
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44275772,
+          "peak_rss": 71368704
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44276820,
+          "peak_rss": 71122944
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "backend": "bounded",
+      "bytes": 20001,
+      "median_ns": 1184870,
+      "samples_ns": [
+        1236768,
+        1192796,
+        1158569,
+        1147430,
+        1206527,
+        1209722,
+        1184416,
+        1205083,
+        1214935,
+        1184870,
+        1164495,
+        1175213,
+        1102305,
+        1193791,
+        1081111
+      ],
+      "memory": [
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44341866,
+          "peak_rss": 71172096
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44341890,
+          "peak_rss": 71057408
+        },
+        {
+          "process_bytes": 55200,
+          "vm_bytes": 44341850,
+          "peak_rss": 71073792
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "text_records_50",
+      "backend": "strict",
+      "bytes": 201691,
+      "median_ns": 1272834,
+      "samples_ns": [
+        1459625,
+        1401875,
+        1393708,
+        1438833,
+        1430416,
+        1307250,
+        1272834,
+        1249709,
+        1262625,
+        1281667,
+        1240750,
+        1243959,
+        1251875,
+        1249666,
+        1251500
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44745161,
+          "peak_rss": 71614464
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44745201,
+          "peak_rss": 71385088
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44745257,
+          "peak_rss": 71729152
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "text_records_50",
+      "backend": "native",
+      "bytes": 201691,
+      "median_ns": 849542,
+      "samples_ns": [
+        872708,
+        849542,
+        817083,
+        841125,
+        836167,
+        1008916,
+        928000,
+        896875,
+        908916,
+        1001542,
+        859166,
+        827084,
+        818667,
+        812708,
+        828458
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44654435,
+          "peak_rss": 71041024
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44654427,
+          "peak_rss": 71237632
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44654491,
+          "peak_rss": 71254016
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "text_records_50",
+      "backend": "lossless",
+      "bytes": 201691,
+      "median_ns": 922666,
+      "samples_ns": [
+        954667,
+        917750,
+        919417,
+        932708,
+        928708,
+        861250,
+        823917,
+        895750,
+        954250,
+        924542,
+        984084,
+        916584,
+        922666,
+        884000,
+        968083
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44671963,
+          "peak_rss": 71483392
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44671995,
+          "peak_rss": 71827456
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44672051,
+          "peak_rss": 71417856
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "text_records_50",
+      "backend": "bounded",
+      "bytes": 201691,
+      "median_ns": 1246959,
+      "samples_ns": [
+        1239375,
+        1305333,
+        1294750,
+        1220583,
+        1246959,
+        1223584,
+        1154000,
+        1141416,
+        1257166,
+        1204250,
+        1217584,
+        1285209,
+        1338042,
+        1307666,
+        1257625
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44604638,
+          "peak_rss": 71155712
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44604534,
+          "peak_rss": 70893568
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44604646,
+          "peak_rss": 71548928
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "optional_51",
+      "backend": "strict",
+      "bytes": 579,
+      "median_ns": 27455,
+      "samples_ns": [
+        25859,
+        25178,
+        24790,
+        25663,
+        25833,
+        28717,
+        27720,
+        27287,
+        28567,
+        28655,
+        30865,
+        27921,
+        27190,
+        27458,
+        27455
+      ],
+      "memory": [
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44338305,
+          "peak_rss": 70991872
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44338289,
+          "peak_rss": 70729728
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44338161,
+          "peak_rss": 71352320
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "optional_51",
+      "backend": "native",
+      "bytes": 579,
+      "median_ns": 14702,
+      "samples_ns": [
+        14087,
+        15401,
+        15612,
+        15146,
+        13539,
+        14200,
+        15083,
+        13868,
+        14087,
+        14058,
+        15586,
+        14167,
+        16277,
+        14702,
+        15376
+      ],
+      "memory": [
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44450203,
+          "peak_rss": 71417856
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44450051,
+          "peak_rss": 71237632
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44450243,
+          "peak_rss": 71483392
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "optional_51",
+      "backend": "lossless",
+      "bytes": 579,
+      "median_ns": 16596,
+      "samples_ns": [
+        16226,
+        15805,
+        16596,
+        16351,
+        17219,
+        14725,
+        16810,
+        16743,
+        16647,
+        17340,
+        14794,
+        15466,
+        17101,
+        18059,
+        16017
+      ],
+      "memory": [
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44450883,
+          "peak_rss": 71385088
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44450763,
+          "peak_rss": 71024640
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44450875,
+          "peak_rss": 71237632
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "optional_51",
+      "backend": "bounded",
+      "bytes": 579,
+      "median_ns": 46545,
+      "samples_ns": [
+        44066,
+        44173,
+        44194,
+        43842,
+        43884,
+        46545,
+        46529,
+        48506,
+        47875,
+        48005,
+        43887,
+        47473,
+        47614,
+        47624,
+        48404
+      ],
+      "memory": [
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44392694,
+          "peak_rss": 71499776
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44392422,
+          "peak_rss": 70893568
+        },
+        {
+          "process_bytes": 5888,
+          "vm_bytes": 44392470,
+          "peak_rss": 70959104
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "unicode_strings",
+      "backend": "strict",
+      "bytes": 33151,
+      "median_ns": 249250,
+      "samples_ns": [
+        249658,
+        249250,
+        248733,
+        259029,
+        257650,
+        250141,
+        238787,
+        233320,
+        246275,
+        239125,
+        240450,
+        237495,
+        281645,
+        259916,
+        252020
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44378847,
+          "peak_rss": 70991872
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44378895,
+          "peak_rss": 70959104
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44378815,
+          "peak_rss": 71368704
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "unicode_strings",
+      "backend": "native",
+      "bytes": 33151,
+      "median_ns": 286191,
+      "samples_ns": [
+        279104,
+        279070,
+        287550,
+        291250,
+        277000,
+        294441,
+        293787,
+        255270,
+        283745,
+        286191,
+        295075,
+        286287,
+        262125,
+        267883,
+        303791
+      ],
+      "memory": [
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44397616,
+          "peak_rss": 71204864
+        },
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44397608,
+          "peak_rss": 71417856
+        },
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44397544,
+          "peak_rss": 71319552
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "unicode_strings",
+      "backend": "lossless",
+      "bytes": 33151,
+      "median_ns": 294437,
+      "samples_ns": [
+        263395,
+        308400,
+        280258,
+        287279,
+        298179,
+        301812,
+        292979,
+        308800,
+        294437,
+        293654,
+        300187,
+        301733,
+        286562,
+        289608,
+        296591
+      ],
+      "memory": [
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44415056,
+          "peak_rss": 71188480
+        },
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44415176,
+          "peak_rss": 71663616
+        },
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44415176,
+          "peak_rss": 71090176
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "unicode_strings",
+      "backend": "bounded",
+      "bytes": 33151,
+      "median_ns": 359079,
+      "samples_ns": [
+        363975,
+        359079,
+        332375,
+        329350,
+        335420,
+        354116,
+        348108,
+        359220,
+        369183,
+        370112,
+        362125,
+        358958,
+        365812,
+        353354,
+        362062
+      ],
+      "memory": [
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44428795,
+          "peak_rss": 71139328
+        },
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44428835,
+          "peak_rss": 71041024
+        },
+        {
+          "process_bytes": 5904,
+          "vm_bytes": 44428875,
+          "peak_rss": 70909952
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "escaped_strings",
+      "backend": "strict",
+      "bytes": 32151,
+      "median_ns": 424784,
+      "samples_ns": [
+        476937,
+        450659,
+        436986,
+        443201,
+        425541,
+        443125,
+        424784,
+        398375,
+        412013,
+        430472,
+        398000,
+        395520,
+        406791,
+        386638,
+        408590
+      ],
+      "memory": [
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44373991,
+          "peak_rss": 70811648
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44373767,
+          "peak_rss": 70942720
+        },
+        {
+          "process_bytes": 8904,
+          "vm_bytes": 44373703,
+          "peak_rss": 70975488
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "escaped_strings",
+      "backend": "native",
+      "bytes": 32151,
+      "median_ns": 277201,
+      "samples_ns": [
+        265139,
+        269437,
+        275166,
+        263007,
+        248902,
+        284645,
+        278840,
+        277201,
+        279034,
+        281708,
+        289541,
+        276263,
+        279909,
+        270840,
+        280402
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44420752,
+          "peak_rss": 71286784
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44420656,
+          "peak_rss": 71368704
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44420768,
+          "peak_rss": 71204864
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "escaped_strings",
+      "backend": "lossless",
+      "bytes": 32151,
+      "median_ns": 283895,
+      "samples_ns": [
+        280986,
+        277166,
+        279256,
+        285604,
+        267069,
+        291687,
+        285006,
+        288763,
+        258805,
+        258888,
+        329909,
+        343902,
+        283895,
+        298312,
+        265145
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44438208,
+          "peak_rss": 70926336
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44438120,
+          "peak_rss": 71204864
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44438256,
+          "peak_rss": 71467008
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "escaped_strings",
+      "backend": "bounded",
+      "bytes": 32151,
+      "median_ns": 1781645,
+      "samples_ns": [
+        1802236,
+        1811381,
+        1795944,
+        1842652,
+        1876680,
+        1898784,
+        1781645,
+        1832840,
+        1761104,
+        1756618,
+        1724743,
+        1717708,
+        1710770,
+        1727541,
+        1777375
+      ],
+      "memory": [
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44451995,
+          "peak_rss": 71417856
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44451731,
+          "peak_rss": 71254016
+        },
+        {
+          "process_bytes": 8920,
+          "vm_bytes": 44451939,
+          "peak_rss": 71204864
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "exact_numbers_1000",
+      "backend": "strict",
+      "bytes": 20001,
+      "median_ns": 1003300,
+      "samples_ns": [
+        1003300,
+        954074,
+        974328,
+        1047064,
+        982467,
+        1011787,
+        963157,
+        973523,
+        903213,
+        973208,
+        1182995,
+        1285148,
+        1152157,
+        1451629,
+        1175101
+      ],
+      "memory": [
+        {
+          "process_bytes": 142856,
+          "vm_bytes": 44409248,
+          "peak_rss": 70926336
+        },
+        {
+          "process_bytes": 142856,
+          "vm_bytes": 44409312,
+          "peak_rss": 71073792
+        },
+        {
+          "process_bytes": 142856,
+          "vm_bytes": 44409216,
+          "peak_rss": 71401472
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "exact_numbers_1000",
+      "backend": "lossless",
+      "bytes": 20001,
+      "median_ns": 794027,
+      "samples_ns": [
+        775194,
+        746759,
+        820495,
+        1004194,
+        794027,
+        798736,
+        790125,
+        707824,
+        825490,
+        760300,
+        779041,
+        768379,
+        1551898,
+        868550,
+        809717
+      ],
+      "memory": [
+        {
+          "process_bytes": 142872,
+          "vm_bytes": 44385798,
+          "peak_rss": 71106560
+        },
+        {
+          "process_bytes": 142872,
+          "vm_bytes": 44363262,
+          "peak_rss": 70909952
+        },
+        {
+          "process_bytes": 142872,
+          "vm_bytes": 44385414,
+          "peak_rss": 71319552
+        }
+      ]
+    },
+    {
+      "target": "erlang",
+      "fixture": "exact_numbers_1000",
+      "backend": "bounded",
+      "bytes": 20001,
+      "median_ns": 1675652,
+      "samples_ns": [
+        1527273,
+        1644393,
+        1553597,
+        1640870,
+        1688527,
+        1572134,
+        1688333,
+        1677870,
+        1656814,
+        1710199,
+        1669833,
+        1675652,
+        1720500,
+        1730819,
+        1695555
+      ],
+      "memory": [
+        {
+          "process_bytes": 142872,
+          "vm_bytes": 44389937,
+          "peak_rss": 71794688
+        },
+        {
+          "process_bytes": 142872,
+          "vm_bytes": 44389857,
+          "peak_rss": 71237632
+        },
+        {
+          "process_bytes": 142872,
+          "vm_bytes": 44389809,
+          "peak_rss": 71303168
+        }
+      ]
+    }
+  ]
+}

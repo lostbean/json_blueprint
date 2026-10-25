@@ -15,6 +15,7 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 | Frozen manifest [`test/schema_manifest.json`](../test/schema_manifest.json) | this repository | checked-in behavioral fixtures | Case identities, instances, schemas and expected outcomes |
 | Diagnostic fixtures [`test/contract_profile_cases.json`](../test/contract_profile_cases.json) | this repository | checked in; 50 fixtures | Valid, unsupported and malformed schema documents with their diagnostic paths |
 | Source baseline 1.7.1 | this repository, commit `0e379c6491d34aca49795f716e87b9003df0130e` (MIT) | commit | The frozen 1.x source and wire contracts |
+| JSONTestSuite | <https://github.com/nst/JSONTestSuite> (MIT, Nicolas Seriot) | `1ef36fa01286573e846ac449e8683f8833c5b26a`; all 318 `test_parsing` files, original bytes in [`corpus.zip`](../test/oracle/json-test-suite/corpus.zip), with [license](../test/oracle/json-test-suite/LICENSE) and [hash/provenance](../test/oracle/json-test-suite/provenance.json) | Independent parser acceptance fixtures on both targets |
 | Oversight interface-laboratory probes | sibling workspace, commit `bd0b83743533313eb9b4eee2bf7f99ed68a26750` | commit | Origin of the initial exact-number and finite-schema cases; the source ledger declared no license, so no third-party grant is claimed |
 
 ## What is compared
@@ -41,6 +42,29 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
    oracle scope, including integers beyond JavaScript's safe range. Existing
    number unit tests continue on both targets with their explicit native-integer
    differences. This oracle uses no downloaded input.
+
+5. **Strict parsing** ([`test/parser_check.py`](../test/parser_check.py)) runs
+   all 318 pinned JSONTestSuite fixtures on Erlang and JavaScript. It preserves
+   invalid bytes rather than decoding them through the host first. All upstream
+   `n_` cases must reject; `y_` cases must accept except the two documented
+   duplicate-key fixtures, which must return the strict duplicate refusal.
+   Each of the 35 implementation-defined `i_` fixtures has an explicit expected
+   outcome: exact large numbers remain accepted without global numeric caps.
+   Invalid Unicode, non-UTF-8 text and a BOM reject. Extreme exponents can exceed
+   JavaScript's exact exponent representation; deep JavaScript input can exhaust
+   host stack capacity. Those outcomes are explicit target-specific failures.
+   Archive hash, identities, duplicate/missing results and process failures are
+   checked. A timeout fails the check rather than skipping cases.
+
+   Another 901 deterministic cases (seed `20261025`) exercise nested values,
+   Unicode and escapes, large integers, decimals, truncation, trailing garbage,
+   malformed containers and escaped duplicate names. Python JSON decoding with
+   symbolic normalized decimal coefficients/exponents and duplicate rejection
+   supplies independent acceptance and exact comparison, including huge Erlang
+   exponents that exceed Python Decimal's representation. Successful parses also check
+   byte/text agreement and parse/render/parse equality. This is a reproducible
+   generated corpus, not continuous fuzzing. Both corpora run offline in the
+   ordinary gate; they do not certify every JSON parser behavior or resource cost.
 
 ## Outcome classes
 
@@ -75,7 +99,8 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 nix develop --command python3 test/schema_check.py
 nix develop --command python3 test/schema_profile_check.py
 python3 test/number_check.py
-nix develop --command sh scripts/gate.sh   # the broader gate, which runs both
+python3 test/parser_check.py                  # both targets, offline corpus
+nix develop --command sh scripts/gate.sh   # the broader gate, including all oracles
 ```
 
 Use the focused checks when only schema agreement is at issue.

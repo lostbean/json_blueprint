@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "src/json/blueprint/value.gleam": "a289e812000a91dc5677ca42d98f449b5a1a3e84790aa9b8bce30a3ad57de5ea",
+    "src/json_blueprint_ffi.mjs": "acf63c54eb55cbda0cbc1ee69d9662ce33a6f53661fc6585393003cd5bf68899",
+    "scripts/parser_benchmark.py": "28bb8a02153563cfd2aebc4496ae5b62c200b5c9e8db782b8251778f207a62ff",
+    "test/parser_benchmark_runner.gleam": "66c596a08342514c80458f1afbfdb985368d348b1af10d9ae69685e88834977a"
+  },
+  "batched": {
+    "src/json/blueprint/value.gleam": "49c0472d0bafa824f551cc6352a44b2dd14daf6aa4198c5f600df0e61d9c3a12",
+    "src/json_blueprint_ffi.mjs": "acf63c54eb55cbda0cbc1ee69d9662ce33a6f53661fc6585393003cd5bf68899",
+    "scripts/parser_benchmark.py": "28bb8a02153563cfd2aebc4496ae5b62c200b5c9e8db782b8251778f207a62ff",
+    "test/parser_benchmark_runner.gleam": "66c596a08342514c80458f1afbfdb985368d348b1af10d9ae69685e88834977a"
+  },
+  "pair": {
+    "src/json/blueprint/value.gleam": "c441e2306181a66c68b724ee13e23ef9c1eb3de0aee3712a518b7bedee58d264",
+    "src/json_blueprint_ffi.mjs": "acf63c54eb55cbda0cbc1ee69d9662ce33a6f53661fc6585393003cd5bf68899",
+    "scripts/parser_benchmark.py": "28bb8a02153563cfd2aebc4496ae5b62c200b5c9e8db782b8251778f207a62ff",
+    "test/parser_benchmark_runner.gleam": "66c596a08342514c80458f1afbfdb985368d348b1af10d9ae69685e88834977a"
+  }
+}

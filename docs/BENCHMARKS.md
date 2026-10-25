@@ -11,6 +11,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 
 | Capture | Question | Decision record |
 | --- | --- | --- |
+| Strict and native parsing, 2026-10-25 | What do strict admission and its Value tree cost on representative and near-limit inputs? | [ADR 0003](adr/0003-strict-parsing-and-independent-resource-bounds.md), existing parser guarantees unchanged |
 | Contract encoding, 2026-10-08 | What does symmetric validation in `contract.value_codec` cost on encoding? | [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) |
 | Object validation, 2026-10-08 | What does indexing objects above 40 members change? | [ADR 0009](adr/0009-index-object-validation-above-forty-members.md) |
 | Schema-driven generation, 2026-10-08 | How do generated, handwritten and dynamic codecs compare, and what does generation cost? | [ADR 0008](adr/0008-development-time-source-generation.md) |
@@ -51,6 +52,8 @@ nix develop --command python3 scripts/contract_encoding_benchmark.py \
   --output .ci-results/contract-encoding-local --trials 3
 nix develop --command python3 scripts/schema_generation_benchmark.py \
   --output /tmp/schema-generation-results
+nix develop --command python3 scripts/parser_benchmark.py \
+  --output /tmp/parser-results --trials 3
 ```
 
 Every runner creates a fresh evidence directory and refuses to reuse one. The
@@ -68,6 +71,66 @@ collection, JIT, scheduling and frequency can change end-to-end figures, so smal
 deltas are not causal estimates.
 
 ## Retained results
+
+### Strict and native parsing, 2026-10-25
+
+The [capture](benchmarks/parser-2026-10-25/) retains all 264 observations,
+source and fixture hashes, commands, toolchain and host identity. It includes
+the handwritten codec's symmetric plain-integer encoding repair and JavaScript
+host-string Unicode check on top of revision `7875416`; the dirty source
+fingerprints identify the measured implementation. The subsequent generated
+integer-helper parity repair is outside these measured parser paths.
+
+This capture used macOS 27.0.1 on arm64, Gleam 1.19.2, Erlang/OTP 29 with
+`+S 1:1`, and Node 24.21.0. Each fixture/backend/target has three fresh sequential
+timing processes and three separate one-parse memory processes. Timing uses one
+warmup batch and five timed batches, with fewer iterations for larger inputs.
+The table reports the median of the three process medians. Full ranges and
+iteration counts remain in the artifacts. No CPU pinning or host isolation was
+used; repository builds and tests were paused during the capture.
+
+Both parsers receive the same text. Before timing, accepted fixtures compare
+exact values after normalizing object order; rejected fixtures must fail in both
+parsers. Every timed parse result reaches an observable sink. Strict parsing
+returns exact `Value` trees with duplicate and resource checks. Native parsing
+returns `Dynamic` through `gleam/json`, with different guarantees and
+representations. These are parser observations, not typed codec or equivalent-work
+comparisons. Fixture loading and semantic checks are outside the timing.
+
+| Fixture | Erlang strict / native, µs | Node strict / native, µs |
+| --- | ---: | ---: |
+| Small record | 1.330 / 0.366 | 8.302 / 0.760 |
+| 100-field object | 70.279 / 13.328 | 187.822 / 3.044 |
+| 500-field object | 332.643 / 82.525 | 1,029.490 / 47.069 |
+| 1,000 decimals | 856.100 / 139.591 | 4,239.725 / 27.683 |
+| 262,143 zeroes (524,287 bytes) | 235,273.041 / 7,755.292 | 265,235.084 / 1,474.417 |
+| Invalid first character, near-limit text | 0.292 / 0.375 | 2,175.125 / 8.167 |
+| Invalid final value, near-limit array | 221,936.875 / 7,645.500 | 284,629.042 / 2,358.417 |
+
+The JavaScript strict text path validates host-string scalar values and converts
+to UTF-8 before syntax parsing. An early syntax error therefore still incurs
+whole-input work. The 10-field object, 10,000-element array and escaped-Unicode
+cases are also retained in the summary.
+
+Memory processes invoke only the selected parser once, retaining its result.
+`wait4` records each process's high-water RSS, converted to bytes according to
+the operating system's units. This is **total process RSS**, including the VM,
+source and result; it is neither allocation nor isolated parser heap. No baseline
+subtraction is performed.
+
+| Fixture / target | Strict peak RSS, MiB | Native peak RSS, MiB |
+| --- | ---: | ---: |
+| Null / Erlang | 66.77 | 67.19 |
+| Null / Node | 49.78 | 49.64 |
+| Near-limit zero array / Erlang | 163.42 | 88.62 |
+| Near-limit zero array / Node | 241.73 | 54.16 |
+
+The near-limit case demonstrates substantial latency and memory costs even for
+half a MiB of text. Limits bound admission, not acceptable service latency or
+concurrency. The capture does not establish a consumer capacity budget, browser
+behavior, or that strict and native parsing are interchangeable. It supports
+further optimization work and explicit workload budgets, not a speed claim or
+a change to parser policy.
 
 ### Contract encoding, 2026-10-08
 
@@ -200,3 +263,117 @@ Parser limits are admission bounds, not heap quotas.
 - To reconstruct a baseline, use an isolated checkout of the baseline commit, copy
   the retained harness and runner into their current paths and apply
   [the formatting-only runner patch](benchmarks/contract-encoding-2026-10-08/before/runner-formatting.patch).
+
+
+## Strict string-scanning optimization, 2026-10-25
+
+This behavior-preserving pass keeps the strict Value parser. It scans ordinary
+string bytes in pairs and avoids chunk-list construction and concatenation for
+unescaped strings. Escape decoding, exact numbers, duplicate-key admission,
+resource limits, error locations and copied-string ownership are unchanged.
+There is no new FFI, dependency, parsing mode or public API.
+
+The existing parser harness now accepts `--workloads representative`. Its seven
+fixtures cover a small record, a response containing 50 records, a tagged event,
+plain/escaped/multilingual text, and a schema-shaped document. They are synthetic
+application-shaped inputs, not a measured production distribution. The default
+`stress` workload remains unchanged. This measures parsing into Value, not
+end-to-end application decoding or encoding.
+
+```sh
+nix develop --command python3 scripts/parser_benchmark.py \
+  --workloads representative --output /tmp/parser-observation
+```
+
+The capture used Gleam 1.19.2, OTP 29 and Node 24.21.0 on macOS arm64. Each
+backend/fixture/mode used three fresh sequential VMs; timing used a warmup batch
+and five timed batches. Peak RSS came from separate one-parse processes with the
+result retained. It includes the runtime and input and is not an allocation or
+retained-heap measurement. The installed Git binary was placed on PATH because
+the system Git shim was unavailable inside this machine's Nix shell.
+
+The [before](benchmarks/parser-optimization-2026-10-25/before/summary.json) and
+[final](benchmarks/parser-optimization-2026-10-25/after/summary.json) captures give
+these strict-parser medians, in microseconds:
+
+| Workload | Erlang before | Erlang after | JavaScript before | JavaScript after |
+| --- | ---: | ---: | ---: | ---: |
+| `record` | 6.48 | 6.80 | 28.45 | 25.57 |
+| `response_50` | 277.92 | 295.11 | 1244.07 | 1094.74 |
+| `tagged_event` | 9.64 | 9.53 | 39.38 | 35.12 |
+| `text_plain` | 90.57 | 70.84 | 517.57 | 311.81 |
+| `text_escaped` | 137.19 | 121.46 | 732.00 | 597.59 |
+| `text_unicode` | 52.89 | 46.16 | 318.52 | 198.61 |
+| `schema_document` | 11.69 | 11.82 | 49.11 | 41.23 |
+
+Text-heavy gains were repeatable across captures. Small Erlang record results
+were variable: this final sequential capture is slower for the record and
+50-record response, while the alternating capture improved the record and left
+the response close to baseline. Do not claim a reliable Erlang record speedup.
+The [alternating results](benchmarks/parser-optimization-2026-10-25/alternating/summary.json)
+rotate baseline, four-byte (`batched`) and selected two-byte (`pair`) variants
+between fresh VMs to reduce ordering bias. The two-byte variant avoids the
+four-byte variant's observed wide-object regression. Its source differs from the
+final file only in the scanner comment. Timing remains observational, never a
+correctness gate.
+
+In the separate [memory stress comparison](benchmarks/parser-optimization-2026-10-25/memory.json),
+the dense 262,143-zero array stayed at approximately 165 MiB total peak RSS on
+Erlang and 242 MiB on JavaScript. The heavily escaped fixture was also effectively
+unchanged. This optimization does not resolve the memory cost of large Value
+trees. Representative fixture RSS differences were small.
+
+Erlang `eprof` and Node CPU profiles identified string scanning, byte-array slices
+and string assembly as relevant costs. For the same record profiling run,
+`scan_string` calls fell from 351,117 to 207,069, and the 48,016 concatenation calls
+for unescaped strings disappeared. Node's plain-text profile decreased from 623
+to 369 samples, with `bitArraySlice` samples falling from 445 to 226. These are
+instrumented diagnostics, not independent speed or allocation estimates.
+[Profile summaries](benchmarks/parser-optimization-2026-10-25/javascript-profiles.json)
+and the [raw profiles, source snapshots, rerun scripts and validation log](benchmarks/parser-optimization-2026-10-25/profile-and-source-evidence.zip)
+retain the evidence. Early captures used the same harness before formatting;
+the exact measured harness is in the archive.
+
+Rejected variants included four-byte scanning, index-based scanning, and a narrow
+JavaScript run-scanning FFI with a Gleam fallback. Some improved long JavaScript
+text more, but introduced Erlang regressions or extra maintained code. Skipping
+unescaped-string assembly alone had little clear benefit; combined with two-byte
+scanning it is retained as a small reduction in per-string allocation.
+
+Validation: 301 root tests on each target, generated-code and schema consumers,
+compiled examples, the finite schema and profile oracles, 62 independent number
+cases, and all 318 JSONTestSuite plus 901 generated parser cases on each target
+passed through `sh scripts/gate.sh` in the Nix shell. Added tests compare parsed
+values and exact failure locations across varying string lengths, UTF-8 text,
+escapes and literal controls through both text and byte entry points. The
+existing input-retention tests remain in the gate. See [ORACLE.md](ORACLE.md) for
+the limits of the correctness claims.
+
+## Native Erlang adoption (2026-10-25)
+
+The production adapter now uses OTP parsing with duplicate rejection, exact
+native integers and deferred decimal tokens. Built-in codecs decode the native
+tree directly; custom callbacks convert their Value subtree. Admission is byte
+limited. JavaScript retains its exact parser with byte-only admission and a
+runtime-capacity error boundary.
+
+A fresh comparison against the frozen optimized-parser worktree used three
+separate VM timing and memory trials per workload. Source hashes stayed unchanged.
+The integrated adapter includes copies of escaping strings and object keys to
+avoid retaining unrelated input bytes. [Raw measurements](../experiment/adoption-results.json)
+include toolchain versions, source and input hashes, all samples and memory snapshots.
+
+Erlang small records improved from 2.07 to 1.25 µs and 50-record responses from
+99.13 to 55.88 µs. The 262,143-integer fixture improved from 235.95 to 41.34 ms;
+peak RSS decreased from 178.94 to 127.88 MiB (about 29%). Small-document peak RSS
+was essentially unchanged. Decimal-to-Float arrays improved 12.91×; exact Number
+arrays improved 1.24×. These are different projection workloads.
+
+JavaScript small records changed from 10.54 to 11.28 µs, responses from 383.21
+to 387.25 µs, and 10,000 integers from 10.20 to 10.02 ms. This does not establish
+a broad JavaScript gain. RSS includes the complete runtime and is not retained
+JSON allocation. Timings and memory observations never gate a change.
+
+The [adoption report](NATIVE-DECODING-ADOPTION.md) records the complete comparison,
+accepted behavior changes, consumer consequences and release checks. The
+[independent oracle](ORACLE.md) remains separate from these performance observations.

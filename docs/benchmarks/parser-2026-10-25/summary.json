@@ -1,0 +1,662 @@
+[
+  {
+    "fixture": "baseline_null",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 112,
+    "vm_median_range_ns": [
+      110,
+      117
+    ],
+    "median_peak_rss_bytes": 70451200,
+    "peak_rss_range_bytes": [
+      70238208,
+      70598656
+    ]
+  },
+  {
+    "fixture": "baseline_null",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 115,
+    "vm_median_range_ns": [
+      109,
+      116
+    ],
+    "median_peak_rss_bytes": 70008832,
+    "peak_rss_range_bytes": [
+      69959680,
+      70172672
+    ]
+  },
+  {
+    "fixture": "baseline_null",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 637,
+    "vm_median_range_ns": [
+      627,
+      689
+    ],
+    "median_peak_rss_bytes": 52051968,
+    "peak_rss_range_bytes": [
+      51904512,
+      52068352
+    ]
+  },
+  {
+    "fixture": "baseline_null",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 1795,
+    "vm_median_range_ns": [
+      1778,
+      1976
+    ],
+    "median_peak_rss_bytes": 52199424,
+    "peak_rss_range_bytes": [
+      52133888,
+      52346880
+    ]
+  },
+  {
+    "fixture": "small_record",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 366,
+    "vm_median_range_ns": [
+      365,
+      387
+    ],
+    "median_peak_rss_bytes": 70336512,
+    "peak_rss_range_bytes": [
+      70303744,
+      70352896
+    ]
+  },
+  {
+    "fixture": "small_record",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 1330,
+    "vm_median_range_ns": [
+      1304,
+      1459
+    ],
+    "median_peak_rss_bytes": 70320128,
+    "peak_rss_range_bytes": [
+      70107136,
+      70418432
+    ]
+  },
+  {
+    "fixture": "small_record",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 760,
+    "vm_median_range_ns": [
+      743,
+      802
+    ],
+    "median_peak_rss_bytes": 51920896,
+    "peak_rss_range_bytes": [
+      51691520,
+      52264960
+    ]
+  },
+  {
+    "fixture": "small_record",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 8302,
+    "vm_median_range_ns": [
+      8192,
+      8345
+    ],
+    "median_peak_rss_bytes": 52248576,
+    "peak_rss_range_bytes": [
+      51855360,
+      52592640
+    ]
+  },
+  {
+    "fixture": "object_10",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 1450,
+    "vm_median_range_ns": [
+      1449,
+      1452
+    ],
+    "median_peak_rss_bytes": 70533120,
+    "peak_rss_range_bytes": [
+      70352896,
+      70762496
+    ]
+  },
+  {
+    "fixture": "object_10",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 6124,
+    "vm_median_range_ns": [
+      5642,
+      6138
+    ],
+    "median_peak_rss_bytes": 70336512,
+    "peak_rss_range_bytes": [
+      70172672,
+      70483968
+    ]
+  },
+  {
+    "fixture": "object_10",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 881,
+    "vm_median_range_ns": [
+      843,
+      890
+    ],
+    "median_peak_rss_bytes": 52019200,
+    "peak_rss_range_bytes": [
+      51871744,
+      52494336
+    ]
+  },
+  {
+    "fixture": "object_10",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 21882,
+    "vm_median_range_ns": [
+      21731,
+      21996
+    ],
+    "median_peak_rss_bytes": 52281344,
+    "peak_rss_range_bytes": [
+      52264960,
+      52297728
+    ]
+  },
+  {
+    "fixture": "object_100",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 13328,
+    "vm_median_range_ns": [
+      13327,
+      14510
+    ],
+    "median_peak_rss_bytes": 70352896,
+    "peak_rss_range_bytes": [
+      70238208,
+      70516736
+    ]
+  },
+  {
+    "fixture": "object_100",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 70279,
+    "vm_median_range_ns": [
+      68707,
+      138621
+    ],
+    "median_peak_rss_bytes": 70451200,
+    "peak_rss_range_bytes": [
+      70139904,
+      70467584
+    ]
+  },
+  {
+    "fixture": "object_100",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 3044,
+    "vm_median_range_ns": [
+      2872,
+      3160
+    ],
+    "median_peak_rss_bytes": 51920896,
+    "peak_rss_range_bytes": [
+      51904512,
+      52101120
+    ]
+  },
+  {
+    "fixture": "object_100",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 187822,
+    "vm_median_range_ns": [
+      184921,
+      188340
+    ],
+    "median_peak_rss_bytes": 52920320,
+    "peak_rss_range_bytes": [
+      52740096,
+      52936704
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 82525,
+    "vm_median_range_ns": [
+      80321,
+      85041
+    ],
+    "median_peak_rss_bytes": 70713344,
+    "peak_rss_range_bytes": [
+      70320128,
+      70942720
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 332643,
+    "vm_median_range_ns": [
+      323027,
+      349034
+    ],
+    "median_peak_rss_bytes": 70090752,
+    "peak_rss_range_bytes": [
+      70057984,
+      70418432
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 47069,
+    "vm_median_range_ns": [
+      46576,
+      47398
+    ],
+    "median_peak_rss_bytes": 51986432,
+    "peak_rss_range_bytes": [
+      51970048,
+      52543488
+    ]
+  },
+  {
+    "fixture": "object_500",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 1029490,
+    "vm_median_range_ns": [
+      1018988,
+      1054043
+    ],
+    "median_peak_rss_bytes": 56655872,
+    "peak_rss_range_bytes": [
+      56541184,
+      56721408
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 314635,
+    "vm_median_range_ns": [
+      282427,
+      315343
+    ],
+    "median_peak_rss_bytes": 70238208,
+    "peak_rss_range_bytes": [
+      70090752,
+      70320128
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 1784750,
+    "vm_median_range_ns": [
+      1726083,
+      1999833
+    ],
+    "median_peak_rss_bytes": 72040448,
+    "peak_rss_range_bytes": [
+      71843840,
+      72220672
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 53718,
+    "vm_median_range_ns": [
+      53583,
+      55833
+    ],
+    "median_peak_rss_bytes": 52019200,
+    "peak_rss_range_bytes": [
+      51920896,
+      52183040
+    ]
+  },
+  {
+    "fixture": "dense_10000",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 8283864,
+    "vm_median_range_ns": [
+      7749291,
+      8548250
+    ],
+    "median_peak_rss_bytes": 63045632,
+    "peak_rss_range_bytes": [
+      63012864,
+      63094784
+    ]
+  },
+  {
+    "fixture": "dense_value_limit",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 7755292,
+    "vm_median_range_ns": [
+      7501833,
+      13881625
+    ],
+    "median_peak_rss_bytes": 92930048,
+    "peak_rss_range_bytes": [
+      92667904,
+      92946432
+    ]
+  },
+  {
+    "fixture": "dense_value_limit",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 235273041,
+    "vm_median_range_ns": [
+      231153042,
+      236809958
+    ],
+    "median_peak_rss_bytes": 171360256,
+    "peak_rss_range_bytes": [
+      171114496,
+      171753472
+    ]
+  },
+  {
+    "fixture": "dense_value_limit",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 1474417,
+    "vm_median_range_ns": [
+      1464500,
+      1532291
+    ],
+    "median_peak_rss_bytes": 56786944,
+    "peak_rss_range_bytes": [
+      56688640,
+      57065472
+    ]
+  },
+  {
+    "fixture": "dense_value_limit",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 265235084,
+    "vm_median_range_ns": [
+      257946042,
+      267434542
+    ],
+    "median_peak_rss_bytes": 253476864,
+    "peak_rss_range_bytes": [
+      253476864,
+      253624320
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 199250,
+    "vm_median_range_ns": [
+      197430,
+      211555
+    ],
+    "median_peak_rss_bytes": 70320128,
+    "peak_rss_range_bytes": [
+      70254592,
+      70385664
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 546555,
+    "vm_median_range_ns": [
+      538666,
+      557666
+    ],
+    "median_peak_rss_bytes": 70254592,
+    "peak_rss_range_bytes": [
+      70107136,
+      70254592
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 37083,
+    "vm_median_range_ns": [
+      33055,
+      38458
+    ],
+    "median_peak_rss_bytes": 52150272,
+    "peak_rss_range_bytes": [
+      52051968,
+      52477952
+    ]
+  },
+  {
+    "fixture": "escaped_unicode",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 4304527,
+    "vm_median_range_ns": [
+      4277986,
+      4341222
+    ],
+    "median_peak_rss_bytes": 57196544,
+    "peak_rss_range_bytes": [
+      57147392,
+      57360384
+    ]
+  },
+  {
+    "fixture": "decimals_1000",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 139591,
+    "vm_median_range_ns": [
+      122308,
+      141966
+    ],
+    "median_peak_rss_bytes": 70336512,
+    "peak_rss_range_bytes": [
+      70123520,
+      70729728
+    ]
+  },
+  {
+    "fixture": "decimals_1000",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 856100,
+    "vm_median_range_ns": [
+      814458,
+      884616
+    ],
+    "median_peak_rss_bytes": 70336512,
+    "peak_rss_range_bytes": [
+      70090752,
+      70533120
+    ]
+  },
+  {
+    "fixture": "decimals_1000",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 27683,
+    "vm_median_range_ns": [
+      26925,
+      28516
+    ],
+    "median_peak_rss_bytes": 52133888,
+    "peak_rss_range_bytes": [
+      52068352,
+      52658176
+    ]
+  },
+  {
+    "fixture": "decimals_1000",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 4239725,
+    "vm_median_range_ns": [
+      4184216,
+      4241750
+    ],
+    "median_peak_rss_bytes": 61440000,
+    "peak_rss_range_bytes": [
+      61259776,
+      61571072
+    ]
+  },
+  {
+    "fixture": "reject_early",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 375,
+    "vm_median_range_ns": [
+      292,
+      459
+    ],
+    "median_peak_rss_bytes": 70221824,
+    "peak_rss_range_bytes": [
+      70107136,
+      70516736
+    ]
+  },
+  {
+    "fixture": "reject_early",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 292,
+    "vm_median_range_ns": [
+      292,
+      375
+    ],
+    "median_peak_rss_bytes": 75726848,
+    "peak_rss_range_bytes": [
+      75710464,
+      76038144
+    ]
+  },
+  {
+    "fixture": "reject_early",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 8167,
+    "vm_median_range_ns": [
+      8167,
+      8542
+    ],
+    "median_peak_rss_bytes": 53329920,
+    "peak_rss_range_bytes": [
+      53116928,
+      53723136
+    ]
+  },
+  {
+    "fixture": "reject_early",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 2175125,
+    "vm_median_range_ns": [
+      2141667,
+      2191667
+    ],
+    "median_peak_rss_bytes": 53313536,
+    "peak_rss_range_bytes": [
+      53149696,
+      54034432
+    ]
+  },
+  {
+    "fixture": "reject_late",
+    "target": "erlang",
+    "backend": "native",
+    "median_ns_per_op": 7645500,
+    "vm_median_range_ns": [
+      7595167,
+      7815458
+    ],
+    "median_peak_rss_bytes": 84885504,
+    "peak_rss_range_bytes": [
+      84705280,
+      85065728
+    ]
+  },
+  {
+    "fixture": "reject_late",
+    "target": "erlang",
+    "backend": "strict",
+    "median_ns_per_op": 221936875,
+    "vm_median_range_ns": [
+      209021167,
+      247936084
+    ],
+    "median_peak_rss_bytes": 171212800,
+    "peak_rss_range_bytes": [
+      171098112,
+      171573248
+    ]
+  },
+  {
+    "fixture": "reject_late",
+    "target": "javascript",
+    "backend": "native",
+    "median_ns_per_op": 2358417,
+    "vm_median_range_ns": [
+      2241500,
+      2478542
+    ],
+    "median_peak_rss_bytes": 59949056,
+    "peak_rss_range_bytes": [
+      59949056,
+      60096512
+    ]
+  },
+  {
+    "fixture": "reject_late",
+    "target": "javascript",
+    "backend": "strict",
+    "median_ns_per_op": 284629042,
+    "vm_median_range_ns": [
+      275225500,
+      287926708
+    ],
+    "median_peak_rss_bytes": 251068416,
+    "peak_rss_range_bytes": [
+      249888768,
+      251281408
+    ]
+  }
+]

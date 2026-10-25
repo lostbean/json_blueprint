@@ -85,15 +85,36 @@ shows the three-state representation and its encoding behavior.
 
 ## Review parser and number policy
 
-`codec.decode_json` uses the strict `Value` parser. Its defaults are 1 MiB of
-UTF-8, depth 64, 262,144 values, and number limits of 1,024 token bytes, 800
-significant digits, and exponent magnitude 1,200. It rejects repeated object
-keys. Use `codec.decode_json_with_limits` with the `value.with_*` functions
-when the application needs different bounds; increasing bytes alone does not
-increase the other limits.
+`codec.decode_json` admits at most 1 MiB of UTF-8 by default and rejects
+repeated object keys. Use `codec.decode_json_with_limits` and
+`value.with_max_bytes` to select another byte limit. Depth, value-count and
+global numeric admission limits and their setters have been removed. Consumers
+that require those policies must inspect their decoded data. Explicit
+`number.parse(token, limits)` still supports caller-selected numeric limits.
 
-`codec.int()` supports at most 24 digits and requires safe integers on
-JavaScript. Use `codec.number()` and the exact `Number` operations for values
+On Erlang/OTP 27 or later, parsing uses OTP's JSON decoder with duplicate detection and exact
+numeric hooks. Built-in codecs decode its native tree directly; custom Value
+callbacks convert only the subtree they receive. `value.parse` still constructs
+a `Value` tree. Parsed object members follow native map order, not source order;
+errors for malformed JSON use native parser diagnostics rather than the previous
+precise byte, line and column locations. Typed field/index errors remain
+available. Syntax admission completes before typed callbacks run. JavaScript
+retains its exact parser and source locations. Its exact decimal exponent must
+fit the target's safe integer representation. Deep JavaScript input can exceed
+the host call stack; this returns `RuntimeCapacityExceeded` rather than a
+configured depth-limit error.
+
+On JavaScript, strict text parsing rejects raw unpaired UTF-16 surrogates with
+`InvalidUnicodeScalar` before UTF-8 conversion can replace them. The error
+locates the first unpaired surrogate and retains no source text. The byte
+limit is checked first; escaped malformed surrogate pairs continue to return
+`InvalidUnicodeEscape`. Valid surrogate pairs and the literal replacement
+character remain accepted.
+
+`codec.int()` supports at most 24 digits in both directions and requires safe
+integers on JavaScript. Encoding a longer Erlang integer returns `ExpectedInt`;
+`integer_between` retains its separate bound-derived digit allowance.
+Use `codec.number()` and the exact `Number` operations for values
 that must retain mathematical JSON precision. Treat projection into native
 `Int` or `Float` as a separate operation that can fail or round. Use
 `codec.float()` when binary floating-point conversion is acceptable. The

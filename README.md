@@ -178,15 +178,18 @@ Gleam checks that the `case` covers every constructor.
 
 ## Defaults
 
-`value.default_limits()` sets strict text parsing to 1 MiB of UTF-8, depth 64,
-262,144 values, and number limits of 1,024 token bytes, 800 significant digits,
-and exponent magnitude 1,200. `codec.decode_json` uses these defaults;
-`value.parse` and `contract.parse` take explicit limits. Adjust them with
-`value.with_max_bytes`, `value.with_max_depth`, `value.with_max_elements`, or
-`value.with_number_limits`, then pass them to `codec.decode_json_with_limits`
-or `contract.parse`. Raising the byte limit does not raise the value limit or
-bound heap use. `contract.validate` and `contract.load` add no resource bounds;
-parse untrusted text with explicit limits first.
+`value.default_limits()` admits at most 1 MiB of UTF-8 text. Change this with
+`value.with_max_bytes` and pass the result to `codec.decode_json_with_limits`,
+`value.parse`, or `contract.parse`. There are no global depth, value-count or
+numeric-token limits. Consumers own structural admission policies; a byte
+limit is not a heap quota.
+
+On Erlang/OTP 27 or later, codecs decode the native parser's output directly. Parser hooks
+reject duplicate keys and retain exact integers and decimal tokens. Built-in
+codecs avoid an intermediate `Value` tree; custom callbacks receive a converted
+subtree. JavaScript retains the strict parser for duplicate rejection and exact
+numbers. Erlang parsing does not preserve object source order or the old precise
+parse locations. See [the migration guide](docs/MIGRATION.md).
 
 ## Schema support
 

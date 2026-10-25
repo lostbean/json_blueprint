@@ -1,0 +1,54 @@
+//// THROWAWAY: strict/native bounded admission agreement on UTF-8 corpus inputs.
+
+import gleam/bit_array
+import gleam/int
+import gleam/io
+import gleam/list
+import gleam/result
+import json/blueprint/value
+import native_bounded
+
+@external(erlang, "parser_corpus_ffi", "read_cases")
+@external(javascript, "./parser_corpus_ffi.mjs", "read_cases")
+fn read_cases() -> List(#(String, BitArray))
+
+pub fn main() -> Nil {
+  let count =
+    list.fold(read_cases(), 0, fn(count, item) {
+      case bit_array.to_string(item.1) {
+        Error(_) -> count
+        Ok(text) -> {
+          list.each(
+            [#(0, 262_144), #(1, 10), #(8, 64), #(64, 1), #(64, 262_144)],
+            fn(bounds) {
+              let limits =
+                value.default_limits()
+                |> value.with_max_depth(bounds.0)
+                |> value.with_max_elements(bounds.1)
+              let strict = value.parse(text, limits) |> result.is_ok
+              let candidate =
+                native_bounded.decode_json_with_resources(
+                  text,
+                  fn(_) { Ok(Nil) },
+                  bounds.0,
+                  bounds.1,
+                )
+                |> result.is_ok
+              case strict == candidate {
+                True -> Nil
+                False -> {
+                  io.println(item.0)
+                  panic as "Admission acceptance mismatch"
+                }
+              }
+            },
+          )
+          count + 1
+        }
+      }
+    })
+  io.println(
+    "UTF-8 admission cases agree under five resource configurations: "
+    <> int.to_string(count),
+  )
+}

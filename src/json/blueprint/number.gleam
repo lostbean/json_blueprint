@@ -29,6 +29,7 @@
 //// ```
 
 import gleam/float
+import gleam/int
 import gleam/order.{type Order}
 
 /// An exact JSON number.
@@ -206,6 +207,92 @@ pub fn parse(token: String, limits: Limits) -> Result(Number, NumberError) {
   }
 }
 
+/// Parse without application admission limits. JavaScript still requires an
+/// exactly representable native exponent; this is a representation constraint.
+@internal
+pub fn from_json_token(token: String) -> Result(Number, NumberError) {
+  let #(negative, chars) = strip_negative_sign(native_byte_codes(token))
+  case split_exponent(chars, []) {
+    Error(_) -> Error(InvalidSyntax)
+    Ok(#(mantissa, exponent)) ->
+      case split_decimal(mantissa, []) {
+        Error(_) -> Error(InvalidSyntax)
+        Ok(decimal) ->
+          case validated_significand(decimal) {
+            Error(_) -> Error(InvalidSyntax)
+            Ok(#(integers, fractions)) ->
+              case valid_exponent_shape(exponent) {
+                False -> Error(InvalidSyntax)
+                True -> {
+                  let digits = drop_leading_zeroes(append(integers, fractions))
+                  case digits {
+                    [] -> Ok(zero)
+                    _ ->
+                      case unrestricted_exponent(exponent) {
+                        Error(error) -> Error(error)
+                        Ok(written) -> {
+                          let #(coefficient, removed) =
+                            trim_trailing_zeroes(digits, 0)
+                          let normalized =
+                            written + { removed - list_length(fractions) }
+                          case
+                            native_validate_native_int(
+                              normalized,
+                              NonFiniteInteger,
+                              NonIntegerValue,
+                              UnsafeNativeInteger,
+                            )
+                          {
+                            Error(_) -> Error(ExponentOutOfRange)
+                            Ok(_) ->
+                              case
+                                native_validate_native_int(
+                                  normalized + list_length(coefficient),
+                                  NonFiniteInteger,
+                                  NonIntegerValue,
+                                  UnsafeNativeInteger,
+                                )
+                              {
+                                Error(_) -> Error(ExponentOutOfRange)
+                                Ok(_) ->
+                                  Ok(make(negative, coefficient, normalized))
+                              }
+                          }
+                        }
+                      }
+                  }
+                }
+              }
+          }
+      }
+  }
+}
+
+fn unrestricted_exponent(exponent: ExponentPart) -> Result(Int, NumberError) {
+  case exponent {
+    NoExponent -> Ok(0)
+    HasExponent(raw) -> {
+      // Grammar is already checked. Convert once rather than repeatedly
+      // growing and printing an arbitrary-precision integer.
+      case int.parse(native_ascii_string(raw)) {
+        Error(_) -> Error(ExponentOutOfRange)
+        Ok(value) ->
+          case
+            native_validate_native_int(
+              value,
+              NonFiniteInteger,
+              NonIntegerValue,
+              UnsafeNativeInteger,
+            )
+          {
+            Error(_) -> Error(ExponentOutOfRange)
+            Ok(_) -> Ok(value)
+          }
+      }
+    }
+  }
+}
+
 fn parse_within_token_limit(
   max_significand_digits: Int,
   max_abs_exponent: Int,
@@ -287,7 +374,7 @@ pub fn to_string(number: Number) -> String {
   case coefficient {
     [48] -> "0"
     _ -> {
-      let scale = exponent10 + list_length(coefficient) - 1
+      let scale = exponent10 + { list_length(coefficient) - 1 }
       let mantissa = match_coefficient_digits(coefficient)
       let sign = case negative {
         True -> "-"

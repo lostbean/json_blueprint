@@ -1,7 +1,7 @@
 #let terms = (
   (slug: "term-json-value", title: [JSON value], body: [An immutable JSON algebra value with ordered object members and an exact number alternative. Duplicate object members remain representable until a checked boundary rejects them.]),
   (slug: "term-exact-number", title: [Exact number], body: [A finite mathematical JSON number represented by a normalized decimal coefficient and exponent, with one positive zero. Its value is independent of a target's native integer or binary64 representation.]),
-  (slug: "term-admission-limits", title: [Admission limits], body: [The caller-authored bounds on input bytes, container depth, value count, and number tokens that strict text parsing enforces independently of one another. A value assembled without parsing carries no admission proof.]),
+  (slug: "term-admission-limits", title: [Admission limits], body: [The caller-authored byte bound checked before text parsing. Consumers own policies for the decoded structure; explicit standalone number parsing can apply separate numeric limits. A value assembled without parsing carries no admission proof.]),
   (slug: "term-codec", title: [Codec], body: [A typed definition joining native encoding, native decoding, a placeholder, and an available or unavailable schema. The native type parameter belongs to the caller's compiled program.]),
   (slug: "term-placeholder", title: [Placeholder], body: [A codec's native value used to describe a definition without input and to construct a failing native decoder. It need not be valid application data.]),
   (slug: "term-schema", title: [Schema], body: [An opaque, checked description of the finite JSON acceptance profile. Descriptions are annotations on that structure.]),

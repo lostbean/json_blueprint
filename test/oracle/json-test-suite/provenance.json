@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/nst/JSONTestSuite",
+  "revision": "1ef36fa01286573e846ac449e8683f8833c5b26a",
+  "directory": "test_parsing",
+  "files": 318,
+  "sha256": "e5acc37437963f2e775cadc14d1a4ecdae985969679d6e829e97a66780dd2021",
+  "license": "MIT; see LICENSE",
+  "packing": "Sorted filenames; original file bytes; ZIP timestamps fixed to 2026-10-25."
+}

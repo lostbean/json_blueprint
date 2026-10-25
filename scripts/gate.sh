@@ -48,3 +48,5 @@ python3 test/schema_check.py
 python3 test/schema_profile_check.py
 
 python3 test/number_check.py
+
+python3 test/parser_check.py

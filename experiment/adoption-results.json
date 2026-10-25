@@ -1,0 +1,1196 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "versions": {
+    "gleam": "gleam 1.19.2",
+    "node": "v24.21.0",
+    "python": "Python 3.14.7",
+    "erlang": "OTP 29 ERTS 17.1.1"
+  },
+  "baseline": "/tmp/blueprint-adoption-baseline",
+  "production": "/Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint",
+  "source_hashes": {
+    "baseline": {
+      "src/gleam_dynamic.erl": "c8d9cca03a3a4b453fae6d9a4cae742a1ed2bcac2d83e237fe7afbec699b0918",
+      "src/gleam_dynamic.mjs": "363c90897aead01e825c1e3e7118a8804aba0dad176b19831dc79019606570e9",
+      "src/json/blueprint/codec.gleam": "8c9da44a3e18a42db13bfff24ab8aad89aaff12dae6c2c8fb7ab9e8587753463",
+      "src/json/blueprint/codegen/internal/schema_materialize.gleam": "aafe1a845294590a48e156c42c00c285500b346c3cd2bbf40867d6fdf5e88949",
+      "src/json/blueprint/codegen/schema.gleam": "395c18de87fea206acebe2f8f26c13c89fbc4afb0c85088234f4c362c750d99f",
+      "src/json/blueprint/codegen.gleam": "d1c11309911ab4bcf100c18dca68f4ea23e85d7489e47b6365244dae526e79df",
+      "src/json/blueprint/contract.gleam": "0466ff18abc6b78c1e8d8c2256a5eb6c93d987e07628d395485a70104851b166",
+      "src/json/blueprint/internal/dynamic.gleam": "044ca0106a7769891a38a0b0a6b327a33ddefae218d6c06605b2fe7ecf740b56",
+      "src/json/blueprint/internal/generated.gleam": "1815b5c523d8a6875a64a66a2c3f274950ea7fc1343db3dbf5d63e2dfe8dd57a",
+      "src/json/blueprint/internal/schema_tree.gleam": "bfaec45d6a049b03d832a6a017d6d85d6382ff8bf1baf758e2a518ce3476a61d",
+      "src/json/blueprint/internal/text.gleam": "d7b4cb58e38473f1b61c5b12cf0c4b1902372c5afcd743beb29e5fd53c5f9ccf",
+      "src/json/blueprint/number.gleam": "0f840a8cc0d707137591a9f79f593717072f603860558cdcf3eb4e26ede9af3f",
+      "src/json/blueprint/schema.gleam": "baae6b577eceded9b98f52f73b993231cfb32389fc7b785e02767c93ed70783c",
+      "src/json/blueprint/value.gleam": "4ea12ec28a532b1cf273e391a5fb4804aca32d95db077a20c5de49ca3c16301c",
+      "src/json/blueprint.gleam": "7ffadc649d2e2ea2afd2bb9c57b79ad2c5bdc592c57c7badb5469fece15e7d4c",
+      "src/json_blueprint_ffi.erl": "957555bdc2215f572c185e4135e19310b857cf8a62e81823876b9523c28ac74c",
+      "src/json_blueprint_ffi.mjs": "acf63c54eb55cbda0cbc1ee69d9662ce33a6f53661fc6585393003cd5bf68899",
+      "src/json_number_ffi.erl": "d171005d9671dd04bb08f9d50c6b16c17429fc137c572803e26fe616ee1a4282",
+      "src/json_number_ffi.mjs": "c11356dfaad655e3bc22796ad04f60e70353dcd324fc1fa8f8e3065cba224305"
+    },
+    "production": {
+      "src/gleam_dynamic.erl": "c8d9cca03a3a4b453fae6d9a4cae742a1ed2bcac2d83e237fe7afbec699b0918",
+      "src/gleam_dynamic.mjs": "363c90897aead01e825c1e3e7118a8804aba0dad176b19831dc79019606570e9",
+      "src/json/blueprint/codec.gleam": "3ce372465de261058824fea4c61c8cf7cadd2ba664c22f99c38c1b67095f2cb5",
+      "src/json/blueprint/codegen/internal/schema_materialize.gleam": "aafe1a845294590a48e156c42c00c285500b346c3cd2bbf40867d6fdf5e88949",
+      "src/json/blueprint/codegen/schema.gleam": "395c18de87fea206acebe2f8f26c13c89fbc4afb0c85088234f4c362c750d99f",
+      "src/json/blueprint/codegen.gleam": "d1c11309911ab4bcf100c18dca68f4ea23e85d7489e47b6365244dae526e79df",
+      "src/json/blueprint/contract.gleam": "0466ff18abc6b78c1e8d8c2256a5eb6c93d987e07628d395485a70104851b166",
+      "src/json/blueprint/internal/dynamic.gleam": "044ca0106a7769891a38a0b0a6b327a33ddefae218d6c06605b2fe7ecf740b56",
+      "src/json/blueprint/internal/generated.gleam": "1815b5c523d8a6875a64a66a2c3f274950ea7fc1343db3dbf5d63e2dfe8dd57a",
+      "src/json/blueprint/internal/native.gleam": "b80fbd24639bf3b25f4d70aae4894b64e2a15aff4408d6cadd78252034e86fa8",
+      "src/json/blueprint/internal/schema_tree.gleam": "bfaec45d6a049b03d832a6a017d6d85d6382ff8bf1baf758e2a518ce3476a61d",
+      "src/json/blueprint/internal/text.gleam": "d7b4cb58e38473f1b61c5b12cf0c4b1902372c5afcd743beb29e5fd53c5f9ccf",
+      "src/json/blueprint/number.gleam": "5f8cf7891d7a7bdff1191ca3c5b82698ab690c5d266e6a058aac9c3dcab42dc4",
+      "src/json/blueprint/schema.gleam": "baae6b577eceded9b98f52f73b993231cfb32389fc7b785e02767c93ed70783c",
+      "src/json/blueprint/value.gleam": "67e196ffcda4530ab61c4595354fa96657ce7f561641218cee6db48cabc84f9c",
+      "src/json/blueprint.gleam": "7ffadc649d2e2ea2afd2bb9c57b79ad2c5bdc592c57c7badb5469fece15e7d4c",
+      "src/json_blueprint_ffi.erl": "957555bdc2215f572c185e4135e19310b857cf8a62e81823876b9523c28ac74c",
+      "src/json_blueprint_ffi.mjs": "ca39e1f352e6d8dcbcf9e8eb26afa86568a3170f849affa6627206272bc865fe",
+      "src/json_blueprint_native_ffi.erl": "527117eb5b375f0e9f5efef6610d194792c9247c1d125189abfdc12fe3c820e5",
+      "src/json_number_ffi.erl": "d171005d9671dd04bb08f9d50c6b16c17429fc137c572803e26fe616ee1a4282",
+      "src/json_number_ffi.mjs": "c11356dfaad655e3bc22796ad04f60e70353dcd324fc1fa8f8e3065cba224305"
+    }
+  },
+  "runner_sha256": "1f7d4b4face96bb2463f6502cb8bf2a6c6fa2fe2ee7725fe98e038906e211154",
+  "method": "Baseline first, then production. Three fresh VMs per workload/target/mode, five timed batches after warmup. Both use strict backend dispatch to codec.decode_json. Memory retains the consumed typed result, forces GC, reports process/VM memory (Erlang) or process.memoryUsage (Node), plus total-process high-water RSS from wait4. RSS is not allocated bytes. Erlang verifies against the lossless experiment; JS timed runs assert decode success and portable codec tests supply semantic evidence.",
+  "runs": [
+    {
+      "implementation": "baseline",
+      "target": "erlang",
+      "fixture": "small_record",
+      "bytes": 44,
+      "input_sha256": "155618b5f23b6e7f77cee3a2c741378d576edef4c6231889a90026e2db286273",
+      "iterations_per_batch": 200,
+      "median_ns": 2071,
+      "vm_median_range_ns": [
+        1931,
+        2180
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            1896,
+            1931,
+            1936,
+            1936,
+            1914
+          ],
+          "median_ns": 1931,
+          "memory": {
+            "process_bytes": 4016,
+            "vm_bytes": 44310251
+          },
+          "peak_rss_bytes": 70975488
+        },
+        {
+          "samples_ns": [
+            2256,
+            2192,
+            2180,
+            2039,
+            2001
+          ],
+          "median_ns": 2180,
+          "memory": {
+            "process_bytes": 4016,
+            "vm_bytes": 44310283
+          },
+          "peak_rss_bytes": 71155712
+        },
+        {
+          "samples_ns": [
+            2121,
+            2071,
+            2080,
+            1933,
+            1927
+          ],
+          "median_ns": 2071,
+          "memory": {
+            "process_bytes": 4016,
+            "vm_bytes": 44254875
+          },
+          "peak_rss_bytes": 71434240
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "erlang",
+      "fixture": "response_50",
+      "bytes": 2301,
+      "input_sha256": "d46e09cef7a6fa8a684c0739a3ff61ffa5ea20125ac736675e5159497287720b",
+      "iterations_per_batch": 86,
+      "median_ns": 99127,
+      "vm_median_range_ns": [
+        96381,
+        99350
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            98100,
+            96381,
+            96301,
+            96953,
+            95285
+          ],
+          "median_ns": 96381,
+          "memory": {
+            "process_bytes": 8920,
+            "vm_bytes": 44317539
+          },
+          "peak_rss_bytes": 71188480
+        },
+        {
+          "samples_ns": [
+            99426,
+            99350,
+            97640,
+            96845,
+            99925
+          ],
+          "median_ns": 99350,
+          "memory": {
+            "process_bytes": 8920,
+            "vm_bytes": 44269347
+          },
+          "peak_rss_bytes": 71221248
+        },
+        {
+          "samples_ns": [
+            99301,
+            99127,
+            99183,
+            97809,
+            96339
+          ],
+          "median_ns": 99127,
+          "memory": {
+            "process_bytes": 8920,
+            "vm_bytes": 44317611
+          },
+          "peak_rss_bytes": 71352320
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "erlang",
+      "fixture": "ints_10000",
+      "bytes": 20001,
+      "input_sha256": "7ea81ee0dbbdd45f4ab8993e8f4cf3f0692f71ae74ffdd28518cc1a0a769bb70",
+      "iterations_per_batch": 9,
+      "median_ns": 2226652,
+      "vm_median_range_ns": [
+        2218768,
+        2227115
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            2446078,
+            2221175,
+            2251597,
+            2227115,
+            2172458
+          ],
+          "median_ns": 2227115,
+          "memory": {
+            "process_bytes": 230528,
+            "vm_bytes": 44398928
+          },
+          "peak_rss_bytes": 72974336
+        },
+        {
+          "samples_ns": [
+            2477592,
+            2152129,
+            2226652,
+            2256550,
+            2172166
+          ],
+          "median_ns": 2226652,
+          "memory": {
+            "process_bytes": 230528,
+            "vm_bytes": 44406000
+          },
+          "peak_rss_bytes": 72744960
+        },
+        {
+          "samples_ns": [
+            2406333,
+            2114986,
+            2218768,
+            2256675,
+            2187055
+          ],
+          "median_ns": 2218768,
+          "memory": {
+            "process_bytes": 230528,
+            "vm_bytes": 44378624
+          },
+          "peak_rss_bytes": 73220096
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "erlang",
+      "fixture": "ints_limit",
+      "bytes": 524287,
+      "input_sha256": "6c4a9981b89abdfca94f3fdfc55a14db5f18a8c5978ad4a823892c0f1316ff9d",
+      "iterations_per_batch": 1,
+      "median_ns": 235952834,
+      "vm_median_range_ns": [
+        227795375,
+        241345958
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            210217250,
+            254140209,
+            235952834,
+            249745625,
+            234107708
+          ],
+          "median_ns": 235952834,
+          "memory": {
+            "process_bytes": 6665216,
+            "vm_bytes": 51342200
+          },
+          "peak_rss_bytes": 187514880
+        },
+        {
+          "samples_ns": [
+            212327000,
+            251592292,
+            241345958,
+            248768458,
+            232350750
+          ],
+          "median_ns": 241345958,
+          "memory": {
+            "process_bytes": 6665216,
+            "vm_bytes": 51349288
+          },
+          "peak_rss_bytes": 189284352
+        },
+        {
+          "samples_ns": [
+            213535041,
+            248465833,
+            226401875,
+            236552125,
+            227795375
+          ],
+          "median_ns": 227795375,
+          "memory": {
+            "process_bytes": 6665216,
+            "vm_bytes": 51350232
+          },
+          "peak_rss_bytes": 187629568
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "bytes": 20001,
+      "input_sha256": "72fc87ed7ec58588ce082940a96050f644dc5c287fd3388a301510ef15db77f8",
+      "iterations_per_batch": 9,
+      "median_ns": 3475361,
+      "vm_median_range_ns": [
+        3385486,
+        3491296
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            3441740,
+            3354138,
+            3364736,
+            3385486,
+            3405583
+          ],
+          "median_ns": 3385486,
+          "memory": {
+            "process_bytes": 55184,
+            "vm_bytes": 44272016
+          },
+          "peak_rss_bytes": 71041024
+        },
+        {
+          "samples_ns": [
+            3496324,
+            3409884,
+            3587222,
+            3475361,
+            3447560
+          ],
+          "median_ns": 3475361,
+          "memory": {
+            "process_bytes": 55184,
+            "vm_bytes": 44281304
+          },
+          "peak_rss_bytes": 71122944
+        },
+        {
+          "samples_ns": [
+            3524680,
+            3495254,
+            3491296,
+            3477555,
+            3383212
+          ],
+          "median_ns": 3491296,
+          "memory": {
+            "process_bytes": 55184,
+            "vm_bytes": 44282288
+          },
+          "peak_rss_bytes": 70942720
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "erlang",
+      "fixture": "exact_numbers_1000",
+      "bytes": 20001,
+      "input_sha256": "72fc87ed7ec58588ce082940a96050f644dc5c287fd3388a301510ef15db77f8",
+      "iterations_per_batch": 9,
+      "median_ns": 962263,
+      "vm_median_range_ns": [
+        943171,
+        969273
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            962263,
+            1035166,
+            1007615,
+            901300,
+            959078
+          ],
+          "median_ns": 962263,
+          "memory": {
+            "process_bytes": 142856,
+            "vm_bytes": 44280911
+          },
+          "peak_rss_bytes": 71155712
+        },
+        {
+          "samples_ns": [
+            971819,
+            941412,
+            943171,
+            909578,
+            995541
+          ],
+          "median_ns": 943171,
+          "memory": {
+            "process_bytes": 142856,
+            "vm_bytes": 44260719
+          },
+          "peak_rss_bytes": 71024640
+        },
+        {
+          "samples_ns": [
+            969273,
+            952587,
+            991976,
+            969287,
+            888893
+          ],
+          "median_ns": 969273,
+          "memory": {
+            "process_bytes": 142856,
+            "vm_bytes": 44280959
+          },
+          "peak_rss_bytes": 71172096
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "javascript",
+      "fixture": "small_record",
+      "bytes": 44,
+      "input_sha256": "155618b5f23b6e7f77cee3a2c741378d576edef4c6231889a90026e2db286273",
+      "iterations_per_batch": 200,
+      "median_ns": 10545,
+      "vm_median_range_ns": [
+        10062,
+        10563
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            14916,
+            13426,
+            10545,
+            10166,
+            9324
+          ],
+          "median_ns": 10545,
+          "memory": {
+            "rss": 55050240,
+            "heapTotal": 11354112,
+            "heapUsed": 6021640,
+            "external": 2174145,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 55361536
+        },
+        {
+          "samples_ns": [
+            14965,
+            15122,
+            10563,
+            10555,
+            10346
+          ],
+          "median_ns": 10563,
+          "memory": {
+            "rss": 55001088,
+            "heapTotal": 11091968,
+            "heapUsed": 6021144,
+            "external": 2174145,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 55312384
+        },
+        {
+          "samples_ns": [
+            14640,
+            13905,
+            10062,
+            9756,
+            9240
+          ],
+          "median_ns": 10062,
+          "memory": {
+            "rss": 54771712,
+            "heapTotal": 10829824,
+            "heapUsed": 6021480,
+            "external": 2174145,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 55033856
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "javascript",
+      "fixture": "response_50",
+      "bytes": 2301,
+      "input_sha256": "d46e09cef7a6fa8a684c0739a3ff61ffa5ea20125ac736675e5159497287720b",
+      "iterations_per_batch": 86,
+      "median_ns": 383207,
+      "vm_median_range_ns": [
+        372827,
+        391335
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            385795,
+            381795,
+            372827,
+            347558,
+            347335
+          ],
+          "median_ns": 372827,
+          "memory": {
+            "rss": 55869440,
+            "heapTotal": 11878400,
+            "heapUsed": 6223664,
+            "external": 2008152,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 56164352
+        },
+        {
+          "samples_ns": [
+            397473,
+            392220,
+            383207,
+            357197,
+            352595
+          ],
+          "median_ns": 383207,
+          "memory": {
+            "rss": 56573952,
+            "heapTotal": 11878400,
+            "heapUsed": 6223696,
+            "external": 2008152,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 56885248
+        },
+        {
+          "samples_ns": [
+            391335,
+            727303,
+            689350,
+            365541,
+            353136
+          ],
+          "median_ns": 391335,
+          "memory": {
+            "rss": 56131584,
+            "heapTotal": 11354112,
+            "heapUsed": 6218208,
+            "external": 2008152,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 56410112
+        }
+      ]
+    },
+    {
+      "implementation": "baseline",
+      "target": "javascript",
+      "fixture": "ints_10000",
+      "bytes": 20001,
+      "input_sha256": "7ea81ee0dbbdd45f4ab8993e8f4cf3f0692f71ae74ffdd28518cc1a0a769bb70",
+      "iterations_per_batch": 9,
+      "median_ns": 10196231,
+      "vm_median_range_ns": [
+        10031976,
+        10834486
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            10926629,
+            10484708,
+            11242509,
+            10834486,
+            10145347
+          ],
+          "median_ns": 10834486,
+          "memory": {
+            "rss": 66093056,
+            "heapTotal": 26034176,
+            "heapUsed": 6549272,
+            "external": 2025852,
+            "arrayBuffers": 157512
+          },
+          "peak_rss_bytes": 66387968
+        },
+        {
+          "samples_ns": [
+            10144893,
+            10196231,
+            11277638,
+            10717143,
+            9925926
+          ],
+          "median_ns": 10196231,
+          "memory": {
+            "rss": 66453504,
+            "heapTotal": 26034176,
+            "heapUsed": 6549016,
+            "external": 2025852,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 66699264
+        },
+        {
+          "samples_ns": [
+            10563611,
+            10026541,
+            10587944,
+            10031976,
+            10020296
+          ],
+          "median_ns": 10031976,
+          "memory": {
+            "rss": 65994752,
+            "heapTotal": 26034176,
+            "heapUsed": 6548984,
+            "external": 2025852,
+            "arrayBuffers": 157512
+          },
+          "peak_rss_bytes": 66256896
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "erlang",
+      "fixture": "small_record",
+      "bytes": 44,
+      "input_sha256": "155618b5f23b6e7f77cee3a2c741378d576edef4c6231889a90026e2db286273",
+      "iterations_per_batch": 200,
+      "median_ns": 1254,
+      "vm_median_range_ns": [
+        1231,
+        1269
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            1367,
+            1280,
+            1186,
+            1160,
+            1231
+          ],
+          "median_ns": 1231,
+          "memory": {
+            "process_bytes": 2872,
+            "vm_bytes": 44278792
+          },
+          "peak_rss_bytes": 70893568
+        },
+        {
+          "samples_ns": [
+            1535,
+            1497,
+            1211,
+            1254,
+            1242
+          ],
+          "median_ns": 1254,
+          "memory": {
+            "process_bytes": 2872,
+            "vm_bytes": 44278728
+          },
+          "peak_rss_bytes": 71122944
+        },
+        {
+          "samples_ns": [
+            1664,
+            1441,
+            1269,
+            1212,
+            1243
+          ],
+          "median_ns": 1269,
+          "memory": {
+            "process_bytes": 2872,
+            "vm_bytes": 44278752
+          },
+          "peak_rss_bytes": 71581696
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "erlang",
+      "fixture": "response_50",
+      "bytes": 2301,
+      "input_sha256": "d46e09cef7a6fa8a684c0739a3ff61ffa5ea20125ac736675e5159497287720b",
+      "iterations_per_batch": 86,
+      "median_ns": 55881,
+      "vm_median_range_ns": [
+        52717,
+        56943
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            50180,
+            56049,
+            55501,
+            51193,
+            52717
+          ],
+          "median_ns": 52717,
+          "memory": {
+            "process_bytes": 8904,
+            "vm_bytes": 44282784
+          },
+          "peak_rss_bytes": 71106560
+        },
+        {
+          "samples_ns": [
+            61203,
+            57819,
+            55881,
+            54141,
+            54375
+          ],
+          "median_ns": 55881,
+          "memory": {
+            "process_bytes": 8904,
+            "vm_bytes": 44282824
+          },
+          "peak_rss_bytes": 71352320
+        },
+        {
+          "samples_ns": [
+            52655,
+            57359,
+            56943,
+            62510,
+            56292
+          ],
+          "median_ns": 56943,
+          "memory": {
+            "process_bytes": 8904,
+            "vm_bytes": 44282680
+          },
+          "peak_rss_bytes": 71385088
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "erlang",
+      "fixture": "ints_10000",
+      "bytes": 20001,
+      "input_sha256": "7ea81ee0dbbdd45f4ab8993e8f4cf3f0692f71ae74ffdd28518cc1a0a769bb70",
+      "iterations_per_batch": 9,
+      "median_ns": 1162092,
+      "vm_median_range_ns": [
+        1157884,
+        1167930
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            1213898,
+            1136291,
+            1153944,
+            1167930,
+            1170828
+          ],
+          "median_ns": 1167930,
+          "memory": {
+            "process_bytes": 230544,
+            "vm_bytes": 44507456
+          },
+          "peak_rss_bytes": 72253440
+        },
+        {
+          "samples_ns": [
+            1349388,
+            1156597,
+            1157509,
+            1435328,
+            1157884
+          ],
+          "median_ns": 1157884,
+          "memory": {
+            "process_bytes": 230544,
+            "vm_bytes": 44507496
+          },
+          "peak_rss_bytes": 72237056
+        },
+        {
+          "samples_ns": [
+            1208148,
+            1147481,
+            1199967,
+            1116560,
+            1162092
+          ],
+          "median_ns": 1162092,
+          "memory": {
+            "process_bytes": 230544,
+            "vm_bytes": 44507456
+          },
+          "peak_rss_bytes": 72384512
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "erlang",
+      "fixture": "ints_limit",
+      "bytes": 524287,
+      "input_sha256": "6c4a9981b89abdfca94f3fdfc55a14db5f18a8c5978ad4a823892c0f1316ff9d",
+      "iterations_per_batch": 1,
+      "median_ns": 41344458,
+      "vm_median_range_ns": [
+        40111167,
+        44084083
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            42992417,
+            38956166,
+            44415291,
+            41344458,
+            40566416
+          ],
+          "median_ns": 41344458,
+          "memory": {
+            "process_bytes": 6665232,
+            "vm_bytes": 51450912
+          },
+          "peak_rss_bytes": 133857280
+        },
+        {
+          "samples_ns": [
+            45037708,
+            40355125,
+            43344291,
+            44084083,
+            46172208
+          ],
+          "median_ns": 44084083,
+          "memory": {
+            "process_bytes": 6665232,
+            "vm_bytes": 51450752
+          },
+          "peak_rss_bytes": 134086656
+        },
+        {
+          "samples_ns": [
+            43569167,
+            38331416,
+            42720083,
+            39851416,
+            40111167
+          ],
+          "median_ns": 40111167,
+          "memory": {
+            "process_bytes": 6665232,
+            "vm_bytes": 51450856
+          },
+          "peak_rss_bytes": 134479872
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "erlang",
+      "fixture": "decimals_1000",
+      "bytes": 20001,
+      "input_sha256": "72fc87ed7ec58588ce082940a96050f644dc5c287fd3388a301510ef15db77f8",
+      "iterations_per_batch": 9,
+      "median_ns": 269134,
+      "vm_median_range_ns": [
+        251046,
+        271597
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            262518,
+            284046,
+            269134,
+            252162,
+            290713
+          ],
+          "median_ns": 269134,
+          "memory": {
+            "process_bytes": 55200,
+            "vm_bytes": 44332432
+          },
+          "peak_rss_bytes": 71335936
+        },
+        {
+          "samples_ns": [
+            251046,
+            251509,
+            246458,
+            237412,
+            294393
+          ],
+          "median_ns": 251046,
+          "memory": {
+            "process_bytes": 55200,
+            "vm_bytes": 44332200
+          },
+          "peak_rss_bytes": 71286784
+        },
+        {
+          "samples_ns": [
+            271597,
+            265199,
+            264074,
+            283879,
+            300861
+          ],
+          "median_ns": 271597,
+          "memory": {
+            "process_bytes": 55200,
+            "vm_bytes": 44332168
+          },
+          "peak_rss_bytes": 71335936
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "erlang",
+      "fixture": "exact_numbers_1000",
+      "bytes": 20001,
+      "input_sha256": "72fc87ed7ec58588ce082940a96050f644dc5c287fd3388a301510ef15db77f8",
+      "iterations_per_batch": 9,
+      "median_ns": 773055,
+      "vm_median_range_ns": [
+        769583,
+        776444
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            773055,
+            789699,
+            748949,
+            733921,
+            809032
+          ],
+          "median_ns": 773055,
+          "memory": {
+            "process_bytes": 142872,
+            "vm_bytes": 44433970
+          },
+          "peak_rss_bytes": 71581696
+        },
+        {
+          "samples_ns": [
+            738041,
+            761916,
+            776444,
+            793296,
+            814847
+          ],
+          "median_ns": 776444,
+          "memory": {
+            "process_bytes": 142872,
+            "vm_bytes": 44433906
+          },
+          "peak_rss_bytes": 71385088
+        },
+        {
+          "samples_ns": [
+            750611,
+            769583,
+            781782,
+            749175,
+            801638
+          ],
+          "median_ns": 769583,
+          "memory": {
+            "process_bytes": 142872,
+            "vm_bytes": 44434066
+          },
+          "peak_rss_bytes": 71581696
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "javascript",
+      "fixture": "small_record",
+      "bytes": 44,
+      "input_sha256": "155618b5f23b6e7f77cee3a2c741378d576edef4c6231889a90026e2db286273",
+      "iterations_per_batch": 200,
+      "median_ns": 11280,
+      "vm_median_range_ns": [
+        11167,
+        12338
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            16895,
+            15794,
+            12338,
+            10727,
+            10156
+          ],
+          "median_ns": 12338,
+          "memory": {
+            "rss": 55132160,
+            "heapTotal": 11091968,
+            "heapUsed": 6118944,
+            "external": 2179589,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 55443456
+        },
+        {
+          "samples_ns": [
+            15912,
+            14492,
+            11167,
+            9681,
+            9216
+          ],
+          "median_ns": 11167,
+          "memory": {
+            "rss": 55443456,
+            "heapTotal": 10829824,
+            "heapUsed": 6118944,
+            "external": 2179589,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 55689216
+        },
+        {
+          "samples_ns": [
+            17980,
+            13920,
+            11280,
+            10478,
+            9896
+          ],
+          "median_ns": 11280,
+          "memory": {
+            "rss": 55705600,
+            "heapTotal": 11354112,
+            "heapUsed": 6118880,
+            "external": 2179589,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 55967744
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "javascript",
+      "fixture": "response_50",
+      "bytes": 2301,
+      "input_sha256": "d46e09cef7a6fa8a684c0739a3ff61ffa5ea20125ac736675e5159497287720b",
+      "iterations_per_batch": 86,
+      "median_ns": 387253,
+      "vm_median_range_ns": [
+        371321,
+        391504
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            407631,
+            405337,
+            387253,
+            354543,
+            358584
+          ],
+          "median_ns": 387253,
+          "memory": {
+            "rss": 56754176,
+            "heapTotal": 11878400,
+            "heapUsed": 6317568,
+            "external": 2008152,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 57065472
+        },
+        {
+          "samples_ns": [
+            400095,
+            391504,
+            401813,
+            361805,
+            358329
+          ],
+          "median_ns": 391504,
+          "memory": {
+            "rss": 56885248,
+            "heapTotal": 11616256,
+            "heapUsed": 6311840,
+            "external": 2008152,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 57163776
+        },
+        {
+          "samples_ns": [
+            409572,
+            392306,
+            371321,
+            352825,
+            353085
+          ],
+          "median_ns": 371321,
+          "memory": {
+            "rss": 56426496,
+            "heapTotal": 11878400,
+            "heapUsed": 6317568,
+            "external": 2008152,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 56737792
+        }
+      ]
+    },
+    {
+      "implementation": "production",
+      "target": "javascript",
+      "fixture": "ints_10000",
+      "bytes": 20001,
+      "input_sha256": "7ea81ee0dbbdd45f4ab8993e8f4cf3f0692f71ae74ffdd28518cc1a0a769bb70",
+      "iterations_per_batch": 9,
+      "median_ns": 10018699,
+      "vm_median_range_ns": [
+        9970861,
+        10560152
+      ],
+      "trials": [
+        {
+          "samples_ns": [
+            10030666,
+            9635222,
+            11088615,
+            10560152,
+            11567416
+          ],
+          "median_ns": 10560152,
+          "memory": {
+            "rss": 65961984,
+            "heapTotal": 27344896,
+            "heapUsed": 6640416,
+            "external": 2025852,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 66240512
+        },
+        {
+          "samples_ns": [
+            10018699,
+            9985370,
+            10699069,
+            10332893,
+            9728819
+          ],
+          "median_ns": 10018699,
+          "memory": {
+            "rss": 65552384,
+            "heapTotal": 26558464,
+            "heapUsed": 6640416,
+            "external": 2025852,
+            "arrayBuffers": 137475
+          },
+          "peak_rss_bytes": 65830912
+        },
+        {
+          "samples_ns": [
+            10550291,
+            9970861,
+            10668805,
+            9735560,
+            9632444
+          ],
+          "median_ns": 9970861,
+          "memory": {
+            "rss": 65798144,
+            "heapTotal": 26034176,
+            "heapUsed": 6641832,
+            "external": 2025852,
+            "arrayBuffers": 157512
+          },
+          "peak_rss_bytes": 66076672
+        }
+      ]
+    }
+  ],
+  "source_hashes_verified_unchanged": true
+}
