@@ -1,9 +1,9 @@
 #!/bin/sh
-# Run from the repository Nix shell. Generation is a development-only package.
+# Run from the repository Nix shell. Generation is an explicit build task.
 set -eu
 cd "$(dirname "$0")/.."
 repository=$(pwd)
-consumer="$repository/codegen/consumer"
+consumer="$repository/examples/codegen"
 output=$(mktemp -d)
 trap 'rm -rf "$output"' EXIT HUP INT TERM
 (
@@ -51,12 +51,8 @@ PYCODE
   for target in erlang javascript; do
     gleam build --target="$target" --warnings-as-errors
   done
-  if grep json_blueprint_codegen manifest.toml; then
-    echo "The generator leaked into production dependencies" >&2
-    exit 1
-  fi
   # The positive production build above rules out unrelated dependency failures.
-  cp "$repository/codegen/consumer/number_is_not_float.gleam.txt" src/number_is_not_float.gleam
+  cp "$repository/examples/codegen/number_is_not_float.gleam.txt" src/number_is_not_float.gleam
   for target in erlang javascript; do
     if gleam check --target="$target" >number-negative.log 2>&1; then
       echo "An exact Number was accepted as a native Float" >&2

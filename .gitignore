@@ -3,7 +3,8 @@
 *.beam
 *.ez
 /build
-/codegen/build
+/examples/codegen/build
+/examples/codegen/generate/build
 erl_crash.dump
 .render/
 **/.render/

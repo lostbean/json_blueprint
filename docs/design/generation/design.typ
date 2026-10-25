@@ -8,7 +8,7 @@
     #invariant(title: "A failed generation returns no module", enforcement: "mechanism")[Invalid names, name collisions, and unsupported shapes return a typed failure. No partial source is returned, and generation performs no file effect.]
     #principle(title: "Keep generation out of application runtime")[Generated applications depend on the contracts runtime and their compiled source. The build compiler, not schema text at runtime, supplies each native type.]
     #points(
-      [Generator placement is recorded in #adr(8). Contracts supplies the codec, schema, and runtime helpers that generated source uses, as declared in #lnk("../../CONTEXT-MAP.md")[the context map].],
+      [The generators share the json_blueprint package and release version; their placement is recorded in #adr(8). Contracts supplies the codec, schema, and runtime helpers that generated source uses, as declared in #lnk("../../CONTEXT-MAP.md")[the context map].],
     )
   ])
 
@@ -38,7 +38,7 @@
 
   #section(title: "Source generation", lead: [Development tools return reviewable source. Runtime document loading never constructs a new native type.], body: [
     #subsection(title: "Typed-definition generator")[
-      #answers(title: "Codegen definition boundary", responsibility: [Lower a typed definition to a standalone Gleam module with matching runtime behavior.], interface: [Dev-only json_blueprint_codegen: Definition, named_mapping, enum_variant, runtime, compile.], interactions: [The runtime codec is checked before lowering. Generated source uses runtime internal/generated helpers under the versioned compatibility contract.], invariants: [Names/references are explicit. Generated applications do not depend on the generator package.], failure: [CompileError preserves invalid names/references/imports, invalid definitions, unavailable schemas, unsupported constructors, and native-number restrictions.])
+      #answers(title: "Codegen definition boundary", responsibility: [Lower a typed definition to a standalone Gleam module with matching runtime behavior.], interface: [json/blueprint/codegen: Definition, named_mapping, enum_variant, runtime, compile.], interactions: [The runtime codec is checked before lowering. Generated source uses runtime internal/generated helpers under the versioned compatibility contract.], invariants: [Names/references are explicit. Runtime conversion does not invoke generation.], failure: [CompileError preserves invalid names/references/imports, invalid definitions, unavailable schemas, unsupported constructors, and native-number restrictions.])
       #entity(id: "generation-definition", title: "Definition(a)", description: [Immutable source-lowering definition whose native type belongs to the compiled caller.], kind: "value-object", owner: "Source generation", domain: "JSON contracts", lifecycle: "immutable", tint: "teal")[
         #attribute(name: "Runtime and source model", type: "Codec(a) × native type expression × lowering function", provenance: "derived")[Definition constructors compose a runtime codec and source instructions. Source names remain explicit input where functions cannot be inspected.]
         #relates(cardinality: "1 : 1")[Definition retains exactly one runtime codec. Its properties and mappings may retain multiple child definitions.]
@@ -58,7 +58,7 @@
         [Qualified callback/constructor names and type/import references are validated as source forms. Compilation checks referenced function types; same-typed callbacks paired with different source references remain a caller trust boundary. Parity tests must compare interpreted and generated behavior.],
         [A generated module exports Value encode/decode, strict text encode/decode, the explicitly distinct native JSON decoder, a schema accessor, and a codec accessor. Strict generated decoding uses the common Value parser; native decoding uses gleam/json after a 1 MiB byte check and does not inherit strict depth/number policies.],
         [Generation returns source only. The caller owns file writing, formatting, compiling, reviewing, committing generated output, and drift checks. Package internal/generated helper names/signatures consumed by checked-in output remain stable within a major version; internal marking alone does not eliminate that compatibility obligation.],
-        [Sources: #lnk("../../../codegen/src/json/blueprint/codegen.gleam")[generator], #lnk("../../../src/json/blueprint/internal/generated.gleam")[runtime helper contract], #lnk("../../../codegen/test/compiled_codec_test.gleam")[compiled source fixtures], and #lnk("../../../codegen/README.md")[build workflow]. #adr(8) records ownership.],
+        [Sources: #lnk("../../../src/json/blueprint/codegen.gleam")[generator], #lnk("../../../src/json/blueprint/internal/generated.gleam")[runtime helper contract], #lnk("../../../test/compiled_codec_test.gleam")[compiled source fixtures], and #lnk("../../../README.md")[build workflow]. #adr(8) records ownership.],
       )
     ]
     #subsection(title: "Schema materialization")[
@@ -66,14 +66,14 @@
         [The internal materializer exports functions that implement #term("term-schema-materialization"): they reconstruct checked schema structure without constructing codec callbacks. It validates module/accessor names, rejects duplicate accessor names, sorts exports by accessor name, and escapes labels as data.],
         [Materialized schema functions may allocate a schema tree on each call. They generate neither native record types nor native codecs, and they establish no constant-evaluation or constant-time lookup guarantee.],
         [Lowering emits supported tree constructors and preserves descriptions, child schemas, property requiredness, and variant payload presence. Unknown or unsupported structure returns a located MaterializationError rather than dropping constraints.],
-        [Sources: #lnk("../../../codegen/src/json/blueprint/codegen/internal/schema_materialize.gleam")[materializer] and #lnk("../../../codegen/test/schema_materialization_test.gleam")[schema materialization evidence].],
+        [Sources: #lnk("../../../src/json/blueprint/codegen/internal/schema_materialize.gleam")[materializer] and #lnk("../../../test/schema_materialization_test.gleam")[schema materialization evidence].],
       )
     ]
     #subsection(title: "Schema-driven native generator")[
-      #answers(title: "Schema generation boundary", responsibility: [Generate native record types and a typed codec from an admitted closed-object schema.], interface: [Dev-only json/blueprint/codegen/schema.compile(module_path: String, name: String, schema: codec.Schema) returns Result(codegen.GeneratedModule, schema.CompileError).], interactions: [The build compiler creates native types from returned source. Generated codec expressions use public codec combinators.], invariants: [No supported constraint is discarded. Native fields retain their original wire names through their codecs.], failure: [Typed generation failures distinguish invalid names, conflicting names, and unsupported shapes with logical schema paths. No partial module is returned.])
+      #answers(title: "Schema generation boundary", responsibility: [Generate native record types and a typed codec from an admitted closed-object schema.], interface: [json/blueprint/codegen/schema.compile(module_path: String, name: String, schema: codec.Schema) returns Result(codegen.GeneratedModule, schema.CompileError).], interactions: [The build compiler creates native types from returned source. Generated codec expressions use public codec combinators.], invariants: [No supported constraint is discarded. Native fields retain their original wire names through their codecs.], failure: [Typed generation failures distinguish invalid names, conflicting names, and unsupported shapes with logical schema paths. No partial module is returned.])
       #points(
         [The #term("term-schema-driven-generator") accepts only a closed-object root. The explicit name is a validated lowercase accessor stem: order selects public Order and `order_codec()`. The module path follows the existing generator's source-path validation.],
-        [Generated root and nested record types are public so consumers can construct native values. Only the root codec accessor is public; nested codec functions are private. Generated applications depend on the runtime package and their compiled source, not the dev-only generator.],
+        [Generated root and nested record types are public so consumers can construct native values. Only the root codec accessor is public; nested codec functions are private. Generated applications depend on JSON Blueprint and their compiled source; generation runs only when explicitly invoked.],
         [The generated module uses ordinary public codec constructors and record continuations. It does not emit a second Value validator or route through the typed-definition generator's specialized emitter. Caller mappings from generated records to business types remain application-owned.],
         [Calling the root accessor constructs its codec and prebinds child codec definitions before field continuations. Exact bounds are reconstructed during that construction; retaining the returned codec reuses those child definitions and bounds across conversions. Each accessor call constructs a new codec without a global cache.],
       )
@@ -131,14 +131,14 @@
         #then[Their source and content fingerprints are identical.]
       ]
       #points(
-        [The #lnk("../../../codegen/consumer/README.md")[separate consumer] loads an order schema, compiles generated records, adds an application-owned envelope and dispatch policy, and tests failure recovery. Its separate generation task owns file effects and works before the generated application module exists. The #lnk("../../../scripts/check-schema-consumer.sh")[consumer check] regenerates source into a disposable consumer, runs the consumer tests on both targets, and compiles a production copy without the generator dependency.],
+        [The #lnk("../../../examples/codegen/README.md")[separate consumer] loads an order schema, compiles generated records, adds an application-owned envelope and dispatch policy, and tests failure recovery. Its separate generation task owns file effects and works before the generated application module exists. The #lnk("../../../scripts/check-schema-consumer.sh")[consumer check] regenerates source into a disposable consumer, runs the consumer tests on both targets, and compiles a production copy without development dependencies.],
         [The consumer's two-target corpus uses portable native bounds. Acceptance comparison distinguishes exact wire acceptance from native Int projection failures; it does not claim full-profile parity or general JSON Schema conformance. CPU, construction, generation, and allocation measurements are separate evidence and impose no timing assertion on semantic tests. #adr(8) records the implementation choice.],
       )
     ]
     #subsection(title: "Generated parity and verification")[
       #points(
         [Generated fixture tests format and compare regenerated source, compile retained modules, compare schema bytes and behavior, and run both targets. Named mapping references need parity evidence beyond source type checking.],
-        [A separate consumer regenerates its module, compares it with committed output, runs its tests on both targets, and builds an isolated production copy without the generator. The same consumer owns the acceptance corpus and the comparison harness for cost measurements.],
+        [A separate consumer regenerates its module, compares it with committed output, runs its tests on both targets, and builds an isolated production copy without development dependencies. The same consumer owns the acceptance corpus and the comparison harness for cost measurements.],
         [Benchmarks of generation, codec construction, and conversion are observations rather than semantic limits. #adr(10) records the method and the accepted findings.],
       )
     ]

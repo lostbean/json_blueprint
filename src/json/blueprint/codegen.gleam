@@ -1,8 +1,8 @@
 //// Codec definitions that run as a `Codec(a)` and compile to a Gleam module
 //// with the same encoder, decoders and schema.
 ////
-//// This module belongs to `json_blueprint_codegen`, a dev-only package: use
-//// it in a build task or a test, not at run time. A `Definition(a)` is built
+//// This module is included in `json_blueprint`. Use it in an explicit build
+//// task or a test. A `Definition(a)` is built
 //// from the same shapes as `json/blueprint/codec`; mappings to your own types
 //// name their functions (`named_mapping`, `enum_variant`) because the
 //// generated source must call them. `runtime` returns the definition's codec.

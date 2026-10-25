@@ -9,7 +9,7 @@ output=$(cd "$output" && pwd)
 {
   git rev-parse HEAD
   git status --porcelain
-  sha256sum flake.lock gleam.toml manifest.toml codegen/gleam.toml codegen/manifest.toml
+  sha256sum flake.lock gleam.toml manifest.toml
   gleam --version
   erl +S 1:1 -noshell -eval 'io:format("Erlang/OTP ~s~n", [erlang:system_info(otp_release)]), halt().'
   node --version
@@ -18,7 +18,7 @@ output=$(cd "$output" && pwd)
   uname -s -m
 } >"$output/provenance.txt"
 for target in erlang javascript; do
-  if (cd codegen && gleam run --target "$target" -m bench_test) >"$output/$target.log" 2>&1; then
+  if gleam run --target "$target" -m bench_test >"$output/$target.log" 2>&1; then
     cat "$output/$target.log"
   else
     status=$?

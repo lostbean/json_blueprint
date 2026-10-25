@@ -10,7 +10,7 @@ import platform
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
-CONSUMER = ROOT / "codegen/consumer"
+CONSUMER = ROOT / "examples/codegen"
 
 
 def run(command, cwd, output, env):
@@ -47,7 +47,7 @@ def main():
     versions["erlang_flags"] = env["ERL_FLAGS"]
     (output / "environment.json").write_text(json.dumps(versions, indent=2) + "\n")
     inputs = {}
-    for source_root in [ROOT / "src", ROOT / "codegen/src", CONSUMER]:
+    for source_root in [ROOT / "src", CONSUMER]:
         for path in sorted(source_root.rglob("*")):
             if (
                 path.is_file()

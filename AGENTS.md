@@ -2,14 +2,14 @@
 
 - JSON Blueprint owns schema-aware values, codecs, schema projection and finite runtime contracts. Protocol admission, business policy and execution belong to consumers.
 - Read the design (`docs/design/`), glossary, coverage and the relevant ADRs before changing behavior. Keep unbuilt intent in the pending ledgers and out of the present-tense design.
-- Preserve the frozen root/schema 1.x surface and the separate dev-only package in `codegen/`. Package version changes require a release decision (ADR 0011).
+- Preserve the frozen root/schema 1.x surface. Source generators belong to this package and run through explicit build tasks. Package version changes require a release decision (ADR 0011).
 - Strict Value parsing and standard JSON/native paths have different precision, duplicate-key and resource guarantees.
 
 ## Commands
 
 - When updating dependency pins, reconcile affected `manifest.toml` files in examples, consumers and nested packages through Gleam, then run the full repository gate; updating the root lock alone is insufficient.
 
-- Application checks, in the Nix shell: `nix develop --command sh scripts/gate.sh` (native compilation, both-target tests for the root and `codegen/` packages, schema consumer, Python oracles).
+- Application checks, in the Nix shell: `nix develop --command sh scripts/gate.sh` (native compilation, both-target tests for the runtime and generators in the root package, schema consumer, Python oracles).
 - Focused checks: `sh scripts/check-schema-consumer.sh`, `python3 test/schema_check.py`, `python3 test/schema_profile_check.py`, `python3 test/number_check.py` (independent Erlang arithmetic oracle).
 - Format named authored files with `nix fmt -- PATH...`. Benchmarks (`sh scripts/benchmark.sh`) are observations and never gate.
 - Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the frozen 1.x API and the migration in `examples/test/`), run by the gate on both targets. Compiled module examples and the codegen consumer run as behavioral tests; README and module-documentation text is reviewed manually.
@@ -61,8 +61,8 @@ for repository formatting. Local test scripts own application compilation and be
 Keep README Gleam examples in compiled example or consumer source. Use named
 `snips-start` / `snips-end` regions (or include a whole example module), and retain
 Prettier ignore ranges around generated README blocks. Format the source first,
-then run `nix run .#snips -- --commands deny README.md codegen/README.md`. CI runs
-`nix run .#snips -- --check --commands deny README.md codegen/README.md` using the shared pinned
+then run `nix run .#snips -- --commands deny README.md`. CI runs
+`nix run .#snips -- --check --commands deny README.md` using the shared pinned
 package. Snips checks synchronization; existing example tests check behavior.
 
 ## Commit messages

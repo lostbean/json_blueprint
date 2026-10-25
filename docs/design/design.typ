@@ -5,7 +5,7 @@
   #section(title: "Foundation", lead: [Two contexts divide the package: #ctx("contracts") owns runtime values, codecs, schemas and validation, and #ctx("generation") owns development-time source generation. Each context states its own goals, invariants and principles.], body: [
     #no-goal(title: "Execute or authorize application operations")[Tool registration, provider admission, transport, job execution, workflow execution, and application policy belong to consumers. Ordinary JSON serialization can use standard Gleam JSON without this package.]
     #no-goal(title: "Claim general JSON Schema conformance")[The #term("term-finite-profile") has bounded independent evidence. A Draft 2020-12 dialect label does not imply support for every keyword or an arbitrary remote schema.]
-    #invariant(title: "Application runtime never depends on the generator", enforcement: "mechanism")[The generator is a separate development-only package. A production build contains the runtime package and generated source, and the consumer check compiles an isolated production copy without the generator dependency.]
+    #invariant(title: "Runtime conversion never invokes generation", enforcement: "mechanism")[The package includes both contexts. Runtime conversion never invokes source generation; the application build explicitly calls generation and compiles its returned source. The consumer check compiles a production copy without development dependencies.]
     #points(
       [Ownership and finite support are recorded in #adr(1). Generation placement is recorded in #adr(8). The release posture of the codec API is recorded in #adr(11).],
     )
@@ -17,7 +17,7 @@
   )
 
   #pagebreak(weak: true)
-  #section(title: "System at a glance", lead: [One package supplies pure values, schemas, codecs and contracts at runtime, and a separate development package supplies source generation.], body: [
+  #section(title: "System at a glance", lead: [One package supplies pure values, schemas, codecs, contracts and explicit source generation.], body: [
     #diagram(altitude: "L1", viewpoint: "context-ownership", title: "Application-owned composition", caption: [Arrows declare dependency direction. Consumers select their own protocol and provider admission policy.], nodes: (
       (id: "app", label: "Application", kind: "actor", tint: "slate"),
       (id: "json", label: "JSON Blueprint", sub: "json_blueprint", kind: "bounded-context", tint: "teal"),
@@ -52,9 +52,9 @@
         [Check], [Scope],
         [Formatting], [A Nix check formats a copied source tree; frozen oracle bytes, generated fixtures, rendered design evidence and build output are excluded],
         [Native compilation], [Authored Erlang FFI compiles independently with warnings as errors],
-        [Package tests], [Compilation with warnings as errors and the test suite on Erlang and JavaScript for the root package and for the codegen package],
+        [Package tests], [Compilation with warnings as errors and the test suite on Erlang and JavaScript for the runtime and generators in the root package],
         [Usage examples], [The examples package builds with warnings as errors, runs its tests on Erlang and JavaScript, and runs once; every usage topic and the legacy and migration forms are compiled code],
-        [Schema consumer], [Fresh generation in disposable packages, tests on both targets, and an isolated production build without the generator],
+        [Schema consumer], [Fresh generation in disposable packages, tests on both targets, and an isolated production build without development dependencies],
         [Independent oracles], [A Python checker compares emitted schemas, decoders and contracts with a Draft 2020-12 validator; a second checker covers retained profile diagnostics. #lnk("../ORACLE.md")[The oracle document] pins the references and states the limits of the comparison],
       ))
       #points(

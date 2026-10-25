@@ -1,43 +1,34 @@
 #!/bin/sh
-# Compile and test application behavior on both
-# targets, for json_blueprint and for the json_blueprint_codegen package in
-# codegen/, then the compiled usage examples in examples/ (built with warnings
-# as errors, tested on both targets and run once, so API drift fails the gate).
-# Each package's own build output is removed first, so a stale
-# module cannot hide a missing one. The Python schema oracle then compares
-# emitted schemas, decoders and contracts against Draft 2020-12.
+# Compile and test the runtime and source generators in one package on both
+# targets, then the separate usage and schema-generation consumers.
+# Each package's own build output is removed first, so a stale module cannot
+# hide a missing one. Python oracles compare the finite schema and number cases.
 set -eu
 cd "$(dirname "$0")/.."
 
-codegen_work=$(mktemp -d "${TMPDIR:-/tmp}/blueprint-codegen.XXXXXX")
-trap 'rm -rf "$codegen_work"' EXIT HUP INT TERM
-find src test codegen/src codegen/test examples/src examples/test -name '*.erl' -type f -exec erlc -Werror -o "$codegen_work" {} +
-cp -R codegen/src codegen/test codegen/gleam.toml codegen/manifest.toml "$codegen_work/"
-python3 - "$codegen_work/gleam.toml" "$PWD" <<'PYCODE'
-import json
-from pathlib import Path
-import sys
-path = Path(sys.argv[1])
-path.write_text(path.read_text().replace('path = ".."', 'path = ' + json.dumps(sys.argv[2])))
-PYCODE
-for package in . "$codegen_work"; do
-  echo "== $package"
-  (
-    cd "$package"
-    rm -rf build/dev/erlang/json_blueprint build/dev/javascript/json_blueprint \
-      build/dev/erlang/json_blueprint_codegen build/dev/javascript/json_blueprint_codegen
+native_output=$(mktemp -d)
+trap 'rm -rf "$native_output"' EXIT HUP INT TERM
+find src test examples/src examples/test examples/codegen/src examples/codegen/test examples/codegen/generate/src -name '*.erl' -type f -exec erlc -Werror -o "$native_output" {} +
 
-    if [ "$package" = "$codegen_work" ]; then
-      gleam run -m compiled_codec_runner
-      gleam run -m schema_codegen_runner
+echo "== json_blueprint"
+rm -rf build/dev/erlang/json_blueprint build/dev/javascript/json_blueprint
+gleam build --target=erlang --warnings-as-errors
+gleam build --target=javascript --warnings-as-errors
+gleam test --target=erlang
+gleam test --target=javascript
 
-    fi
-    gleam build --target=erlang --warnings-as-errors
-    gleam build --target=javascript --warnings-as-errors
-    gleam test --target=erlang
-    gleam test --target=javascript
-  )
-done
+# Compile freshly regenerated typed and schema fixtures without modifying the
+# committed fixtures used by the parity tests above.
+generation_work="$native_output/generation"
+mkdir "$generation_work"
+cp -R src test gleam.toml manifest.toml "$generation_work/"
+(
+  cd "$generation_work"
+  gleam run -m compiled_codec_runner
+  gleam run -m schema_codegen_runner
+  gleam build --target=erlang --warnings-as-errors
+  gleam build --target=javascript --warnings-as-errors
+)
 
 echo "== examples"
 (

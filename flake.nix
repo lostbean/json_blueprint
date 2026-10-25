@@ -43,10 +43,11 @@
           settings.global.excludes = [
             "test/oracle/*"
             "test/schema_manifest.json"
-            "codegen/test/generated/*"
+            "test/generated/*"
             "docs/design/*"
             "build/*"
-            "codegen/build/*"
+            "examples/codegen/build/*"
+            "examples/codegen/generate/build/*"
             "examples/build/*"
             ".ci-results/*"
           ];

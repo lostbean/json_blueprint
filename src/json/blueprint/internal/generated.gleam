@@ -1,4 +1,4 @@
-//// Helpers called by modules that `json_blueprint_codegen` generates.
+//// Helpers called by modules that `json/blueprint/codegen` generates.
 ////
 //// Generated modules live in application repositories, so the names and
 //// signatures here stay stable within a major version of json_blueprint,

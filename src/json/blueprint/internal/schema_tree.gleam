@@ -1,5 +1,5 @@
 //// The representation behind the opaque `codec.Schema`. Only this package
-//// and the modules that `json_blueprint_codegen` generates use it; callers
+//// and the modules that `json/blueprint/codegen` generates use it; callers
 //// read a schema through `codec.view` and `codec.description`, so this type
 //// can gain variants without breaking them. Generated modules construct it
 //// in `const` declarations, so its existing constructors stay as they are

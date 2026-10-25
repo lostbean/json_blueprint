@@ -1,2 +1,2 @@
 target-version = "py311"
-exclude = ["build", "codegen/build", "test/oracle", ".ci-results"]
+exclude = ["build", "test/oracle", ".ci-results"]

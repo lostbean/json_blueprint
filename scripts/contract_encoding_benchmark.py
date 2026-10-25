@@ -23,7 +23,7 @@ def command(*args, cwd=ROOT, env=None):
 
 def source_hashes():
     paths = []
-    for directory in ("src", "codegen/src", "codegen/test"):
+    for directory in ("src", "test"):
         paths.extend(
             path
             for path in (ROOT / directory).rglob("*")
@@ -35,8 +35,6 @@ def source_hashes():
             "flake.lock",
             "gleam.toml",
             "manifest.toml",
-            "codegen/gleam.toml",
-            "codegen/manifest.toml",
             "scripts/contract_encoding_benchmark.py",
         )
     )
@@ -118,7 +116,7 @@ def main():
     for target in ("erlang", "javascript"):
         build = subprocess.run(
             ["gleam", "build", "--target", target, "--warnings-as-errors"],
-            cwd=ROOT / "codegen",
+            cwd=ROOT,
             env=environment,
             text=True,
             stdout=subprocess.PIPE,
@@ -131,7 +129,7 @@ def main():
             print(f"{target} trial {trial}/{args.trials}", flush=True)
             result = subprocess.run(
                 ["gleam", "run", "--target", target, "-m", MODULE],
-                cwd=ROOT / "codegen",
+                cwd=ROOT,
                 env=environment,
                 text=True,
                 stdout=subprocess.PIPE,
