@@ -7,3 +7,5 @@
 - **Alternatives.** Declaring 2.0 now would promise a stable codec surface before the owner accepts it. Bumping a minor version would mix additive and breaking changes under one number.
 - **Consequences.** Applications depend on the codec API by path until a release is decided. The README states the installed 1.7.1 surface separately from the checkout surface. Source and wire consequences for 1.x callers are recorded in ADR-0007 and the legacy section of the design.
 - **Evidence.** The manifest declares 1.7.1 and the latest release tag is `v1.7.1`; no tag exists for the codec API. The development generator package declares 0.1.0 and is not published.
+
+Superseded on 2026-10-25 by [ADR 0013](0013-prepare-the-consolidated-package-as-2-0-0.md#adr-0013), which records the owner's decision to prepare version 2.0.0.

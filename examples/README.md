@@ -32,3 +32,6 @@ schema-aware examples, and [`migration_test.gleam`](test/migration_test.gleam) m
 one record from a 1.x `Decoder` to a `Codec` and shows the wire differences that need
 review. Schema-driven code generation is the separate
 [`examples/codegen`](codegen/README.md).
+
+Follow the [2.0 migration guide](../docs/MIGRATION.md) for the package upgrade
+steps and the separate review of codec wire formats.

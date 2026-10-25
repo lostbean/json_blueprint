@@ -7,14 +7,9 @@
     #no-goal(title: "Claim general JSON Schema conformance")[The #term("term-finite-profile") has bounded independent evidence. A Draft 2020-12 dialect label does not imply support for every keyword or an arbitrary remote schema.]
     #invariant(title: "Runtime conversion never invokes generation", enforcement: "mechanism")[The package includes both contexts. Runtime conversion never invokes source generation; the application build explicitly calls generation and compiles its returned source. The consumer check compiles a production copy without development dependencies.]
     #points(
-      [Ownership and finite support are recorded in #adr(1). Generation placement is recorded in #adr(8). The release posture of the codec API is recorded in #adr(11).],
+      [Ownership and finite support are recorded in #adr(1). Generation placement is recorded in #adr(8). The owner selected version 2.0.0 for the consolidated package in #adr(13), superseding the hold in #adr(11). The #lnk("../MIGRATION.md")[migration guide] separates legacy API upgrade changes from adopting codec wire formats.],
     )
   ])
-
-  #pagebreak(weak: true)
-  #pending-ledger(
-    pending-entry(title: "Release version of the codec API", kind: "ruling", since: "2026-10-08")[The manifest declares 1.7.1 while the codec API, runtime contracts and generator are unreleased. The owner decides when and under which version number they are released; #adr(11) records the hold.],
-  )
 
   #pagebreak(weak: true)
   #section(title: "System at a glance", lead: [One package supplies pure values, schemas, codecs, contracts and explicit source generation.], body: [

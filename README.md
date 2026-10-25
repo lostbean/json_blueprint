@@ -6,8 +6,9 @@ publish a Draft 2020-12 schema from the same definition.
 [![Package Version](https://img.shields.io/hexpm/v/json_blueprint)](https://hex.pm/packages/json_blueprint)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
 
-The codec and runtime-contract APIs described here are unreleased work toward
-2.0. The published 1.7.1 package provides the frozen 1.x API.
+This checkout prepares JSON Blueprint 2.0.0, including codecs, runtime
+contracts, and source generation. Until 2.0.0 is published to Hex, use the Git
+or path dependency below. Published 1.7.1 provides the legacy 1.x API.
 
 ## When to use it
 
@@ -61,8 +62,7 @@ acceptance, while a `Codec(a)` owns conversion to and from an application type.
 
 ## Installation
 
-Use the repository's `main` branch to try the unreleased codec and
-runtime-contract APIs:
+Before the 2.0.0 Hex release, use the repository's `main` branch:
 
 ```toml
 [dependencies]
@@ -72,7 +72,13 @@ json_blueprint = { git = "https://github.com/lostbean/json_blueprint.git", ref =
 Gleam records the resolved Git commit in `manifest.toml`; commit that file to
 keep builds pinned to the same revision.
 
-For the published 1.x API in `json/blueprint` and `json/blueprint/schema`:
+After 2.0.0 is published, install the major version with:
+
+```sh
+gleam add json_blueprint@2
+```
+
+To stay on published 1.x in `json/blueprint` and `json/blueprint/schema`:
 
 ```sh
 gleam add json_blueprint@1.7.1
@@ -197,28 +203,26 @@ behavior. Browser JavaScript is not tested.
 
 ## Upgrading from 1.x
 
-Code using the published 1.x combinators can continue with that API. In this
-checkout, the 1.x decoder remains the choice for recursive types. Legacy unions
-use `{"type": ..., "data": ...}` and enum encoders use `{"enum": ...}`;
-codecs use `{"tag": ..., "value": ...}` and a bare string for an enum. Legacy
-optional fields also treat absence and `null` alike. Review the migration
-example before changing stored or exchanged JSON.
+Follow the [2.0 migration guide](docs/MIGRATION.md) when upgrading from
+published 1.7.1. You can keep using `json/blueprint` and
+`json/blueprint/schema`; adopting the codec API is a separate application
+change. Keep the legacy decoder for recursive types.
 
-Three changes in this checkout:
+1. Build `Decoder` and `FieldDecoder` with the published combinators. Their
+   constructors and record fields are now opaque.
+2. Replace imports of the removed `json/blueprint/dynamic` module with the
+   appropriate `gleam/dynamic/decode` API. `get_dynamic_decoder` still returns
+   a function, and its errors now use that module's `DecodeError` type.
+3. Check large inputs: `blueprint.decode` now rejects text above 1 MiB of UTF-8
+   before parsing. Use `blueprint.decode_with_max_bytes` for an explicit larger
+   bound.
+4. Run your stored JSON and schema fixtures before adopting codecs. Codec
+   records reject unknown fields, optional fields distinguish absence from
+   `null`, and union/enum wire forms differ from the legacy encoders.
 
-- `json/blueprint/dynamic` is internal. Import `gleam/dynamic/decode` instead.
-- `Decoder` and `FieldDecoder` are opaque; build them with combinators rather
-  than record syntax. `get_dynamic_decoder` returns
-  `fn(Dynamic) -> Result(t, List(decode.DecodeError))` with the same
-  `expected`, `found`, and `path` fields.
-- `blueprint.decode` rejects text above 1 MiB before parsing, with a
-  `json.UnableToDecode` error naming the limit. Use
-  `blueprint.decode_with_max_bytes` to raise that bound.
-
-The [migration example](examples/test/migration_test.gleam) compiles and runs
-the same record through both APIs and shows the wire differences to review.
-The 1.x schema module describes a broader set of forms; it is not the runtime
-contract validator described above.
+The [compiled migration example](examples/test/migration_test.gleam) exercises
+both APIs and their wire differences on Erlang and JavaScript. The guide covers
+parser limits, schema support, exact numbers, and source generation as well.
 
 ## Build-time generation
 
@@ -231,9 +235,9 @@ Your build task writes, formats, and compiles the returned source. Both paths us
 JSON Blueprint at runtime.
 
 The generators are included in `json_blueprint` under
-`json/blueprint/codegen` and `json/blueprint/codegen/schema`. The codec API and
-generators in this checkout are unreleased. Use the checkout by path until its
-release version is decided; no separate generator dependency is required:
+`json/blueprint/codegen` and `json/blueprint/codegen/schema`. They share the
+2.0.0 package and need no separate generator dependency. Before the Hex release,
+you can use a local checkout:
 
 ```toml
 [dependencies]
