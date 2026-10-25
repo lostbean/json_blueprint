@@ -1,6 +1,6 @@
 # Native decoding adoption: both targets
 
-Status: implemented in the separate worktree; full repository gate, production benchmarks and temporary downstream validation complete in the native-direct-decoding worktree, 2026-10-25. This is a pre-release change, not a release cut. The frozen legacy API stays available; the selected release version remains 2.0.0.
+Status: integrated on 2026-10-25. Production benchmarks and both repositories' full gates pass. The frozen legacy API stays available; 2.0.0 remains the selected release-preparation version. No release or tag has been cut.
 
 ## Decision and scope
 
@@ -118,9 +118,11 @@ RSS includes the VM and supporting runtime, **not just live JSON objects**. It m
 
 The full repository gate passes: Erlang and JavaScript warnings-as-errors builds and tests, compiled examples, generated-code consumers, all 85 schema/decoder/contract cases, 50 schema-profile fixtures, 62 independent exact-number cases, and 318 upstream plus 901 generated parser cases on each target. The parser oracle uses symbolic exact decimal comparison for huge exponents. Design rendering and validation both pass. Independent implementation review found and fixed source-binary retention and inefficient exponent construction; no remaining correctness issue was identified within the stated contract.
 
-Fresh production benchmarking is complete, with unchanged source hashes verified. The temporary llm_wire migration passes its fast gate (403 Gleam tests and 3 Python tests), design checks and external consumer execution. Its [authored patch](../experiment/llm-wire-byte-admission.patch) applies cleanly; [validation details](../experiment/llm-wire-byte-admission.md) explain the scope. The real sibling checkout and dependency pins remain unchanged. Final integration needs a published/committed Blueprint revision, reconciled consumer manifests and the full consumer gate.
+Fresh production benchmarking is complete, with unchanged source hashes verified.
 
-The implementation is not merged or published. No release has been cut.
+The `llm_wire` migration is committed as `33a732fd956cfbe90c8324e262d0c3b18ac06df7`. Repository integration pins `llm_wire` and its nested consumer to Blueprint commit `909ceb74864898082bf0c6323bb9b3a3af8346ab` through their Git dependency declarations and Gleam-reconciled manifests. The real consumer migration passes its full gate: 403 Gleam tests, 3 Python tests, fresh external API-boundary consumers, native compilation, local TLS/HTTP2 stream cancellation, and concurrency checks through 1,000 callers with no failures. Existing separately owned provider/transcription guards remain unchanged. The earlier [prepared patch](../experiment/llm-wire-byte-admission.patch) and [temporary validation details](../experiment/llm-wire-byte-admission.md) remain historical evidence.
+
+Blueprint's implementation is integrated on `main`. The frozen legacy API remains available. Version 2.0.0 remains the selected release-preparation version; no release or tag has been cut.
 
 ## Recommendation
 
