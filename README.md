@@ -17,7 +17,7 @@ or path dependency below. Published 1.7.1 provides the legacy 1.x API.
 - Validate arguments against a schema received at runtime, such as a tool
   declaration, when the schema fits the supported profile below.
 - Admit untrusted JSON text with duplicate-key rejection, exact numbers, and
-  explicit size, nesting, value-count, and number limits.
+  a configurable byte limit. Applications own additional structural limits.
 
 For ordinary serialization, `gleam/json` is enough. Applications own HTTP,
 authorization, protocol policy, and effects in custom callbacks.
@@ -34,8 +34,8 @@ authorization, protocol policy, and effects in custom callbacks.
   pairs, enums, nullable values, and inclusive numeric bounds.
 - `map`, `try_map`, and `custom` adapt application types; later fields can be
   checked against fields already decoded.
-- Encode and decode failures carry JSON paths; parse failures locate the source
-  position, and definition mistakes have typed errors.
+- Encode and decode failures carry JSON paths, and definition mistakes have
+  typed errors. Native parse-error locations are unavailable.
 - `value.parse` admits bounded text, preserves exact JSON numbers, and rejects
   repeated object keys. `Value` can also bridge to `gleam/json` and
   `gleam/dynamic/decode`.
