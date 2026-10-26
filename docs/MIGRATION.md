@@ -96,24 +96,45 @@ unrepresentable written or normalized exponents and comparison magnitudes
 return `ExponentOutOfRange` rather than silently rounding. Erlang retains exact
 arbitrary-size integer arithmetic.
 
-On Erlang/OTP 27 or later, parsing uses OTP's JSON decoder with duplicate detection and exact
-numeric hooks. Built-in codecs decode its native tree directly; custom Value
-callbacks convert only the subtree they receive. `value.parse` still constructs
-a `Value` tree. Parsed object members follow native map order, not source order;
-errors for malformed JSON use native parser diagnostics rather than the previous
-precise byte, line and column locations. Typed field/index errors remain
-available. Syntax admission completes before typed callbacks run. JavaScript
-retains its exact parser and source locations. Its exact decimal exponent must
-fit the target's safe integer representation. Deep JavaScript input or unusually long numeric tokens can exceed
-the host call stack; this returns `RuntimeCapacityExceeded` rather than a
-configured depth-limit error.
+On Erlang/OTP 27 or later, parsing uses OTP's JSON decoder with duplicate
+detection and exact numeric hooks. JavaScript uses native `JSON.parse` with
+source-text retention for numbers, followed by a scan for decoded duplicate
+names and malformed escaped surrogate pairs. Both targets decode built-in codecs
+from the native tree; custom Value callbacks convert only their subtree.
+`value.parse` still constructs a complete `Value` tree. This is not streaming:
+the JavaScript native tree is allocated before duplicate-key rejection.
 
-On JavaScript, strict text parsing rejects raw unpaired UTF-16 surrogates with
-`InvalidUnicodeScalar` before UTF-8 conversion can replace them. The error
-locates the first unpaired surrogate and retains no source text. The byte
-limit is checked first; escaped malformed surrogate pairs continue to return
-`InvalidUnicodeEscape`. Valid surrogate pairs and the literal replacement
-character remain accepted.
+JavaScript strict parsing requires reviver `context.source` support. The old
+portable parser fallback has been removed. Runtimes without this capability
+return `UnsupportedRuntime`, not a syntax error or rounded values. This applies
+to strict text/byte parsing and codec JSON decoding; the frozen legacy API is
+unchanged. See [browser/runtime requirements and executed checks](BROWSER-SUPPORT.md).
+
+### Diagnostics and object order
+
+Native parsing changes the JavaScript diagnostic contract as well as the Erlang
+contract. Do not match native error wording or depend on source-order errors:
+
+- Native syntax, duplicate-key and raw Unicode-scalar failures have
+  `Location(0, 0, 0)`, meaning unavailable, rather than precise byte/line/column
+  coordinates. Typed field/index paths remain available.
+- Malformed syntax and escaped surrogate pairs return `NativeSyntax`; raw
+  unpaired UTF-16 surrogates return `InvalidUnicodeScalar`. They are rejected
+  before UTF-8 conversion can replace them. Errors retain no source text.
+- A multiply-invalid document may report a different first failure. Native
+  syntax validation precedes duplicate scanning and typed callbacks. Deep
+  malformed nesting can report syntax rather than exhausted host capacity.
+- Erlang objects follow native map order. JavaScript follows `Object.keys`
+  order: array-index names precede other names. Rendering parsed Values and
+  choosing the first unknown field can therefore differ from source order.
+  Array order is unchanged; manually constructed Values retain their order.
+
+The byte bound is checked first. `parse_bits` rejects invalid UTF-8 and a leading
+BOM. JavaScript exact decimal exponents and comparison magnitudes must fit its
+safe-integer representation. Deep structures or long numeric tokens can exceed
+host capacity and return `RuntimeCapacityExceeded`; the byte limit is not a
+memory or stack quota. User callback exceptions remain owned by the caller.
+Valid surrogate pairs and the literal replacement character remain accepted.
 
 `codec.int()` supports at most 24 digits in both directions and requires safe
 integers on JavaScript. Encoding a longer Erlang integer returns `ExpectedInt`;

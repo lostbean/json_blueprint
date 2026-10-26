@@ -86,6 +86,18 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
    character remains valid. These are public-behavior regressions, not a claim
    that Python's byte-based corpus exercises malformed JavaScript host strings.
 
+7. **Browser execution** ([`scripts/check-browsers.mjs`](../scripts/check-browsers.mjs))
+   separately exercises public APIs in Chromium, Firefox and WebKit, asserting
+   numeric source-text support before testing strict behavior.
+   [Browser evidence](BROWSER-SUPPORT.md) records the exact versions and limits.
+
+8. **Unsupported JavaScript runtimes** ([`test/unsupported_runtime_check.mjs`](../test/unsupported_runtime_check.mjs))
+   remove reviver source context before importing the built modules in a separate
+   Node process. The ordinary gate checks explicit `UnsupportedRuntime` refusal,
+   text/byte admission precedence, callback suppression and unchanged legacy
+   decoding. This simulates a missing capability; it does not certify an old
+   browser release.
+
 Both parser corpora and the host-string tests run offline in the ordinary gate.
 They do not certify every JSON parser behavior, browser runtime or resource cost.
 

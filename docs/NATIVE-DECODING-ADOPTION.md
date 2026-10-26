@@ -1,6 +1,8 @@
 # Native decoding adoption: both targets
 
-Status: integrated on 2026-10-25. Production benchmarks and both repositories' full gates pass. The frozen legacy API stays available; 2.0.0 remains the selected release-preparation version. No release or tag has been cut.
+**Historical Erlang-adoption snapshot.** The JavaScript decision below is superseded by [ADR 0015](adr/0015-adopt-javascript-native-hybrid.md); see the current [migration guide](MIGRATION.md) and [benchmarks](BENCHMARKS.md). Commit pins and verification counts below describe this earlier integration, not the latest checkout.
+
+Status at capture: integrated on 2026-10-25. Production benchmarks and both repositories' full gates pass. The frozen legacy API stays available; 2.0.0 remains the selected release-preparation version. No release or tag has been cut.
 
 ## Decision and scope
 

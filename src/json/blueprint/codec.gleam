@@ -59,10 +59,11 @@
 //// the fields before it; see `try_map`.
 ////
 //// `decode_json` applies a 1 MiB byte bound and rejects duplicate keys.
-//// `decode_json_with_limits` takes a different byte bound. Erlang decodes
+//// `decode_json_with_limits` takes a different byte bound. Both targets decode
 //// built-in codecs directly from the native parse tree; custom codecs and
 //// `value()` materialize their requested `Value` subtree. JavaScript uses
-//// the portable parser. Neither path applies a depth or value-count limit.
+//// JSON.parse with exact source retention and strict duplicate/Unicode checks.
+//// Neither target applies a depth or value-count limit.
 //// `to_json` and `decoder` bridge to `gleam/json` and
 //// `gleam/dynamic/decode`.
 ////
@@ -465,22 +466,11 @@ pub fn decode_json_with_limits(
   text: String,
   limits: value.Limits,
 ) -> Result(a, DecodeError) {
-  case native.supported() {
-    True -> {
-      use raw <- result.try(
-        value.parse_native(text, limits)
-        |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) }),
-      )
-      codec.native_decode(raw)
-    }
-    False -> {
-      use raw <- result.try(
-        value.parse(text, limits)
-        |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) }),
-      )
-      codec.decode(raw)
-    }
-  }
+  use raw <- result.try(
+    value.parse_native(text, limits)
+    |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) }),
+  )
+  codec.native_decode(raw)
 }
 
 /// Encode to `gleam/json`, for libraries that take `json.Json`. Numbers are
@@ -647,7 +637,10 @@ pub fn int() -> Codec(Int) {
     },
     decode_int,
     fn(raw) {
-      native.int(raw) |> result.replace_error(DecodeError([], ExpectedInt))
+      native.int(raw)
+      |> result.map_error(fn(error) {
+        native_numeric_failure(error, ExpectedInt)
+      })
     },
     tree.IntSchema,
     0,
@@ -701,6 +694,11 @@ pub fn float() -> Codec(Float) {
         Ok(item) -> Ok(item)
         Error(native.NotNumber) -> fail(ExpectedNumber)
         Error(native.Unrepresentable) -> fail(FloatOutOfRange)
+        Error(native.ProjectionCapacity) ->
+          Error(native_numeric_failure(
+            native.ProjectionCapacity,
+            FloatOutOfRange,
+          ))
       }
     },
     tree.NumberSchema,
@@ -729,8 +727,29 @@ fn zero() -> Number {
   found
 }
 
+// Capacity exhaustion is neither invalid JSON number syntax nor a wrong type.
+fn native_numeric_failure(
+  error: native.NumericError,
+  fallback: Reason,
+) -> DecodeError {
+  case error {
+    native.ProjectionCapacity ->
+      DecodeError(
+        [],
+        InvalidJson(value.ParseError(
+          value.Location(0, 0, 0),
+          value.RuntimeCapacityExceeded,
+        )),
+      )
+    _ -> DecodeError([], fallback)
+  }
+}
+
 fn native_number(raw: native.Raw) -> Result(Number, DecodeError) {
-  native.number(raw) |> result.replace_error(DecodeError([], ExpectedNumber))
+  native.number(raw)
+  |> result.map_error(fn(error) {
+    native_numeric_failure(error, ExpectedNumber)
+  })
 }
 
 fn native_value(raw: native.Raw) -> Result(Value, DecodeError) {
@@ -814,7 +833,10 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
     native_decode: fn(raw) {
       ensure(defect)
       use item <- result.try(
-        native.number(raw) |> result.replace_error(DecodeError([], ExpectedInt)),
+        native.number(raw)
+        |> result.map_error(fn(error) {
+          native_numeric_failure(error, ExpectedInt)
+        }),
       )
       case number.is_integer(item) {
         False -> fail(ExpectedInt)

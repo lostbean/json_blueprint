@@ -13,40 +13,40 @@ pub fn raw_surrogates_reject_before_utf8_conversion_test() {
     value.parse("\"" <> utf16_unit(unit) <> "\"", value.default_limits())
     |> should.equal(
       Error(value.ParseError(
-        value.Location(1, 1, 2),
+        value.Location(0, 0, 0),
         value.InvalidUnicodeScalar,
       )),
     )
   })
   value.parse("\"" <> utf16_unit(0xD800), value.default_limits())
   |> should.equal(
-    Error(value.ParseError(value.Location(1, 1, 2), value.InvalidUnicodeScalar)),
+    Error(value.ParseError(value.Location(0, 0, 0), value.InvalidUnicodeScalar)),
   )
   value.parse(
     "\"" <> utf16_unit(0xD800) <> utf16_unit(0xD800) <> "\"",
     value.default_limits(),
   )
   |> should.equal(
-    Error(value.ParseError(value.Location(1, 1, 2), value.InvalidUnicodeScalar)),
+    Error(value.ParseError(value.Location(0, 0, 0), value.InvalidUnicodeScalar)),
   )
 }
 
 @target(javascript)
-pub fn raw_surrogate_locations_count_utf8_bytes_and_graphemes_test() {
+pub fn raw_surrogate_diagnostics_are_unlocated_test() {
   let source = "[\r\n\"á🚀" <> utf16_unit(0xDC00) <> "\"]"
   let assert Error(error) = value.parse(source, value.default_limits())
   error
   |> should.equal(value.ParseError(
-    value.Location(11, 2, 4),
+    value.Location(0, 0, 0),
     value.InvalidUnicodeScalar,
   ))
   value.is_limit_exceeded(error) |> should.be_false
   value.describe_parse_error(error)
-  |> should.equal("invalid JSON at line 2, column 4: invalid Unicode scalar")
+  |> should.equal("invalid JSON: invalid Unicode scalar")
 
   value.parse(" \r\n \r \n\"" <> utf16_unit(0xD800), value.default_limits())
   |> should.equal(
-    Error(value.ParseError(value.Location(8, 4, 2), value.InvalidUnicodeScalar)),
+    Error(value.ParseError(value.Location(0, 0, 0), value.InvalidUnicodeScalar)),
   )
 }
 

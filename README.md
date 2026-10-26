@@ -184,12 +184,15 @@ Gleam checks that the `case` covers every constructor.
 numeric-token limits. Consumers own structural admission policies; a byte
 limit is not a heap quota.
 
-On Erlang/OTP 27 or later, codecs decode the native parser's output directly. Parser hooks
-reject duplicate keys and retain exact integers and decimal tokens. Built-in
-codecs avoid an intermediate `Value` tree; custom callbacks receive a converted
-subtree. JavaScript retains the strict parser for duplicate rejection and exact
-numbers. Erlang parsing does not preserve object source order or the old precise
-parse locations. See [the migration guide](docs/MIGRATION.md).
+Both targets decode built-in codecs directly from native parser output, avoiding
+an intermediate `Value` tree. Erlang/OTP 27+ uses JSON parser hooks; JavaScript
+uses `JSON.parse` with numeric source text and a duplicate-key/Unicode scan
+and requires runtime support for source text; older runtimes return
+`UnsupportedRuntime`. No portable parser fallback is included.
+Exact numbers and duplicate rejection are retained. Custom callbacks receive a
+converted subtree. Native parsing changes object order and precise parse
+locations; typed field/index errors remain. See [the migration guide](docs/MIGRATION.md)
+and [browser support and executed checks](docs/BROWSER-SUPPORT.md).
 
 ## Schema support
 
@@ -202,7 +205,7 @@ JSON Schema validation. See the [oracle and its limits](docs/ORACLE.md).
 `codec.int()` accepts at most 24 digits and, on JavaScript, must stay within the
 safe integer range. Use `codec.number()` for larger exact values.
 `codec.decoder` inherits the parser's precision, duplicate-key, and resource
-behavior. Browser JavaScript is not tested.
+behavior.
 
 ## Upgrading from 1.x
 

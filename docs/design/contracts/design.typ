@@ -125,8 +125,8 @@
     ]
     #subsection(title: "Strict document admission")[
       #points(
-        [Text parsing checks UTF-8 byte size before allocating the document tree. On JavaScript, a raw unpaired UTF-16 surrogate then fails with InvalidUnicodeScalar before UTF-8 conversion can replace it. Its location is the end of the valid prefix, measured in UTF-8 bytes and grapheme columns. Byte parsing additionally reports the first invalid UTF-8 byte. A valid document has exactly one root value followed only by JSON whitespace; trailing content rejects.],
-        [Erlang uses OTP JSON hooks to reject duplicate names and retain exact integer values and decimal tokens. Built-in codecs decode the native tree directly; custom Value callbacks convert only their subtree. JavaScript retains the portable exact parser.],
+        [Text parsing checks UTF-8 byte size before allocating the document tree. On JavaScript, a raw unpaired UTF-16 surrogate then fails with InvalidUnicodeScalar before UTF-8 conversion can replace it. Native host-string diagnostics have an unavailable location. Byte parsing additionally reports the first invalid UTF-8 byte. A valid document has exactly one root value followed only by JSON whitespace; trailing content rejects.],
+        [Erlang uses OTP JSON hooks to reject duplicate names and retain exact integer values and decimal tokens. Built-in codecs decode the native tree directly; custom Value callbacks convert only their subtree. JavaScript uses native JSON.parse with numeric source retention, then scans original text for decoded duplicate names and malformed escaped surrogate pairs. Native parsing allocates the complete host tree before that scan. JavaScript runtimes without reviver numeric source text return UnsupportedRuntime. There is no portable parser fallback.],
       )
       #md-table(3, (
         [Bound], [Default], [Change],
@@ -135,9 +135,14 @@
       #points(
         [There is no global depth, value-count or numeric-token admission bound, streaming admission or request-wide time budget. The caller has already allocated input text; byte admission is not a heap quota. Consumers own structural policy.],
         [String admission validates escapes and surrogate pairing. Literal control characters, malformed escapes, and unterminated strings reject. Object duplicate detection compares decoded names, so escaped equivalent names collide.],
-        [Erlang object members follow native map order. JavaScript retains source order. Arrays retain input order. Value conversion copies strings so small retained values do not retain the complete source binary.],
-        [JavaScript ParseError locations retain zero-based byte offsets and one-based line/column. Erlang native syntax and duplicate errors have an unavailable location, represented by zeroes; their description does not invent a source position. Public parse errors retain no input text. Syntax validation completes before typed callbacks run.],
+        [Erlang object members follow native map order. JavaScript follows Object.keys order, placing array-index names before other names. Arrays retain input order. Value conversion copies strings so small retained values do not retain the complete source binary.],
+        [Native syntax, duplicate and JavaScript raw Unicode-scalar errors have an unavailable location, represented by zeroes; their description does not invent a source position. Malformed escaped surrogates report NativeSyntax. Native grammar and numeric admission can precede duplicate rejection on multiply-invalid input. Public parse errors retain no input text. Syntax validation completes before typed callbacks run.],
       )
+      #behavior(title: "Unsupported JavaScript runtimes refuse strict parsing", level: "boundary", area: "Strict admission")[
+        #given[The JavaScript runtime does not provide numeric source text to JSON.parse revivers.]
+        #when[The application parses valid JSON within its byte bound through a strict text or byte entry point.]
+        #then[Parsing returns UnsupportedRuntime without invoking typed callbacks or silently rounding numbers.]
+      ]
       #behavior(title: "The parser refuses repeated names", level: "boundary", area: "Strict admission")[
         #given[A document repeats the same decoded member name in one object.]
         #when[The application parses the document.]
@@ -146,10 +151,10 @@
       #behavior(title: "Host text cannot silently replace malformed Unicode", level: "boundary", area: "Strict admission")[
         #given[JavaScript input text contains a raw unpaired surrogate and is within its byte bound.]
         #when[The application parses the text through the strict entry point.]
-        #then[Parsing fails with InvalidUnicodeScalar at the first unpaired surrogate without retaining source text in the error.]
+        #then[Parsing fails with InvalidUnicodeScalar and an unavailable native location without retaining source text in the error.]
       ]
       #points(
-        [#adr(14) records byte-only native admission and supersedes the independent limits in #adr(3). Source: #lnk("../../../src/json/blueprint/value.gleam")[value parser]. #lnk("../../../test/bounded_parsing_test.gleam")[admission tests] and #lnk("../../../test/value_parse_test.gleam")[grammar cases] cover the boundary. Benchmark observations are not hard heap quotas.],
+        [#adr(15) records JavaScript native hybrid admission. #adr(14) records byte-only native admission and supersedes the independent limits in #adr(3). Source: #lnk("../../../src/json/blueprint/value.gleam")[value parser]. #lnk("../../../test/bounded_parsing_test.gleam")[admission tests] and #lnk("../../../test/value_parse_test.gleam")[grammar cases] cover the boundary. Benchmark observations are not hard heap quotas.],
       )
     ]
     #subsection(title: "Rendering and standard JSON bridges")[
@@ -164,7 +169,7 @@
   ])
 
   #section(title: "Typed codecs", lead: [This unit composes bidirectional conversion for caller-owned native types and discovers the supported schema.], body: [
-    #answers(title: "Codec boundary", responsibility: [Encode and decode native a using one retained definition and known wire shape.], interface: [Primitive codecs, collection codecs, record and union builders, mapping, custom, encode/decode, schema, check, placeholder.], interactions: [On Erlang, strict text admission builds a native tree for direct built-in decoding; custom callbacks convert their subtree to Value. JavaScript decodes through Value. Schema publication exposes an opaque schema for consumer admission.], invariants: [Built-in constructors preserve their declared wire shape. Unknown child schema propagates through every enclosing schema query.], failure: [Value failures return path and Reason. Source definition mistakes panic at first affected use; check returns DefinitionError instead.])
+    #answers(title: "Codec boundary", responsibility: [Encode and decode native a using one retained definition and known wire shape.], interface: [Primitive codecs, collection codecs, record and union builders, mapping, custom, encode/decode, schema, check, placeholder.], interactions: [On both targets, strict text admission builds a native tree for direct built-in decoding; custom callbacks convert their subtree to Value. Schema publication exposes an opaque schema for consumer admission.], invariants: [Built-in constructors preserve their declared wire shape. Unknown child schema propagates through every enclosing schema query.], failure: [Value failures return path and Reason. Source definition mistakes panic at first affected use; check returns DefinitionError instead.])
     #subsection(title: "Constructor acceptance")[
       #md-table(3, (
         [Constructor], [Native and JSON shape], [Acceptance and encoding rule],

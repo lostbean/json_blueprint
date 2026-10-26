@@ -308,11 +308,11 @@ def check_case(name: str, raw: bytes, row: dict[str, object], target: str) -> No
         expected = "unicode_escape"
     if name.startswith("i_"):
         expected = IMPLEMENTATION_CASES[name]
-    # The portable JavaScript representation still requires an exact native
+    # The JavaScript representation still requires an exact native
     # integer exponent, independently of application admission limits.
     if target == "javascript" and name == "i_number_huge_exp.json":
         expected = "number"
-    if target == "erlang" and expected == "unicode_escape":
+    if expected == "unicode_escape":
         expected = "syntax"
     if name.startswith("n_"):
         assert isinstance(row.get("rejected"), str), f"accepted invalid input: {name}"

@@ -7,10 +7,10 @@
 pub fn exceeds_byte_limit(source: String, max_bytes: Int) -> Bool
 
 /// Check host string scalar validity before UTF-8 conversion can replace an
-/// unpaired UTF-16 surrogate. Failure carries the valid prefix for location
-/// reporting. Erlang strings already hold UTF-8, so no extra scan is needed.
+/// unpaired UTF-16 surrogate. Failure retains no input text. Erlang strings
+/// already hold UTF-8, so no extra scan is needed.
 @external(javascript, "../../../json_blueprint_ffi.mjs", "validate_scalars")
-pub fn validate_scalars(_source: String) -> Result(Nil, String) {
+pub fn validate_scalars(_source: String) -> Result(Nil, Nil) {
   Ok(Nil)
 }
 

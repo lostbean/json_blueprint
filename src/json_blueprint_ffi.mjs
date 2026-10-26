@@ -14,10 +14,10 @@ export function validate_scalars(source) {
       if (next >= 0xdc00 && next <= 0xdfff) {
         i++;
       } else {
-        return new Error(source.slice(0, i));
+        return new Error(undefined);
       }
     } else if (unit >= 0xdc00 && unit <= 0xdfff) {
-      return new Error(source.slice(0, i));
+      return new Error(undefined);
     }
   }
   return new Ok(undefined);
@@ -51,11 +51,6 @@ export function utf8_byte_size_exceeds(string, max) {
     if (bytes > max) return true;
   }
   return false;
-}
-
-// JavaScript strings decoded from bytes never share the input's memory.
-export function copy_string(text) {
-  return text;
 }
 
 // Convert host stack/capacity exhaustion into the parser's explicit outcome.

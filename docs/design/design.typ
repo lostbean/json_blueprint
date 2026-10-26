@@ -54,7 +54,7 @@
       ))
       #points(
         [The package gate removes each package's build output first, so an obsolete compiled module cannot hide a missing source module. Runtime logs are evidence and never substitute for compiler diagnostics.],
-        [Continuous integration runs the gate on Erlang/OTP and Node.js with formatting and compilation as the required checks. Nix pins the compiler, the runtimes and the Python oracle environment. Browser JavaScript is not tested.],
+        [Continuous integration runs the gate on Erlang/OTP and Node.js with formatting and compilation as the required checks. Nix pins the compiler, the runtimes and the Python oracle environment. A separate browser probe executes public API checks in Chromium, Firefox and WebKit; its tested versions and limits are recorded in docs/BROWSER-SUPPORT.md. Browser tooling is not a runtime dependency.],
         [CI invokes the shared treefmt and design-layer validators directly. Local scripts own application behavior; no local formatter or design-check wrappers are maintained. #adr(12) #lnk("../../scripts/gate.sh")[The package gate] and #lnk("../../flake.nix")[the development environment] define operational verification.],
       )
     ]
@@ -67,8 +67,8 @@
     #subsection(title: "Measurement")[
       #points(
         [Benchmarks are observations of a named checkout. No timing threshold enters a gate, and the ordinary gate keeps the semantic tests of the benchmark fixtures. #adr(10) records the policy and the accepted findings.],
-        [Each capture starts three fresh VMs per target, runs an untimed warmup, and reports the median of the VM medians with the range of those medians. A capture records its source fingerprints, lockfile hashes, toolchain versions and host. Comparisons run the baseline before the changed code in fixed order.],
-        [Complete-text, Value-only and construction cases measure different work. A comparison matches cases with the same parser policy: generated native decoding uses the standard JSON parser and strict decoding uses the package parser, with different number, duplicate-key and resource guarantees.],
+        [Each capture declares its fresh-VM count and candidate order, runs an untimed warmup, and reports the median of the VM medians with their range. A capture records source fingerprints, lockfile hashes, toolchain versions and host. Historical captures use three VMs in fixed order; the JavaScript hybrid comparison uses six VMs with rotating candidate order.],
+        [Complete-text, Value-only and construction cases measure different work. A comparison matches cases with the same parser policy: plain standard-JSON decoding and strict admission differ in number, duplicate-key and resource guarantees even when both use a native parser.],
         [The weekly benchmark workflow runs the harness on both targets. #lnk("../../scripts/benchmark.sh")[The benchmark script] writes a fresh evidence directory and refuses to reuse one. #lnk("../BENCHMARKS.md")[The benchmark document] retains the method, environment and dated observations.],
       )
     ]

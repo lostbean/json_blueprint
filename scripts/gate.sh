@@ -16,6 +16,7 @@ gleam build --target=erlang --warnings-as-errors
 gleam build --target=javascript --warnings-as-errors
 gleam test --target=erlang
 gleam test --target=javascript
+node test/unsupported_runtime_check.mjs
 
 # Compile freshly regenerated typed and schema fixtures without modifying the
 # committed fixtures used by the parity tests above.

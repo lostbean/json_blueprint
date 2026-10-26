@@ -207,21 +207,21 @@ pub fn strings_may_start_with_a_combining_mark_test() {
 }
 
 @target(javascript)
-pub fn error_columns_count_graphemes_test() {
+pub fn native_syntax_diagnostics_do_not_invent_columns_test() {
   // "é" is two bytes and one column; "e\u{0301}" is three bytes and one column.
   case value.parse("{\"é\": ?}", value.default_limits()) {
-    Error(value.ParseError(location, value.UnexpectedCharacter)) ->
-      location |> should.equal(value.Location(7, 1, 7))
+    Error(value.ParseError(location, value.NativeSyntax)) ->
+      location |> should.equal(value.Location(0, 0, 0))
     other -> panic as { "expected unexpected byte: " <> string.inspect(other) }
   }
   case value.parse("[\r\n\"e\u{0301}\", x]", value.default_limits()) {
-    Error(value.ParseError(location, value.UnexpectedCharacter)) ->
-      location |> should.equal(value.Location(10, 2, 6))
+    Error(value.ParseError(location, value.NativeSyntax)) ->
+      location |> should.equal(value.Location(0, 0, 0))
     other -> panic as { "expected unexpected byte: " <> string.inspect(other) }
   }
   case value.parse("[1, é]", value.default_limits()) {
-    Error(value.ParseError(location, value.UnexpectedCharacter)) ->
-      location |> should.equal(value.Location(4, 1, 5))
+    Error(value.ParseError(location, value.NativeSyntax)) ->
+      location |> should.equal(value.Location(0, 0, 0))
     other -> panic as { "expected unexpected byte: " <> string.inspect(other) }
   }
 }

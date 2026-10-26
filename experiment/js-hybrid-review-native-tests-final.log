@@ -1,0 +1,73 @@
+warning: Git tree '/Users/edgar/.codex/worktrees/javascript-hybrid-parser/json_blueprint' is dirty
+error (ignored): SQLite database '/private/tmp/json-blueprint-hybrid-nix-cache/nix/eval-cache-v6/d698f89523de79c6df4406f33de1dce7c4e053778b7bd6c942601973a9b7756a.sqlite' is busy
+Gleam magic
+..........
+panic test/bounded_parsing_test.gleam:215
+ test: bounded_parsing_test.error_columns_count_graphemes_test
+ info: expected unexpected byte: Error(ParseError(location: Location(byte_offset: 0, line: 0, column: 0), reason: NativeSyntax))
+..............................................................................................................................................................................
+panic src/gleeunit/should.gleam:10
+ test: host_string_test.raw_surrogate_locations_count_utf8_bytes_and_graphemes_test
+ info:
+ParseError(location: Location(byte_offset: 0, line: 0, column: 0), reason: InvalidUnicodeScalar)
+should equal
+ParseError(location: Location(byte_offset: 11, line: 2, column: 4), reason: InvalidUnicodeScalar)
+
+panic src/gleeunit/should.gleam:10
+ test: host_string_test.raw_surrogates_reject_before_utf8_conversion_test
+ info:
+Error(ParseError(location: Location(byte_offset: 0, line: 0, column: 0), reason: InvalidUnicodeScalar))
+should equal
+Error(ParseError(location: Location(byte_offset: 1, line: 1, column: 2), reason: InvalidUnicodeScalar))
+.......................................
+panic src/gleeunit/should.gleam:10
+ test: native_number_test.unsafe_exponent_remains_a_javascript_representation_failure_test
+ info:
+True
+should equal
+False
+...................
+panic src/gleeunit/should.gleam:10
+ test: public_codec_convenience_test.public_decode_error_renderer_handles_paths_and_private_values_test
+ info:
+"invalid JSON: duplicate object key"
+should equal
+"invalid JSON at line 1, column 15: duplicate object key"
+.....................................................
+panic src/gleeunit/should.gleam:10
+ test: value_parse_test.duplicate_object_key_rejected_test
+ info:
+0
+should equal
+23
+
+panic test/value_parse_test.gleam:213
+ test: value_parse_test.hostile_syntax_errors_test
+ info: expected unexpected end of input
+........
+panic src/gleeunit/should.gleam:10
+ test: value_parse_test.portable_parser_reports_host_stack_capacity_test
+ info:
+Error(ParseError(location: Location(byte_offset: 0, line: 0, column: 0), reason: NativeSyntax))
+should equal
+Error(ParseError(location: Location(byte_offset: 0, line: 0, column: 0), reason: RuntimeCapacityExceeded))
+
+panic test/value_parse_test.gleam:203
+ test: value_parse_test.standalone_cr_whitespace_and_error_location_test
+ info: expected unexpected byte error on line 2
+
+panic src/gleeunit/should.gleam:10
+ test: value_parse_test.string_runs_preserve_values_and_failure_locations_test
+ info:
+Error(ParseError(location: Location(byte_offset: 0, line: 0, column: 0), reason: NativeSyntax))
+should equal
+Error(ParseError(location: Location(byte_offset: 1, line: 1, column: 2), reason: UnexpectedCharacter))
+
+panic src/gleeunit/should.gleam:10
+ test: value_parse_test.wide_object_resource_and_duplicate_boundary_test
+ info:
+0
+should equal
+1
+..........
+313 passed, 11 failures

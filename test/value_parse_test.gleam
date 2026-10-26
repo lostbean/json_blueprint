@@ -101,9 +101,7 @@ pub fn duplicate_object_key_rejected_test() {
 
   case value.parse("{\"key\": 1, \"other\": 2, \"key\": 3}", limits) {
     Error(value.ParseError(loc, value.DuplicateObjectKey)) -> {
-      loc.byte_offset |> should.equal(23)
-      loc.line |> should.equal(1)
-      loc.column |> should.equal(24)
+      loc |> should.equal(value.Location(0, 0, 0))
     }
     _ -> panic as "expected duplicate key error"
   }
@@ -192,13 +190,11 @@ pub fn standalone_cr_whitespace_and_error_location_test() {
   value.parse(valid_cr_json, limits)
   |> should.be_ok
 
-  // Standalone CR produces aligned line and column on syntax errors
+  // Native syntax failures have no portable source location.
   let cr_syntax_err = "{\r  \"name\": ?}"
   case value.parse(cr_syntax_err, limits) {
-    Error(value.ParseError(loc, value.UnexpectedCharacter)) -> {
-      loc.byte_offset |> should.equal(12)
-      loc.line |> should.equal(2)
-      loc.column |> should.equal(11)
+    Error(value.ParseError(loc, value.NativeSyntax)) -> {
+      loc |> should.equal(value.Location(0, 0, 0))
     }
     _ -> panic as "expected unexpected byte error on line 2"
   }
@@ -209,32 +205,32 @@ pub fn hostile_syntax_errors_test() {
   let limits = test_limits()
 
   case value.parse("", limits) {
-    Error(value.ParseError(_, value.UnexpectedEndOfInput)) -> Nil
+    Error(value.ParseError(_, value.NativeSyntax)) -> Nil
     _ -> panic as "expected unexpected end of input"
   }
 
   case value.parse("[1, 2,]", limits) {
-    Error(value.ParseError(_, value.UnexpectedCharacter)) -> Nil
+    Error(value.ParseError(_, value.NativeSyntax)) -> Nil
     _ -> panic as "expected unexpected byte on trailing comma"
   }
 
   case value.parse("{\"a\": 1,}", limits) {
-    Error(value.ParseError(_, value.UnexpectedCharacter)) -> Nil
+    Error(value.ParseError(_, value.NativeSyntax)) -> Nil
     _ -> panic as "expected unexpected byte on trailing comma"
   }
 
   case value.parse("true false", limits) {
-    Error(value.ParseError(_, value.TrailingContent)) -> Nil
+    Error(value.ParseError(_, value.NativeSyntax)) -> Nil
     _ -> panic as "expected trailing content error"
   }
 
   case value.parse("\"unterminated", limits) {
-    Error(value.ParseError(_, value.UnterminatedString)) -> Nil
+    Error(value.ParseError(_, value.NativeSyntax)) -> Nil
     _ -> panic as "expected unterminated string"
   }
 
   case value.parse("\"bad escape \\q\"", limits) {
-    Error(value.ParseError(_, value.InvalidEscape)) -> Nil
+    Error(value.ParseError(_, value.NativeSyntax)) -> Nil
     _ -> panic as "expected invalid escape sequence"
   }
 }
@@ -259,10 +255,7 @@ pub fn wide_object_resource_and_duplicate_boundary_test() {
   let wide_with_duplicate = wide_prefix <> "\"k1\": 9999}"
   case value.parse(wide_with_duplicate, limits) {
     Error(value.ParseError(loc, value.DuplicateObjectKey)) -> {
-      // Duplicate is located at the exact offset of the duplicate key at the end
-      loc.line |> should.equal(1)
-      loc.byte_offset |> should.equal(string.byte_size(wide_prefix))
-      loc.column |> should.equal(string.byte_size(wide_prefix) + 1)
+      loc |> should.equal(value.Location(0, 0, 0))
     }
     _ -> panic as "expected duplicate key error for wide object"
   }
@@ -295,33 +288,23 @@ pub fn string_runs_preserve_values_and_failure_locations_test() {
       list.each(["\n", "\r", "\t"], fn(control) {
         let source = "\"" <> prefix <> control <> "\""
         let expected =
-          Error(value.ParseError(
-            value.Location(length + 1, 1, length + 2),
-            value.UnexpectedCharacter,
-          ))
+          Error(value.ParseError(value.Location(0, 0, 0), value.NativeSyntax))
         value.parse(source, limits) |> should.equal(expected)
         value.parse_bits(bit_array.from_string(source), limits)
         |> should.equal(expected)
       })
       value.parse("\"" <> prefix <> "\\q\"", limits)
       |> should.equal(
-        Error(value.ParseError(
-          value.Location(length + 1, 1, length + 2),
-          value.InvalidEscape,
-        )),
+        Error(value.ParseError(value.Location(0, 0, 0), value.NativeSyntax)),
       )
       value.parse("\"" <> prefix, limits)
       |> should.equal(
-        Error(value.ParseError(
-          value.Location(0, 1, 1),
-          value.UnterminatedString,
-        )),
+        Error(value.ParseError(value.Location(0, 0, 0), value.NativeSyntax)),
       )
     },
   )
 }
 
-@target(erlang)
 pub fn native_parse_diagnostics_are_explicitly_unlocated_test() {
   value.parse("[1,?]", test_limits())
   |> should.equal(
@@ -345,9 +328,13 @@ pub fn duplicate_escaped_names_reject_on_both_backends_test() {
 }
 
 @target(javascript)
-pub fn portable_parser_reports_host_stack_capacity_test() {
+pub fn native_parser_distinguishes_syntax_and_capacity_test() {
   let opens = string.repeat("[", 20_000)
-  list.each([opens, opens <> "0" <> string.repeat("]", 20_000)], fn(source) {
+  value.parse(opens, value.default_limits())
+  |> should.equal(
+    Error(value.ParseError(value.Location(0, 0, 0), value.NativeSyntax)),
+  )
+  list.each([opens <> "0" <> string.repeat("]", 20_000)], fn(source) {
     let expected =
       Error(value.ParseError(
         value.Location(0, 0, 0),

@@ -45,8 +45,9 @@ pub fn huge_exponent_remains_exact_on_erlang_test() {
 pub fn unsafe_exponent_remains_a_javascript_representation_failure_test() {
   number.from_json_token("1e9007199254740993")
   |> should.equal(Error(number.ExponentOutOfRange))
-  native.supported() |> should.be_false
-  native.parse("1", 1024) |> should.equal(Error(native.UnsupportedRuntime))
+  native.supported() |> should.be_true
+  native.parse("1e9007199254740993", 1024)
+  |> should.equal(Error(native.NumberRepresentation))
 }
 
 @target(erlang)

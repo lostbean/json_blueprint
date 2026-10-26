@@ -323,22 +323,10 @@ fn int_value(n: Int) -> value.Value {
   value.Number(v)
 }
 
-@target(erlang)
 fn duplicate_parse_message() -> String {
   "invalid JSON: duplicate object key"
 }
 
-@target(javascript)
-fn duplicate_parse_message() -> String {
-  "invalid JSON at line 1, column 15: duplicate object key"
-}
-
-@target(erlang)
 fn syntax_parse_message() -> String {
   "invalid JSON: native parser rejected the document"
-}
-
-@target(javascript)
-fn syntax_parse_message() -> String {
-  "invalid JSON at line 1, column 9: unexpected end of input"
 }

@@ -351,11 +351,12 @@ the limits of the correctness claims.
 
 ## Native Erlang adoption (2026-10-25)
 
-The production adapter now uses OTP parsing with duplicate rejection, exact
+At this capture, the production adapter adopted OTP parsing with duplicate rejection, exact
 native integers and deferred decimal tokens. Built-in codecs decode the native
 tree directly; custom callbacks convert their Value subtree. Admission is byte
-limited. JavaScript retains its exact parser with byte-only admission and a
-runtime-capacity error boundary.
+limited. JavaScript still retained its exact parser with byte-only admission and
+a runtime-capacity error boundary. The later JavaScript hybrid capture below
+supersedes that implementation choice.
 
 A fresh comparison against the frozen optimized-parser worktree used three
 separate VM timing and memory trials per workload. Source hashes stayed unchanged.
@@ -377,3 +378,57 @@ JSON allocation. Timings and memory observations never gate a change.
 The [adoption report](NATIVE-DECODING-ADOPTION.md) records the complete comparison,
 accepted behavior changes, consumer consequences and release checks. The
 [independent oracle](ORACLE.md) remains separate from these performance observations.
+
+## JavaScript native hybrid adoption, 2026-10-25
+
+This capture supersedes the earlier JavaScript byte-only-parser measurements
+for the native hybrid path. It compares baseline commit `2c6df61` with the
+final native-only source (portable fallback removed), identified by full source and harness hashes in the
+[raw results](benchmarks/javascript-hybrid-2026-10-25/results-native-only.json).
+
+Node 24.21.0, Gleam 1.19.2, macOS arm64. Six fresh timing VMs per
+candidate/workload, rotating candidate order; five timed batches per VM. Separate
+fresh processes measure peak RSS and forced-GC retained heap. All 17 fixture
+parity checks pass, 43 rows complete, and source/support hashes are unchanged.
+There is no CPU affinity/frequency control. These application-shaped fixtures
+are not an observed production traffic distribution.
+
+| Workload | Previous parser (µs) | Native-only hybrid (µs) | Speedup | Peak RSS MiB: previous → hybrid |
+| --- | ---: | ---: | ---: | ---: |
+| Small record | 10.78 | 5.71 | 1.89× | 53.04 → 52.89 |
+| 50-record response | 392.33 | 162.45 | 2.42× | 54.06 → 53.01 |
+| 51 optional-field records | 107.50 | 69.42 | 1.55× | 53.15 → 53.09 |
+| 10,000 integers | 10,365.17 | 4,376.79 | 2.37× | 63.31 → 56.64 |
+| 262,143 integers | 319,978.23 | 162,570.42 | 1.97× | 263.22 → 103.41 |
+| 1,000 decimals → Float | 5,235.10 | 602.41 | 8.69× | 58.88 → 53.44 |
+| 1,000 decimals → exact Number | 4,289.06 | 2,800.63 | 1.53× | 58.82 → 56.22 |
+| Unicode strings | 1,058.46 | 124.00 | 8.54× | 55.41 → 53.26 |
+| 50 text-heavy records | 6,411.73 | 1,102.98 | 5.81× | 56.32 → 54.23 |
+| Whole Value: 262,143 integers | 271,636.77 | 292,551.33 | 0.93× | 243.77 → 258.89 |
+| Custom callback: response | 382.40 | 287.50 | 1.33× | 53.91 → 53.13 |
+
+The large typed array lowers peak RSS about 61%, while retained heap after GC
+stays around 16.4 MiB in both variants. The gain is transient allocation, not a
+smaller returned list. Small-record process RSS is dominated by Node. The large
+whole-Value array is about 8% slower and uses about 6% more peak RSS in this
+capture; do not generalize direct typed-decoding gains to whole-Value consumers.
+
+The native-only hybrid small-record/response results (5.71/162.45 µs) remain
+close to the earlier prototype (5.52/157.47 µs) and the first adoption capture
+with fallback retained (5.72/164.07 µs). Dense typed peak RSS is 103.41 MiB versus
+103.46/104.86 MiB in those earlier captures. These are separate captures, not a
+controlled causal comparison of the cleanup. Removing the fallback simplifies
+maintenance without claiming another performance gain. The final runtime has
+188 fewer source lines than baseline, including its new 233-line JS adapter.
+The [previous adoption capture](benchmarks/javascript-hybrid-2026-10-25/results.json)
+is retained with its own source hashes for provenance.
+
+Reproduce with `nix develop --command python3 experiment/js-hybrid-benchmark.py
+--work /tmp/blueprint-js-hybrid-fresh --output /tmp/blueprint-js-hybrid-fresh.json`
+(on one shell line). The harness snapshots the baseline commit and current
+source, checks native feature selection, and refuses stale snapshots or existing
+output. Plain native rows lack strict guarantees and are only a cost reference.
+
+[ADR 0015](adr/0015-adopt-javascript-native-hybrid.md) owns the decision;
+[the migration guide](MIGRATION.md) describes diagnostic changes and
+[browser validation](BROWSER-SUPPORT.md) records executed engines.
