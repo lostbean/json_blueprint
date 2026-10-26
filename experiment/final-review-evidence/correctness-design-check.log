@@ -1,0 +1,5 @@
+warning: Git tree '/Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint' is dirty
+design-aggregate: 0 guideline(s) — every structural guideline is satisfied.
+design-aggregate: /Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint/docs/design/design-layer.pdf is fresh (3 context(s), 23 term(s))
+token-coverage: OK — 43 token(s) across 9 table(s); 8 table(s) checked total against their vocabulary, 1 open table(s) (KIND-COLOR) checked by lookup only; every referenced token is defined
+layer-integrity OK: 3 design doc(s), 2 glossary file(s), 14 ADR(s) in /Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint — resolved 28 ADR citations, 4 context citations, 67 links resolved, 450 prose runs, 2 root context index, 15 term citations

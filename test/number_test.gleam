@@ -603,3 +603,42 @@ pub fn from_int_erlang_adversarial_guard_test() {
   call_from_int_raw(number.from_int, "fractional")
   |> should.equal(Error(number.NonIntegerValue))
 }
+
+pub fn normalization_near_native_exponent_boundary_stays_exact_test() {
+  let limits = number.limits(100, 100, 9_007_199_254_740_991)
+  let assert Ok(plain) = number.parse("1e-9007199254740991", limits)
+  let assert Ok(zeroes) = number.parse("1.00e-9007199254740991", limits)
+  number.compare(plain, zeroes) |> should.equal(order.Eq)
+  number.to_string(zeroes) |> should.equal("1e-9007199254740991")
+  let assert Ok(positive) = number.parse("1e9007199254740990", limits)
+  let assert Ok(fraction) = number.parse("0.1e9007199254740991", limits)
+  number.compare(positive, fraction) |> should.equal(order.Eq)
+}
+
+@target(javascript)
+pub fn unsafe_written_or_normalized_exponents_are_refused_test() {
+  let limits = number.limits(100, 100, 9_007_199_254_740_991)
+  number.parse("100e-9007199254740993", limits)
+  |> should.equal(Error(number.ExponentOutOfRange))
+  number.parse("0.01e9007199254740993", limits)
+  |> should.equal(Error(number.ExponentOutOfRange))
+  number.parse("0.1e-9007199254740991", limits)
+  |> should.equal(Error(number.ExponentOutOfRange))
+  // Comparison uses coefficient length plus exponent, which must be exact too.
+  number.parse("12e9007199254740990", limits)
+  |> should.equal(Error(number.ExponentOutOfRange))
+  number.parse("1e9007199254740991", limits)
+  |> should.equal(Error(number.ExponentOutOfRange))
+}
+
+@target(erlang)
+pub fn written_exponents_beyond_js_range_remain_exact_test() {
+  let limits = number.limits(100, 100, 9_007_199_254_740_991)
+  let assert Ok(plain) = number.parse("1e-9007199254740991", limits)
+  let assert Ok(compensated) = number.parse("100e-9007199254740993", limits)
+  number.compare(plain, compensated) |> should.equal(order.Eq)
+  let assert Ok(positive) = number.parse("0.01e9007199254740993", limits)
+  number.to_string(positive) |> should.equal("1e9007199254740991")
+  let assert Ok(magnitude) = number.parse("12e9007199254740990", limits)
+  number.to_string(magnitude) |> should.equal("1.2e9007199254740991")
+}

@@ -101,13 +101,29 @@ def invalid_constant(token: str) -> object:
 
 
 def exact_load(text: str) -> object:
-    return json.loads(
+    value = json.loads(
         text,
         parse_int=exact_number,
         parse_float=exact_number,
         parse_constant=invalid_constant,
         object_pairs_hook=object_pairs,
     )
+    scalar_strings(value)
+    return value
+
+
+def scalar_strings(value: object) -> None:
+    """Python permits lone escaped surrogates; our declared profile does not."""
+    if isinstance(value, str):
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+            raise ValueError("non-scalar string")
+    elif isinstance(value, list):
+        for child in value:
+            scalar_strings(child)
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            scalar_strings(key)
+            scalar_strings(child)
 
 
 def semantics(value: object) -> object:
@@ -148,6 +164,120 @@ def generated_cases() -> dict[str, bytes]:
         exponent = rng.randrange(-900, 900)
         cases[f"decimal_{index:03}.json"] = f"[{coefficient}e{exponent}]".encode()
     cases["generated_duplicate_escaped.json"] = b'{"a":1,"\\u0061":2}'
+    cases.update(boundary_cases())
+    return cases
+
+
+def boundary_cases() -> dict[str, bytes]:
+    """Finite constructed boundaries, independent of Blueprint's parser code."""
+    cases = {}
+    # Every literal control byte rejects, while its escaped spelling accepts.
+    for code in range(32):
+        cases[f"control_literal_{code:02}.json"] = b'"' + bytes([code]) + b'"'
+        cases[f"control_escaped_{code:02}.json"] = f'"\\u{code:04x}"'.encode()
+    scalars = [
+        0,
+        31,
+        32,
+        127,
+        128,
+        0x7FF,
+        0x800,
+        0xD7FF,
+        0xE000,
+        0xFFFF,
+        0x10000,
+        0x10FFFF,
+    ]
+    for code in scalars:
+        for escaped in (False, True):
+            cases[f"scalar_{code:x}_{escaped}.json"] = json.dumps(
+                {chr(code): [chr(code)]}, ensure_ascii=escaped
+            ).encode("utf-8")
+    # Raw valid scalars and escaped names denote the same key, including pairs.
+    for index, key in enumerate(["a", "雪", "🚀", "\x00", "\n", '"', "\\"]):
+        literal = json.dumps(key, ensure_ascii=False)
+        escaped = (
+            '"'
+            + "".join(
+                f"\\u{int.from_bytes(key.encode('utf-16-be')[i : i + 2], 'big'):04x}"
+                for i in range(0, len(key.encode("utf-16-be")), 2)
+            )
+            + '"'
+        )
+        cases[f"duplicate_equivalent_nested_{index}.json"] = (
+            '[{"outer":{' + literal + ":1," + escaped + ":2}}]"
+        ).encode()
+    cases["distinct_normalization_forms.json"] = '{"é":1,"é":2}'.encode()
+    # UTF-8 continuation, overlong, surrogate, out-of-range and truncated forms.
+    bad_utf8 = [
+        b"\x80",
+        b"\xc0\xaf",
+        b"\xc1\xbf",
+        b"\xe0\x80\xaf",
+        b"\xed\xa0\x80",
+        b"\xed\xbf\xbf",
+        b"\xf0\x80\x80\xaf",
+        b"\xf4\x90\x80\x80",
+        b"\xf5\x80\x80\x80",
+        b"\xff",
+        b"\xfe",
+        b"\xc2",
+        b"\xe2",
+        b"\xe2\x82",
+        b"\xf0",
+        b"\xf0\x9f",
+        b"\xf0\x9f\x92",
+    ]
+    for index, raw in enumerate(bad_utf8):
+        cases[f"utf8_value_{index}.json"] = b'["' + raw + b'"]'
+        cases[f"utf8_key_{index}.json"] = b'{"' + raw + b'":0}'
+    escaped_invalid = [
+        "\\ud800",
+        "\\udbff",
+        "\\udc00",
+        "\\udfff",
+        "\\ud800\\ud800",
+        "\\udc00\\ud800",
+        "\\udbffx",
+        "\\udbff\\ue000",
+    ]
+    for index, raw in enumerate(escaped_invalid):
+        cases[f"surrogate_value_{index}.json"] = ('["' + raw + '"]').encode()
+        cases[f"surrogate_key_{index}.json"] = ('{"' + raw + '":0}').encode()
+    # Check every byte-prefix, including cuts through UTF-8 and escape tokens.
+    documents = [
+        '{"雪":["🚀","\\uD83D\\uDE80",true,null,-1.00000000000000001e+2]}'.encode(),
+        b'[{"a":"\\"\\\\\\n"},[0,1e-400,9007199254740993]]',
+    ]
+    for document_index, document in enumerate(documents):
+        for end in range(len(document) + 1):
+            cases[f"prefix_{document_index}_{end:03}.json"] = document[:end]
+    numbers = [
+        "1.00000000000000001",
+        "9007199254740993",
+        "-0e999999999",
+        "1e999999999",
+        "1e-999999999",
+        "1e1201",
+        "1e-1201",
+        "4.9406564584124654e-324",
+        "1.7976931348623157e308",
+        "1" * 1100,
+        "0." + "1" * 1100,
+        "1e+" + "0" * 1000 + "2",
+    ]
+    for index, token in enumerate(numbers):
+        cases[f"number_boundary_{index}.json"] = ("[" + token + "]").encode()
+    for depth in (65, 100, 256, 500):
+        cases[f"nested_valid_{depth}.json"] = b"[" * depth + b"0" + b"]" * depth
+    # Deliberately invalid, so every target must return an error (never crash).
+    cases["n_generated_deep_unclosed.json"] = b"[" * 20000
+    cases["n_generated_deep_trailing_comma.json"] = b"[" * 20000 + b"0," + b"]" * 20000
+    wide = b"[" + b",".join([b"0"] * 10000)
+    cases["wide_valid.json"] = wide + b"]"
+    cases["n_generated_wide_unclosed.json"] = wide
+    cases["n_generated_wide_trailing_comma.json"] = wide + b",]"
     return cases
 
 
@@ -170,6 +300,12 @@ def load_cases() -> dict[str, bytes]:
 
 def check_case(name: str, raw: bytes, row: dict[str, object], target: str) -> None:
     expected = STRICT_DIFFERENCES.get(name)
+    if name.startswith("duplicate_equivalent_nested_"):
+        expected = "duplicate"
+    elif name.startswith(("utf8_value_", "utf8_key_")):
+        expected = "utf8"
+    elif name.startswith(("surrogate_value_", "surrogate_key_")):
+        expected = "unicode_escape"
     if name.startswith("i_"):
         expected = IMPLEMENTATION_CASES[name]
     # The portable JavaScript representation still requires an exact native

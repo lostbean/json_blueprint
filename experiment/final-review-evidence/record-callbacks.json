@@ -1,0 +1,15 @@
+{
+  "rejected": 4,
+  "decode_callbacks": [
+    "next-x:1",
+    "next-y"
+  ],
+  "encode_callbacks": [
+    "get-x",
+    "next-x:1",
+    "get-y",
+    "next-y"
+  ],
+  "source_sha256": "e19909700a4092402a756889e601cf4e18b8b07e7ba2b1fa99c7107ef2637a3e",
+  "compiled_sha256": "16ac40d94e9e0ef22a6d354562d296c6e0738cf1d4198798203fb160836bdcfa"
+}

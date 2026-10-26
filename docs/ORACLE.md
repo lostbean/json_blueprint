@@ -56,15 +56,38 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
    Archive hash, identities, duplicate/missing results and process failures are
    checked. A timeout fails the check rather than skipping cases.
 
-   Another 901 deterministic cases (seed `20261025`) exercise nested values,
+   Another 1,179 deterministic cases (seed `20261025`) exercise nested values,
    Unicode and escapes, large integers, decimals, truncation, trailing garbage,
    malformed containers and escaped duplicate names. Python JSON decoding with
    symbolic normalized decimal coefficients/exponents and duplicate rejection
    supplies independent acceptance and exact comparison, including huge Erlang
-   exponents that exceed Python Decimal's representation. Successful parses also check
-   byte/text agreement and parse/render/parse equality. This is a reproducible
-   generated corpus, not continuous fuzzing. Both corpora run offline in the
-   ordinary gate; they do not certify every JSON parser behavior or resource cost.
+   exponents that exceed Python Decimal's representation. Python's permissive
+   escaped-surrogate behavior is narrowed by an explicit Unicode-scalar check;
+   equivalent escaped names must fail specifically as duplicates. Successful
+   parses also check byte/text agreement and parse/render/parse equality.
+
+   The 278 constructed boundary cases added for release readiness cover all
+   literal control bytes and their escaped forms, UTF-8/scalar boundaries,
+   malformed UTF-8 in names and values, nested escaped-equivalent duplicate
+   names (including surrogate pairs), distinct normalization forms, every
+   byte-prefix of two Unicode/escape-rich documents, long numeric tokens and
+   exponents, valid depths through 500, 20,000-level malformed nesting, and
+   10,000-element valid/malformed arrays. Malformed deep input must return a
+   rejection, including an explicit host-capacity refusal where applicable;
+   a crash, missing result or timeout fails the checker. This is a reproducible
+   finite corpus, not continuous fuzzing or a runtime memory/stack guarantee.
+
+6. **JavaScript host strings** ([`test/host_string_test.gleam`](../test/host_string_test.gleam))
+   are checked separately from valid UTF-8 wire input. All 2,048 surrogate code
+   units, when unpaired in a value or member name, must return
+   `InvalidUnicodeScalar` through both `value.parse` and `codec.decode_json`:
+   8,192 boundary checks. Valid pair boundaries remain accepted, and encoded
+   surrogate bytes reject as invalid UTF-8 while the literal replacement
+   character remains valid. These are public-behavior regressions, not a claim
+   that Python's byte-based corpus exercises malformed JavaScript host strings.
+
+Both parser corpora and the host-string tests run offline in the ordinary gate.
+They do not certify every JSON parser behavior, browser runtime or resource cost.
 
 ## Outcome classes
 

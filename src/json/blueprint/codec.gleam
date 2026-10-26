@@ -113,6 +113,7 @@
 //// }
 //// ```
 
+import gleam/dict.{type Dict}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/json
@@ -383,10 +384,14 @@ pub opaque type Codec(a) {
 /// `success`.
 type Fields(a) {
   Fields(
-    encode: fn(a) -> Result(List(#(String, Value)), EncodeError),
-    // Decode from the members, and count the members used.
-    decode: fn(List(#(String, Value))) -> Result(#(a, Int), DecodeError),
-    native_decode: fn(native.Raw) -> Result(#(a, Int), DecodeError),
+    // Thread visited declarations through conversion, without running
+    // placeholder continuations again. Decode results count present members.
+    encode: fn(a, Dict(String, Nil)) ->
+      Result(List(#(String, Value)), EncodeError),
+    decode: fn(List(#(String, Value)), Dict(String, Nil)) ->
+      Result(#(a, Int), DecodeError),
+    native_decode: fn(native.Raw, Dict(String, Nil)) ->
+      Result(#(a, Int), DecodeError),
     names: fn() -> List(String),
     properties: fn() -> Result(List(Property), DefinitionError),
   )
@@ -1156,30 +1161,36 @@ pub fn field(
   let rest = fn(item) { record_fields(name, next(item)) }
   let fields =
     Fields(
-      encode: fn(record) {
+      encode: fn(record, seen) {
+        let seen = visit_name(name, seen)
         let item = get(record)
         use encoded <- result.try(codec.encode(item) |> at_encode(Field(name)))
-        use others <- result.map(rest(item).encode(record))
-        prepend_member(name, encoded, others)
+        use others <- result.map(rest(item).encode(record, seen))
+        [#(name, encoded), ..others]
       },
-      decode: fn(members) {
+      decode: fn(members, seen) {
+        let seen = visit_name(name, seen)
         case list.key_find(members, name) {
           Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
           Ok(raw) -> {
             use item <- result.try(codec.decode(raw) |> at_decode(Field(name)))
-            use #(record, used) <- result.map(rest(item).decode(members))
+            use #(record, used) <- result.map(rest(item).decode(members, seen))
             #(record, used + 1)
           }
         }
       },
-      native_decode: fn(members) {
+      native_decode: fn(members, seen) {
+        let seen = visit_name(name, seen)
         case native.field(members, name) {
           Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
           Ok(raw) -> {
             use item <- result.try(
               codec.native_decode(raw) |> at_decode(Field(name)),
             )
-            use #(record, used) <- result.map(rest(item).native_decode(members))
+            use #(record, used) <- result.map(rest(item).native_decode(
+              members,
+              seen,
+            ))
             #(record, used + 1)
           }
         }
@@ -1214,37 +1225,44 @@ pub fn optional_field(
   let rest = fn(item) { record_fields(name, next(item)) }
   let fields =
     Fields(
-      encode: fn(record) {
+      encode: fn(record, seen) {
+        let seen = visit_name(name, seen)
         case get(record) {
-          None -> rest(None).encode(record)
+          None -> rest(None).encode(record, seen)
           Some(item) -> {
             use encoded <- result.try(
               codec.encode(item) |> at_encode(Field(name)),
             )
-            use others <- result.map(rest(Some(item)).encode(record))
-            prepend_member(name, encoded, others)
+            use others <- result.map(rest(Some(item)).encode(record, seen))
+            [#(name, encoded), ..others]
           }
         }
       },
-      decode: fn(members) {
+      decode: fn(members, seen) {
+        let seen = visit_name(name, seen)
         case list.key_find(members, name) {
-          Error(Nil) -> rest(None).decode(members)
+          Error(Nil) -> rest(None).decode(members, seen)
           Ok(raw) -> {
             use item <- result.try(codec.decode(raw) |> at_decode(Field(name)))
-            use #(record, used) <- result.map(rest(Some(item)).decode(members))
+            use #(record, used) <- result.map(rest(Some(item)).decode(
+              members,
+              seen,
+            ))
             #(record, used + 1)
           }
         }
       },
-      native_decode: fn(members) {
+      native_decode: fn(members, seen) {
+        let seen = visit_name(name, seen)
         case native.field(members, name) {
-          Error(Nil) -> rest(None).native_decode(members)
+          Error(Nil) -> rest(None).native_decode(members, seen)
           Ok(raw) -> {
             use item <- result.try(
               codec.native_decode(raw) |> at_decode(Field(name)),
             )
             use #(record, used) <- result.map(rest(Some(item)).native_decode(
               members,
+              seen,
             ))
             #(record, used + 1)
           }
@@ -1264,9 +1282,9 @@ pub fn optional_field(
 pub fn success(value: r) -> Codec(r) {
   record(
     Fields(
-      encode: fn(_) { Ok([]) },
-      decode: fn(_) { Ok(#(value, 0)) },
-      native_decode: fn(_) { Ok(#(value, 0)) },
+      encode: fn(_, _) { Ok([]) },
+      decode: fn(_, _) { Ok(#(value, 0)) },
+      native_decode: fn(_, _) { Ok(#(value, 0)) },
       names: fn() { [] },
       properties: fn() { Ok([]) },
     ),
@@ -1292,21 +1310,19 @@ fn property(
   }
 }
 
+// Validate declarations during actual conversion, including omitted fields.
+// A dictionary avoids a quadratic scan for wide records.
+fn visit_name(name: String, seen: Dict(String, Nil)) -> Dict(String, Nil) {
+  case dict.has_key(seen, name) {
+    True -> definition_panic(DuplicateFieldName(name))
+    False -> dict.insert(seen, name, Nil)
+  }
+}
+
 fn prepend_name(name: String, others: List(String)) -> List(String) {
   case list.contains(others, name) {
     True -> definition_panic(DuplicateFieldName(name))
     False -> [name, ..others]
-  }
-}
-
-fn prepend_member(
-  name: String,
-  encoded: Value,
-  others: List(#(String, Value)),
-) -> List(#(String, Value)) {
-  case list.key_find(others, name) {
-    Ok(_) -> definition_panic(DuplicateFieldName(name))
-    Error(Nil) -> [#(name, encoded), ..others]
   }
 }
 
@@ -1319,11 +1335,13 @@ fn record_fields(after: String, codec: Codec(r)) -> Fields(r) {
 
 fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
   Codec(
-    encode: fn(item) { fields.encode(item) |> result.map(value.Object) },
+    encode: fn(item) {
+      fields.encode(item, dict.new()) |> result.map(value.Object)
+    },
     decode: fn(raw) {
       case raw {
         value.Object(members) -> {
-          use #(record, used) <- result.try(fields.decode(members))
+          use #(record, used) <- result.try(fields.decode(members, dict.new()))
           case used == list.length(members) {
             True -> Ok(record)
             // A member was not used: name it, as an unknown or repeated key.
@@ -1339,7 +1357,10 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
       case native.keys(raw) {
         Error(Nil) -> fail(ExpectedObject)
         Ok(names) -> {
-          use #(record, used) <- result.try(fields.native_decode(raw))
+          use #(record, used) <- result.try(fields.native_decode(
+            raw,
+            dict.new(),
+          ))
           case used == list.length(names) {
             True -> Ok(record)
             False ->

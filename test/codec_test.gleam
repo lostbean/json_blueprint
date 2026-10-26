@@ -836,6 +836,90 @@ pub fn a_mistaken_definition_panics_with_the_key_at_first_use_test() {
   |> should.equal(Error(Nil))
 }
 
+pub fn duplicate_record_fields_panic_on_both_decode_paths_test() {
+  let repeated = {
+    use a <- codec.field("id", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.field("id", codec.int(), get: fn(p) { p.1 })
+    codec.success(#(a, b))
+  }
+  // The extra member used to make the member count equal the declaration count.
+  list.each(["{\"id\":1}", "{\"id\":1,\"extra\":2}"], fn(text) {
+    let assert Ok(raw) = value.parse(text, value.default_limits())
+    let expected =
+      Ok("json_blueprint: invalid codec definition: field \"id\" appears twice")
+    panic_message(fn() { codec.decode_json(repeated, text) })
+    |> should.equal(expected)
+    panic_message(fn() { codec.decode(repeated, raw) })
+    |> should.equal(expected)
+  })
+}
+
+pub fn duplicate_optional_fields_panic_even_when_absent_test() {
+  let repeated = {
+    use a <- codec.optional_field("id", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.optional_field("id", codec.int(), get: fn(p) { p.1 })
+    codec.success(#(a, b))
+  }
+  list.each(["{}", "{\"id\":1}", "{\"id\":1,\"extra\":2}"], fn(text) {
+    let assert Ok(raw) = value.parse(text, value.default_limits())
+    let expected =
+      Ok("json_blueprint: invalid codec definition: field \"id\" appears twice")
+    panic_message(fn() { codec.decode_json(repeated, text) })
+    |> should.equal(expected)
+    panic_message(fn() { codec.decode(repeated, raw) })
+    |> should.equal(expected)
+  })
+}
+
+pub fn duplicate_optional_fields_panic_on_encoding_test() {
+  let repeated = {
+    use a <- codec.optional_field("id", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.optional_field("id", codec.int(), get: fn(p) { p.1 })
+    codec.success(#(a, b))
+  }
+  let expected =
+    Ok("json_blueprint: invalid codec definition: field \"id\" appears twice")
+  list.each(
+    [#(None, None), #(Some(1), None), #(None, Some(2)), #(Some(1), Some(2))],
+    fn(record) {
+      panic_message(fn() { codec.encode(repeated, record) })
+      |> should.equal(expected)
+      panic_message(fn() { codec.encode_json(repeated, record) })
+      |> should.equal(expected)
+    },
+  )
+  let required_then_optional = {
+    use a <- codec.field("id", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.optional_field("id", codec.int(), get: fn(p) { p.1 })
+    codec.success(#(a, b))
+  }
+  panic_message(fn() { codec.encode(required_then_optional, #(1, None)) })
+  |> should.equal(expected)
+  let optional_then_required = {
+    use a <- codec.optional_field("id", codec.int(), get: fn(p) { p.0 })
+    use b <- codec.field("id", codec.int(), get: fn(p) { p.1 })
+    codec.success(#(a, b))
+  }
+  panic_message(fn() { codec.encode(optional_then_required, #(None, 1)) })
+  |> should.equal(expected)
+}
+
+pub fn record_decode_keeps_declared_field_error_precedence_test() {
+  let record = {
+    use id <- codec.field("id", codec.int(), get: fn(p) { p })
+    codec.success(id)
+  }
+  list.each(["{\"extra\":2}", "{\"id\":\"bad\",\"extra\":2}"], fn(text) {
+    let assert Ok(raw) = value.parse(text, value.default_limits())
+    let expected = case text {
+      "{\"extra\":2}" -> Error(DecodeError([Field("id")], codec.MissingField))
+      _ -> Error(DecodeError([Field("id")], codec.ExpectedInt))
+    }
+    codec.decode_json(record, text) |> should.equal(expected)
+    codec.decode(record, raw) |> should.equal(expected)
+  })
+}
+
 // --- bridges -------------------------------------------------------------------
 
 pub fn to_json_matches_encode_json_test() {

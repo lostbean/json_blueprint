@@ -91,6 +91,10 @@ repeated object keys. Use `codec.decode_json_with_limits` and
 global numeric admission limits and their setters have been removed. Consumers
 that require those policies must inspect their decoded data. Explicit
 `number.parse(token, limits)` still supports caller-selected numeric limits.
+On JavaScript, raising those limits cannot bypass exact integer representation:
+unrepresentable written or normalized exponents and comparison magnitudes
+return `ExponentOutOfRange` rather than silently rounding. Erlang retains exact
+arbitrary-size integer arithmetic.
 
 On Erlang/OTP 27 or later, parsing uses OTP's JSON decoder with duplicate detection and exact
 numeric hooks. Built-in codecs decode its native tree directly; custom Value
@@ -100,7 +104,7 @@ errors for malformed JSON use native parser diagnostics rather than the previous
 precise byte, line and column locations. Typed field/index errors remain
 available. Syntax admission completes before typed callbacks run. JavaScript
 retains its exact parser and source locations. Its exact decimal exponent must
-fit the target's safe integer representation. Deep JavaScript input can exceed
+fit the target's safe integer representation. Deep JavaScript input or unusually long numeric tokens can exceed
 the host call stack; this returns `RuntimeCapacityExceeded` rather than a
 configured depth-limit error.
 

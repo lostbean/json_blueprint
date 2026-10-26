@@ -1,0 +1,18 @@
+warning: Git tree '/Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint' is dirty
+Gleam magic
+  Compiling json_blueprint
+   Compiled in 0.06s
+    Running review_exponent.main
+Ok(Decimal(negative: False, digits: "1", exponent10: -9007199254740991))
+Ok(Decimal(negative: False, digits: "1", exponent10: -9007199254740990))
+1e-9007199254740991
+1e-9007199254740990
+Lt
+  Compiling json_blueprint
+   Compiled in 0.29s
+    Running review_exponent.main
+Ok(Decimal(False, "1", -9007199254740991))
+Ok(Decimal(False, "1", -9007199254740991))
+1e-9007199254740991
+1e-9007199254740991
+Eq

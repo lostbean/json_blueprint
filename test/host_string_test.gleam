@@ -1,5 +1,6 @@
 import gleam/list
 import gleeunit/should
+import json/blueprint/codec
 import json/blueprint/value
 
 @target(javascript)
@@ -74,4 +75,50 @@ pub fn scalar_strings_and_escaped_pairs_parse_test() {
   })
   value.parse("\"\\uD83D\\uDE80\"", value.default_limits())
   |> should.equal(Ok(value.String("🚀")))
+  codec.decode_json(codec.string(), "\"\\uD83D\\uDE80\"")
+  |> should.equal(Ok("🚀"))
+}
+
+@target(javascript)
+pub fn every_unpaired_utf16_unit_rejects_in_values_and_names_test() {
+  check_raw_surrogate(0xD800)
+}
+
+@target(javascript)
+fn check_raw_surrogate(unit: Int) -> Nil {
+  case unit > 0xDFFF {
+    True -> Nil
+    False -> {
+      let raw = utf16_unit(unit)
+      list.each(["\"" <> raw <> "\"", "{\"" <> raw <> "\":0}"], fn(source) {
+        let assert Error(value.ParseError(_, value.InvalidUnicodeScalar)) =
+          value.parse(source, value.default_limits())
+        let assert Error(codec.DecodeError(
+          [],
+          codec.InvalidJson(value.ParseError(_, value.InvalidUnicodeScalar)),
+        )) = codec.decode_json(codec.value(), source)
+      })
+      check_raw_surrogate(unit + 1)
+    }
+  }
+}
+
+@target(javascript)
+pub fn valid_utf16_pair_boundaries_are_not_rejected_test() {
+  list.each([0xD800, 0xD83D, 0xDBFF], fn(high) {
+    list.each([0xDC00, 0xDE80, 0xDFFF], fn(low) {
+      let pair = utf16_unit(high) <> utf16_unit(low)
+      codec.decode_json(codec.string(), "\"" <> pair <> "\"")
+      |> should.equal(Ok(pair))
+    })
+  })
+}
+
+pub fn utf8_surrogate_bytes_reject_but_replacement_character_is_valid_test() {
+  // Wire bytes encoding a surrogate are invalid UTF-8, independently of the
+  // JavaScript host-string boundary. U+FFFD itself remains a valid scalar.
+  let assert Error(value.ParseError(_, value.InvalidUtf8)) =
+    value.parse_bits(<<34, 0xED, 0xA0, 0x80, 34>>, value.default_limits())
+  value.parse_bits(<<34, 0xEF, 0xBF, 0xBD, 34>>, value.default_limits())
+  |> should.equal(Ok(value.String("�")))
 }

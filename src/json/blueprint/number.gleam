@@ -60,7 +60,7 @@ pub opaque type Limits {
 }
 
 /// Why `parse` refused a token. `InvalidSyntax` is not a JSON number; the other
-/// variants exceed a bound of `Limits`.
+/// variants exceed a bound of `Limits` or the target's exact exponent representation.
 pub type NumberError {
   InvalidSyntax
   TokenTooLong
@@ -197,7 +197,9 @@ type DecimalPart {
 
 /// Parse a JSON number token, such as `-12.5e3`, exactly. Leading or trailing
 /// whitespace, a leading `+`, leading zeros and a bare `.` are invalid, as in
-/// JSON.
+/// JSON. JavaScript refuses written exponents, normalized exponents, or decimal
+/// comparison magnitudes outside its safe integer range with `ExponentOutOfRange`,
+/// even when the supplied limits are larger. Erlang retains arbitrary integers.
 pub fn parse(token: String, limits: Limits) -> Result(Number, NumberError) {
   let Limits(max_token_bytes, max_significand_digits, max_abs_exponent) = limits
   case native_byte_length(token) > max_token_bytes {
@@ -352,14 +354,24 @@ fn normalize_parsed_number(
         _ -> {
           let #(coefficient, removed_zeroes) =
             trim_trailing_zeroes(significant_digits, 0)
+          // Combine the small adjustment first: subtracting the fraction length
+          // before restoring trailing zeroes can round a JavaScript exponent.
           let normalized_exponent =
-            written_exponent - list_length(fraction_digits) + removed_zeroes
+            written_exponent + { removed_zeroes - list_length(fraction_digits) }
           case
             normalized_exponent > max_abs_exponent
             || normalized_exponent < -max_abs_exponent
           {
             True -> Error(ExponentOutOfRange)
-            False -> Ok(make(negative, coefficient, normalized_exponent))
+            False ->
+              case
+                exact_exponent(normalized_exponent),
+                exact_exponent(normalized_exponent + list_length(coefficient))
+              {
+                Ok(_), Ok(_) ->
+                  Ok(make(negative, coefficient, normalized_exponent))
+                _, _ -> Error(ExponentOutOfRange)
+              }
           }
         }
       }
@@ -872,13 +884,30 @@ fn strip_exponent_sign(chars: List(Int)) -> #(Bool, List(Int)) {
   }
 }
 
+// Exponents and the magnitude used by comparison must stay exact on the host.
+// Checking only the caller's limit is insufficient when that limit is large.
+@target(erlang)
+fn exact_exponent(value: Int) -> Result(Int, Nil) {
+  Ok(value)
+}
+
+@target(javascript)
+fn exact_exponent(value: Int) -> Result(Int, Nil) {
+  // Only integer arithmetic on parsed digits and lengths reaches this helper.
+  // The range check also refuses nonfinite results, without formatting a string.
+  case value >= -9_007_199_254_740_991 && value <= 9_007_199_254_740_991 {
+    True -> Ok(value)
+    False -> Error(Nil)
+  }
+}
+
 fn parse_bounded_digits(
   digits: List(Int),
   max_value: Int,
   current: Int,
 ) -> Result(Int, Nil) {
   case digits {
-    [] -> Ok(current)
+    [] -> exact_exponent(current)
     [digit, ..rest] -> {
       let next = current * 10 + digit_value(digit)
       case next > max_value {

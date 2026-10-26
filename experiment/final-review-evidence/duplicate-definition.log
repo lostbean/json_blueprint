@@ -1,0 +1,14 @@
+warning: Git tree '/Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint' is dirty
+Gleam magic
+  Compiling json_blueprint
+   Compiled in 0.31s
+    Running review_duplicate.main
+Ok(#(1, 1))
+Ok(#(1, 1))
+Error(DuplicateFieldName("x"))
+  Compiling json_blueprint
+   Compiled in 0.04s
+    Running review_duplicate.main
+Ok(#(1, 1))
+Ok(#(1, 1))
+Error(DuplicateFieldName(name: "x"))

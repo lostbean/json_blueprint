@@ -1,0 +1,19 @@
+import gleam/io
+import gleam/string
+import json/blueprint/number
+
+pub fn main() {
+  let limits = number.limits(100, 100, 9_007_199_254_740_991)
+  let plain = number.parse("1e-9007199254740991", limits)
+  let padded = number.parse("1.00e-9007199254740991", limits)
+  io.println(string.inspect(plain))
+  io.println(string.inspect(padded))
+  case plain, padded {
+    Ok(a), Ok(b) -> {
+      io.println(number.to_string(a))
+      io.println(number.to_string(b))
+      io.println(string.inspect(number.compare(a, b)))
+    }
+    _, _ -> Nil
+  }
+}

@@ -1,0 +1,1856 @@
+{
+  "before_revision": "ce233eed218e5bc7a68e171a23c60075c2a389a7",
+  "source_hashes": {
+    "before": {
+      "src/gleam_dynamic.erl": "c8d9cca03a3a4b453fae6d9a4cae742a1ed2bcac2d83e237fe7afbec699b0918",
+      "src/gleam_dynamic.mjs": "363c90897aead01e825c1e3e7118a8804aba0dad176b19831dc79019606570e9",
+      "src/json/blueprint/codec.gleam": "3ce372465de261058824fea4c61c8cf7cadd2ba664c22f99c38c1b67095f2cb5",
+      "src/json/blueprint/codegen/internal/schema_materialize.gleam": "aafe1a845294590a48e156c42c00c285500b346c3cd2bbf40867d6fdf5e88949",
+      "src/json/blueprint/codegen/schema.gleam": "395c18de87fea206acebe2f8f26c13c89fbc4afb0c85088234f4c362c750d99f",
+      "src/json/blueprint/codegen.gleam": "d1c11309911ab4bcf100c18dca68f4ea23e85d7489e47b6365244dae526e79df",
+      "src/json/blueprint/contract.gleam": "0466ff18abc6b78c1e8d8c2256a5eb6c93d987e07628d395485a70104851b166",
+      "src/json/blueprint/internal/dynamic.gleam": "044ca0106a7769891a38a0b0a6b327a33ddefae218d6c06605b2fe7ecf740b56",
+      "src/json/blueprint/internal/generated.gleam": "1815b5c523d8a6875a64a66a2c3f274950ea7fc1343db3dbf5d63e2dfe8dd57a",
+      "src/json/blueprint/internal/native.gleam": "b80fbd24639bf3b25f4d70aae4894b64e2a15aff4408d6cadd78252034e86fa8",
+      "src/json/blueprint/internal/schema_tree.gleam": "bfaec45d6a049b03d832a6a017d6d85d6382ff8bf1baf758e2a518ce3476a61d",
+      "src/json/blueprint/internal/text.gleam": "d7b4cb58e38473f1b61c5b12cf0c4b1902372c5afcd743beb29e5fd53c5f9ccf",
+      "src/json/blueprint/number.gleam": "5f8cf7891d7a7bdff1191ca3c5b82698ab690c5d266e6a058aac9c3dcab42dc4",
+      "src/json/blueprint/schema.gleam": "baae6b577eceded9b98f52f73b993231cfb32389fc7b785e02767c93ed70783c",
+      "src/json/blueprint/value.gleam": "67e196ffcda4530ab61c4595354fa96657ce7f561641218cee6db48cabc84f9c",
+      "src/json/blueprint.gleam": "7ffadc649d2e2ea2afd2bb9c57b79ad2c5bdc592c57c7badb5469fece15e7d4c",
+      "src/json_blueprint_ffi.erl": "957555bdc2215f572c185e4135e19310b857cf8a62e81823876b9523c28ac74c",
+      "src/json_blueprint_ffi.mjs": "ca39e1f352e6d8dcbcf9e8eb26afa86568a3170f849affa6627206272bc865fe",
+      "src/json_blueprint_native_ffi.erl": "527117eb5b375f0e9f5efef6610d194792c9247c1d125189abfdc12fe3c820e5",
+      "src/json_number_ffi.erl": "d171005d9671dd04bb08f9d50c6b16c17429fc137c572803e26fe616ee1a4282",
+      "src/json_number_ffi.mjs": "c11356dfaad655e3bc22796ad04f60e70353dcd324fc1fa8f8e3065cba224305"
+    },
+    "after": {
+      "src/gleam_dynamic.erl": "c8d9cca03a3a4b453fae6d9a4cae742a1ed2bcac2d83e237fe7afbec699b0918",
+      "src/gleam_dynamic.mjs": "363c90897aead01e825c1e3e7118a8804aba0dad176b19831dc79019606570e9",
+      "src/json/blueprint/codec.gleam": "e19909700a4092402a756889e601cf4e18b8b07e7ba2b1fa99c7107ef2637a3e",
+      "src/json/blueprint/codegen/internal/schema_materialize.gleam": "aafe1a845294590a48e156c42c00c285500b346c3cd2bbf40867d6fdf5e88949",
+      "src/json/blueprint/codegen/schema.gleam": "395c18de87fea206acebe2f8f26c13c89fbc4afb0c85088234f4c362c750d99f",
+      "src/json/blueprint/codegen.gleam": "d1c11309911ab4bcf100c18dca68f4ea23e85d7489e47b6365244dae526e79df",
+      "src/json/blueprint/contract.gleam": "0466ff18abc6b78c1e8d8c2256a5eb6c93d987e07628d395485a70104851b166",
+      "src/json/blueprint/internal/dynamic.gleam": "044ca0106a7769891a38a0b0a6b327a33ddefae218d6c06605b2fe7ecf740b56",
+      "src/json/blueprint/internal/generated.gleam": "1815b5c523d8a6875a64a66a2c3f274950ea7fc1343db3dbf5d63e2dfe8dd57a",
+      "src/json/blueprint/internal/native.gleam": "b80fbd24639bf3b25f4d70aae4894b64e2a15aff4408d6cadd78252034e86fa8",
+      "src/json/blueprint/internal/schema_tree.gleam": "bfaec45d6a049b03d832a6a017d6d85d6382ff8bf1baf758e2a518ce3476a61d",
+      "src/json/blueprint/internal/text.gleam": "d7b4cb58e38473f1b61c5b12cf0c4b1902372c5afcd743beb29e5fd53c5f9ccf",
+      "src/json/blueprint/number.gleam": "90f816c2c24850b35e20ad06a4f093f9a249a7122422ee542bec41ac196143d2",
+      "src/json/blueprint/schema.gleam": "baae6b577eceded9b98f52f73b993231cfb32389fc7b785e02767c93ed70783c",
+      "src/json/blueprint/value.gleam": "67e196ffcda4530ab61c4595354fa96657ce7f561641218cee6db48cabc84f9c",
+      "src/json/blueprint.gleam": "7ffadc649d2e2ea2afd2bb9c57b79ad2c5bdc592c57c7badb5469fece15e7d4c",
+      "src/json_blueprint_ffi.erl": "957555bdc2215f572c185e4135e19310b857cf8a62e81823876b9523c28ac74c",
+      "src/json_blueprint_ffi.mjs": "ca39e1f352e6d8dcbcf9e8eb26afa86568a3170f849affa6627206272bc865fe",
+      "src/json_blueprint_native_ffi.erl": "527117eb5b375f0e9f5efef6610d194792c9247c1d125189abfdc12fe3c820e5",
+      "src/json_number_ffi.erl": "d171005d9671dd04bb08f9d50c6b16c17429fc137c572803e26fe616ee1a4282",
+      "src/json_number_ffi.mjs": "c11356dfaad655e3bc22796ad04f60e70353dcd324fc1fa8f8e3065cba224305"
+    }
+  },
+  "captured_at_utc": "2026-10-25T23:19:48.036061+00:00",
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "versions": {
+    "gleam": "gleam 1.19.2",
+    "node": "v24.21.0",
+    "erlang": "OTP 29 ERTS 17.1.1"
+  },
+  "method": "Six fresh VMs per variant/target/workload, alternating order. Each VM warms then measures five batches: 5000 calls for numbers, 500 for records. Median of VM medians; per-call nanoseconds. Observable sink retains last Result. Compilation, environment lookup, limit construction and outcome checks excluded. Erlang +S 1:1; Node default GC. No machine affinity/frequency control. Boundary outcomes measured separately, not timed. Wide-record codecs use unique names and required integer fields; construction, source generation and equality preflight excluded.",
+  "support_hashes": {
+    "experiment/correctness-number-benchmark.py": "a8e323730db4825454fec0f40592de88b441c801029bad15f4ca6c012821c0d0",
+    "experiment/correctness-number-runner.gleam": "6372f0237c91addfd6334ed211c2237f97c23ad90306d790d602031597c611dd",
+    "scripts/parser_benchmark.py": "718d1e8eb714ce4e68e0b20cdad706c67fdecf1056aa6104202641bc3c30106c",
+    "test/bench_ffi.erl": "8e4e49868724cfa4cb0a5d8800fe26a1a7df9c18866de640580bb21e2d51851d",
+    "test/bench_ffi.mjs": "2ba6127ad7123b143f32513083fd7c6d0b5fe8ae472ab6635c02d4aa549b12f8"
+  },
+  "runs": [
+    {
+      "target": "erlang",
+      "workload": "ordinary_decimal",
+      "token": "19.90",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:1.99e1",
+      "samples_ns": [
+        [
+          239,
+          232,
+          240,
+          252,
+          235
+        ],
+        [
+          265,
+          244,
+          248,
+          231,
+          242
+        ],
+        [
+          250,
+          249,
+          269,
+          268,
+          273
+        ],
+        [
+          271,
+          252,
+          224,
+          252,
+          275
+        ],
+        [
+          256,
+          259,
+          226,
+          235,
+          238
+        ],
+        [
+          242,
+          255,
+          275,
+          263,
+          259
+        ]
+      ],
+      "vm_medians_ns": [
+        239,
+        244,
+        268,
+        252,
+        238,
+        259
+      ],
+      "median_ns": 248.0
+    },
+    {
+      "target": "erlang",
+      "workload": "ordinary_decimal",
+      "token": "19.90",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:1.99e1",
+      "samples_ns": [
+        [
+          247,
+          244,
+          243,
+          244,
+          249
+        ],
+        [
+          249,
+          273,
+          270,
+          235,
+          249
+        ],
+        [
+          242,
+          244,
+          243,
+          258,
+          243
+        ],
+        [
+          280,
+          271,
+          265,
+          233,
+          228
+        ],
+        [
+          273,
+          259,
+          284,
+          247,
+          262
+        ],
+        [
+          292,
+          286,
+          282,
+          271,
+          271
+        ]
+      ],
+      "vm_medians_ns": [
+        244,
+        249,
+        243,
+        265,
+        262,
+        282
+      ],
+      "median_ns": 255.5
+    },
+    {
+      "target": "erlang",
+      "workload": "ordinary_exponent",
+      "token": "-6.02214076e23",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:-6.02214076e23",
+      "samples_ns": [
+        [
+          411,
+          393,
+          404,
+          393,
+          407
+        ],
+        [
+          417,
+          391,
+          431,
+          389,
+          390
+        ],
+        [
+          457,
+          436,
+          403,
+          382,
+          452
+        ],
+        [
+          455,
+          454,
+          459,
+          442,
+          443
+        ],
+        [
+          421,
+          457,
+          443,
+          440,
+          459
+        ],
+        [
+          394,
+          396,
+          396,
+          441,
+          443
+        ]
+      ],
+      "vm_medians_ns": [
+        404,
+        391,
+        436,
+        454,
+        443,
+        396
+      ],
+      "median_ns": 420.0
+    },
+    {
+      "target": "erlang",
+      "workload": "ordinary_exponent",
+      "token": "-6.02214076e23",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:-6.02214076e23",
+      "samples_ns": [
+        [
+          475,
+          436,
+          449,
+          534,
+          442
+        ],
+        [
+          443,
+          404,
+          479,
+          461,
+          432
+        ],
+        [
+          469,
+          459,
+          472,
+          456,
+          415
+        ],
+        [
+          415,
+          426,
+          421,
+          474,
+          449
+        ],
+        [
+          481,
+          443,
+          431,
+          457,
+          497
+        ],
+        [
+          478,
+          423,
+          397,
+          450,
+          414
+        ]
+      ],
+      "vm_medians_ns": [
+        449,
+        443,
+        459,
+        426,
+        457,
+        423
+      ],
+      "median_ns": 446.0
+    },
+    {
+      "target": "erlang",
+      "workload": "large_safe_exponent",
+      "token": "1e-9007199254740991",
+      "limits": "large",
+      "variant": "before",
+      "outcome": "Ok:1e-9007199254740991",
+      "samples_ns": [
+        [
+          483,
+          481,
+          460,
+          463,
+          442
+        ],
+        [
+          460,
+          481,
+          468,
+          505,
+          455
+        ],
+        [
+          425,
+          419,
+          444,
+          464,
+          427
+        ],
+        [
+          487,
+          422,
+          461,
+          437,
+          419
+        ],
+        [
+          502,
+          399,
+          435,
+          438,
+          419
+        ],
+        [
+          486,
+          480,
+          456,
+          412,
+          418
+        ]
+      ],
+      "vm_medians_ns": [
+        463,
+        468,
+        427,
+        437,
+        435,
+        456
+      ],
+      "median_ns": 446.5
+    },
+    {
+      "target": "erlang",
+      "workload": "large_safe_exponent",
+      "token": "1e-9007199254740991",
+      "limits": "large",
+      "variant": "after",
+      "outcome": "Ok:1e-9007199254740991",
+      "samples_ns": [
+        [
+          419,
+          440,
+          463,
+          463,
+          464
+        ],
+        [
+          464,
+          458,
+          465,
+          458,
+          477
+        ],
+        [
+          478,
+          460,
+          426,
+          449,
+          465
+        ],
+        [
+          438,
+          468,
+          467,
+          582,
+          466
+        ],
+        [
+          428,
+          467,
+          486,
+          474,
+          435
+        ],
+        [
+          417,
+          419,
+          423,
+          476,
+          468
+        ]
+      ],
+      "vm_medians_ns": [
+        463,
+        464,
+        460,
+        467,
+        467,
+        423
+      ],
+      "median_ns": 463.5
+    },
+    {
+      "target": "erlang",
+      "workload": "record_20",
+      "token": "record_20",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19}",
+      "samples_ns": [
+        [
+          13254,
+          13638,
+          13602,
+          12951,
+          14081
+        ],
+        [
+          13518,
+          12899,
+          13163,
+          13553,
+          13078
+        ],
+        [
+          14424,
+          13268,
+          13164,
+          13233,
+          13433
+        ],
+        [
+          13580,
+          13321,
+          13573,
+          13131,
+          13516
+        ],
+        [
+          13288,
+          13768,
+          12904,
+          13400,
+          13300
+        ],
+        [
+          13107,
+          14114,
+          13801,
+          13790,
+          13379
+        ]
+      ],
+      "vm_medians_ns": [
+        13602,
+        13163,
+        13268,
+        13516,
+        13300,
+        13790
+      ],
+      "median_ns": 13408.0
+    },
+    {
+      "target": "erlang",
+      "workload": "record_20",
+      "token": "record_20",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19}",
+      "samples_ns": [
+        [
+          16469,
+          15893,
+          16472,
+          16529,
+          15606
+        ],
+        [
+          16881,
+          16792,
+          16784,
+          16060,
+          16340
+        ],
+        [
+          15726,
+          16203,
+          16754,
+          15830,
+          16226
+        ],
+        [
+          16404,
+          16337,
+          16075,
+          16281,
+          15832
+        ],
+        [
+          16140,
+          16477,
+          15783,
+          16400,
+          16158
+        ],
+        [
+          15629,
+          15508,
+          16869,
+          15954,
+          16076
+        ]
+      ],
+      "vm_medians_ns": [
+        16469,
+        16784,
+        16203,
+        16281,
+        16158,
+        15954
+      ],
+      "median_ns": 16242.0
+    },
+    {
+      "target": "erlang",
+      "workload": "record_100",
+      "token": "record_100",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19,\"f20\":20,\"f21\":21,\"f22\":22,\"f23\":23,\"f24\":24,\"f25\":25,\"f26\":26,\"f27\":27,\"f28\":28,\"f29\":29,\"f30\":30,\"f31\":31,\"f32\":32,\"f33\":33,\"f34\":34,\"f35\":35,\"f36\":36,\"f37\":37,\"f38\":38,\"f39\":39,\"f40\":40,\"f41\":41,\"f42\":42,\"f43\":43,\"f44\":44,\"f45\":45,\"f46\":46,\"f47\":47,\"f48\":48,\"f49\":49,\"f50\":50,\"f51\":51,\"f52\":52,\"f53\":53,\"f54\":54,\"f55\":55,\"f56\":56,\"f57\":57,\"f58\":58,\"f59\":59,\"f60\":60,\"f61\":61,\"f62\":62,\"f63\":63,\"f64\":64,\"f65\":65,\"f66\":66,\"f67\":67,\"f68\":68,\"f69\":69,\"f70\":70,\"f71\":71,\"f72\":72,\"f73\":73,\"f74\":74,\"f75\":75,\"f76\":76,\"f77\":77,\"f78\":78,\"f79\":79,\"f80\":80,\"f81\":81,\"f82\":82,\"f83\":83,\"f84\":84,\"f85\":85,\"f86\":86,\"f87\":87,\"f88\":88,\"f89\":89,\"f90\":90,\"f91\":91,\"f92\":92,\"f93\":93,\"f94\":94,\"f95\":95,\"f96\":96,\"f97\":97,\"f98\":98,\"f99\":99}",
+      "samples_ns": [
+        [
+          70878,
+          78221,
+          72420,
+          105768,
+          71339
+        ],
+        [
+          61367,
+          62280,
+          64378,
+          62164,
+          62723
+        ],
+        [
+          62544,
+          63272,
+          61500,
+          60836,
+          62047
+        ],
+        [
+          61816,
+          63626,
+          65268,
+          60863,
+          62540
+        ],
+        [
+          61025,
+          61438,
+          62199,
+          60186,
+          61610
+        ],
+        [
+          59926,
+          61388,
+          59862,
+          59796,
+          60512
+        ]
+      ],
+      "vm_medians_ns": [
+        72420,
+        62280,
+        62047,
+        62540,
+        61438,
+        59926
+      ],
+      "median_ns": 62163.5
+    },
+    {
+      "target": "erlang",
+      "workload": "record_100",
+      "token": "record_100",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19,\"f20\":20,\"f21\":21,\"f22\":22,\"f23\":23,\"f24\":24,\"f25\":25,\"f26\":26,\"f27\":27,\"f28\":28,\"f29\":29,\"f30\":30,\"f31\":31,\"f32\":32,\"f33\":33,\"f34\":34,\"f35\":35,\"f36\":36,\"f37\":37,\"f38\":38,\"f39\":39,\"f40\":40,\"f41\":41,\"f42\":42,\"f43\":43,\"f44\":44,\"f45\":45,\"f46\":46,\"f47\":47,\"f48\":48,\"f49\":49,\"f50\":50,\"f51\":51,\"f52\":52,\"f53\":53,\"f54\":54,\"f55\":55,\"f56\":56,\"f57\":57,\"f58\":58,\"f59\":59,\"f60\":60,\"f61\":61,\"f62\":62,\"f63\":63,\"f64\":64,\"f65\":65,\"f66\":66,\"f67\":67,\"f68\":68,\"f69\":69,\"f70\":70,\"f71\":71,\"f72\":72,\"f73\":73,\"f74\":74,\"f75\":75,\"f76\":76,\"f77\":77,\"f78\":78,\"f79\":79,\"f80\":80,\"f81\":81,\"f82\":82,\"f83\":83,\"f84\":84,\"f85\":85,\"f86\":86,\"f87\":87,\"f88\":88,\"f89\":89,\"f90\":90,\"f91\":91,\"f92\":92,\"f93\":93,\"f94\":94,\"f95\":95,\"f96\":96,\"f97\":97,\"f98\":98,\"f99\":99}",
+      "samples_ns": [
+        [
+          114850,
+          111017,
+          115585,
+          113163,
+          114501
+        ],
+        [
+          115456,
+          115809,
+          115666,
+          114100,
+          114681
+        ],
+        [
+          115001,
+          116369,
+          116983,
+          114644,
+          115674
+        ],
+        [
+          116407,
+          119503,
+          115460,
+          116095,
+          117482
+        ],
+        [
+          113260,
+          114093,
+          113693,
+          119706,
+          118669
+        ],
+        [
+          114407,
+          114673,
+          113143,
+          114791,
+          113509
+        ]
+      ],
+      "vm_medians_ns": [
+        114501,
+        115456,
+        115674,
+        116407,
+        114093,
+        114407
+      ],
+      "median_ns": 114978.5
+    },
+    {
+      "target": "javascript",
+      "workload": "ordinary_decimal",
+      "token": "19.90",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:1.99e1",
+      "samples_ns": [
+        [
+          2081,
+          1747,
+          1630,
+          1635,
+          1550
+        ],
+        [
+          2070,
+          1758,
+          1665,
+          1547,
+          1535
+        ],
+        [
+          3696,
+          10218,
+          6912,
+          4363,
+          1810
+        ],
+        [
+          2361,
+          1870,
+          1662,
+          1596,
+          1568
+        ],
+        [
+          1984,
+          1775,
+          1649,
+          1560,
+          1474
+        ],
+        [
+          2015,
+          1725,
+          1607,
+          1545,
+          1460
+        ]
+      ],
+      "vm_medians_ns": [
+        1635,
+        1665,
+        4363,
+        1662,
+        1649,
+        1607
+      ],
+      "median_ns": 1655.5
+    },
+    {
+      "target": "javascript",
+      "workload": "ordinary_decimal",
+      "token": "19.90",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:1.99e1",
+      "samples_ns": [
+        [
+          2424,
+          2170,
+          2083,
+          2025,
+          1975
+        ],
+        [
+          2426,
+          2143,
+          2009,
+          2000,
+          1996
+        ],
+        [
+          2575,
+          2213,
+          2077,
+          1963,
+          1891
+        ],
+        [
+          2534,
+          2302,
+          2220,
+          2208,
+          2179
+        ],
+        [
+          2432,
+          2168,
+          2074,
+          2001,
+          1947
+        ],
+        [
+          2609,
+          2140,
+          2088,
+          1990,
+          1975
+        ]
+      ],
+      "vm_medians_ns": [
+        2083,
+        2009,
+        2077,
+        2220,
+        2074,
+        2088
+      ],
+      "median_ns": 2080.0
+    },
+    {
+      "target": "javascript",
+      "workload": "ordinary_exponent",
+      "token": "-6.02214076e23",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:-6.02214076e23",
+      "samples_ns": [
+        [
+          2830,
+          2469,
+          2405,
+          2197,
+          2229
+        ],
+        [
+          2781,
+          2505,
+          2420,
+          2373,
+          2180
+        ],
+        [
+          2857,
+          2460,
+          2414,
+          2174,
+          2172
+        ],
+        [
+          2798,
+          2780,
+          2466,
+          2354,
+          2280
+        ],
+        [
+          2973,
+          2477,
+          2371,
+          2205,
+          2469
+        ],
+        [
+          2839,
+          2459,
+          2379,
+          2171,
+          2178
+        ]
+      ],
+      "vm_medians_ns": [
+        2405,
+        2420,
+        2414,
+        2466,
+        2469,
+        2379
+      ],
+      "median_ns": 2417.0
+    },
+    {
+      "target": "javascript",
+      "workload": "ordinary_exponent",
+      "token": "-6.02214076e23",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:-6.02214076e23",
+      "samples_ns": [
+        [
+          3462,
+          3000,
+          2907,
+          2663,
+          2556
+        ],
+        [
+          3314,
+          2944,
+          2877,
+          2660,
+          2669
+        ],
+        [
+          3335,
+          2953,
+          2884,
+          2710,
+          2585
+        ],
+        [
+          3304,
+          2952,
+          2864,
+          2606,
+          2575
+        ],
+        [
+          3428,
+          2996,
+          2913,
+          2752,
+          2623
+        ],
+        [
+          3322,
+          2945,
+          2902,
+          2615,
+          2571
+        ]
+      ],
+      "vm_medians_ns": [
+        2907,
+        2877,
+        2884,
+        2864,
+        2913,
+        2902
+      ],
+      "median_ns": 2893.0
+    },
+    {
+      "target": "javascript",
+      "workload": "large_safe_exponent",
+      "token": "1e-9007199254740991",
+      "limits": "large",
+      "variant": "before",
+      "outcome": "Ok:1e-9007199254740991",
+      "samples_ns": [
+        [
+          2646,
+          2412,
+          2336,
+          2112,
+          2051
+        ],
+        [
+          2649,
+          2414,
+          2378,
+          2189,
+          2095
+        ],
+        [
+          2959,
+          2517,
+          2403,
+          2229,
+          2180
+        ],
+        [
+          2952,
+          2753,
+          3953,
+          4596,
+          2201
+        ],
+        [
+          2951,
+          2621,
+          2495,
+          2266,
+          2217
+        ],
+        [
+          2632,
+          2480,
+          2377,
+          2112,
+          2053
+        ]
+      ],
+      "vm_medians_ns": [
+        2336,
+        2378,
+        2403,
+        2952,
+        2495,
+        2377
+      ],
+      "median_ns": 2390.5
+    },
+    {
+      "target": "javascript",
+      "workload": "large_safe_exponent",
+      "token": "1e-9007199254740991",
+      "limits": "large",
+      "variant": "after",
+      "outcome": "Ok:1e-9007199254740991",
+      "samples_ns": [
+        [
+          3258,
+          3169,
+          2969,
+          2799,
+          2689
+        ],
+        [
+          3305,
+          3120,
+          2957,
+          2714,
+          2726
+        ],
+        [
+          3444,
+          3127,
+          3084,
+          2827,
+          2753
+        ],
+        [
+          3612,
+          3496,
+          3161,
+          2819,
+          2790
+        ],
+        [
+          3698,
+          3150,
+          3046,
+          2844,
+          2748
+        ],
+        [
+          3570,
+          3305,
+          3090,
+          2972,
+          2889
+        ]
+      ],
+      "vm_medians_ns": [
+        2969,
+        2957,
+        3084,
+        3161,
+        3046,
+        3090
+      ],
+      "median_ns": 3065.0
+    },
+    {
+      "target": "javascript",
+      "workload": "record_20",
+      "token": "record_20",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19}",
+      "samples_ns": [
+        [
+          73992,
+          64466,
+          65068,
+          62968,
+          62717
+        ],
+        [
+          73433,
+          64757,
+          64265,
+          63850,
+          66241
+        ],
+        [
+          75062,
+          64179,
+          63075,
+          65020,
+          62676
+        ],
+        [
+          73233,
+          64070,
+          63897,
+          63786,
+          62766
+        ],
+        [
+          73838,
+          66148,
+          63812,
+          62953,
+          62804
+        ],
+        [
+          73531,
+          63465,
+          62271,
+          62643,
+          63827
+        ]
+      ],
+      "vm_medians_ns": [
+        64466,
+        64757,
+        64179,
+        63897,
+        63812,
+        63465
+      ],
+      "median_ns": 64038.0
+    },
+    {
+      "target": "javascript",
+      "workload": "record_20",
+      "token": "record_20",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19}",
+      "samples_ns": [
+        [
+          74784,
+          68080,
+          65723,
+          66311,
+          65475
+        ],
+        [
+          74964,
+          71877,
+          66124,
+          65660,
+          65882
+        ],
+        [
+          74988,
+          68672,
+          66239,
+          65449,
+          65568
+        ],
+        [
+          77085,
+          69851,
+          67436,
+          66766,
+          66286
+        ],
+        [
+          75935,
+          68336,
+          66371,
+          67279,
+          65381
+        ],
+        [
+          76996,
+          68790,
+          66263,
+          66643,
+          68259
+        ]
+      ],
+      "vm_medians_ns": [
+        66311,
+        66124,
+        66239,
+        67436,
+        67279,
+        68259
+      ],
+      "median_ns": 66795.0
+    },
+    {
+      "target": "javascript",
+      "workload": "record_100",
+      "token": "record_100",
+      "limits": "default",
+      "variant": "before",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19,\"f20\":20,\"f21\":21,\"f22\":22,\"f23\":23,\"f24\":24,\"f25\":25,\"f26\":26,\"f27\":27,\"f28\":28,\"f29\":29,\"f30\":30,\"f31\":31,\"f32\":32,\"f33\":33,\"f34\":34,\"f35\":35,\"f36\":36,\"f37\":37,\"f38\":38,\"f39\":39,\"f40\":40,\"f41\":41,\"f42\":42,\"f43\":43,\"f44\":44,\"f45\":45,\"f46\":46,\"f47\":47,\"f48\":48,\"f49\":49,\"f50\":50,\"f51\":51,\"f52\":52,\"f53\":53,\"f54\":54,\"f55\":55,\"f56\":56,\"f57\":57,\"f58\":58,\"f59\":59,\"f60\":60,\"f61\":61,\"f62\":62,\"f63\":63,\"f64\":64,\"f65\":65,\"f66\":66,\"f67\":67,\"f68\":68,\"f69\":69,\"f70\":70,\"f71\":71,\"f72\":72,\"f73\":73,\"f74\":74,\"f75\":75,\"f76\":76,\"f77\":77,\"f78\":78,\"f79\":79,\"f80\":80,\"f81\":81,\"f82\":82,\"f83\":83,\"f84\":84,\"f85\":85,\"f86\":86,\"f87\":87,\"f88\":88,\"f89\":89,\"f90\":90,\"f91\":91,\"f92\":92,\"f93\":93,\"f94\":94,\"f95\":95,\"f96\":96,\"f97\":97,\"f98\":98,\"f99\":99}",
+      "samples_ns": [
+        [
+          696202,
+          690809,
+          691437,
+          709533,
+          688657
+        ],
+        [
+          693592,
+          694396,
+          687326,
+          697703,
+          684430
+        ],
+        [
+          695546,
+          692856,
+          685679,
+          710875,
+          689637
+        ],
+        [
+          706150,
+          726020,
+          697127,
+          712083,
+          717119
+        ],
+        [
+          699747,
+          703085,
+          709643,
+          715873,
+          695957
+        ],
+        [
+          713357,
+          714067,
+          702404,
+          700351,
+          697733
+        ]
+      ],
+      "vm_medians_ns": [
+        691437,
+        693592,
+        692856,
+        712083,
+        703085,
+        702404
+      ],
+      "median_ns": 697998.0
+    },
+    {
+      "target": "javascript",
+      "workload": "record_100",
+      "token": "record_100",
+      "limits": "default",
+      "variant": "after",
+      "outcome": "Ok:{\"f0\":0,\"f1\":1,\"f2\":2,\"f3\":3,\"f4\":4,\"f5\":5,\"f6\":6,\"f7\":7,\"f8\":8,\"f9\":9,\"f10\":10,\"f11\":11,\"f12\":12,\"f13\":13,\"f14\":14,\"f15\":15,\"f16\":16,\"f17\":17,\"f18\":18,\"f19\":19,\"f20\":20,\"f21\":21,\"f22\":22,\"f23\":23,\"f24\":24,\"f25\":25,\"f26\":26,\"f27\":27,\"f28\":28,\"f29\":29,\"f30\":30,\"f31\":31,\"f32\":32,\"f33\":33,\"f34\":34,\"f35\":35,\"f36\":36,\"f37\":37,\"f38\":38,\"f39\":39,\"f40\":40,\"f41\":41,\"f42\":42,\"f43\":43,\"f44\":44,\"f45\":45,\"f46\":46,\"f47\":47,\"f48\":48,\"f49\":49,\"f50\":50,\"f51\":51,\"f52\":52,\"f53\":53,\"f54\":54,\"f55\":55,\"f56\":56,\"f57\":57,\"f58\":58,\"f59\":59,\"f60\":60,\"f61\":61,\"f62\":62,\"f63\":63,\"f64\":64,\"f65\":65,\"f66\":66,\"f67\":67,\"f68\":68,\"f69\":69,\"f70\":70,\"f71\":71,\"f72\":72,\"f73\":73,\"f74\":74,\"f75\":75,\"f76\":76,\"f77\":77,\"f78\":78,\"f79\":79,\"f80\":80,\"f81\":81,\"f82\":82,\"f83\":83,\"f84\":84,\"f85\":85,\"f86\":86,\"f87\":87,\"f88\":88,\"f89\":89,\"f90\":90,\"f91\":91,\"f92\":92,\"f93\":93,\"f94\":94,\"f95\":95,\"f96\":96,\"f97\":97,\"f98\":98,\"f99\":99}",
+      "samples_ns": [
+        [
+          750058,
+          760046,
+          775921,
+          750153,
+          746975
+        ],
+        [
+          762512,
+          780351,
+          784890,
+          769182,
+          751732
+        ],
+        [
+          752111,
+          756407,
+          741985,
+          745878,
+          747702
+        ],
+        [
+          764384,
+          768374,
+          769132,
+          769259,
+          781834
+        ],
+        [
+          753749,
+          762740,
+          768922,
+          758313,
+          752517
+        ],
+        [
+          776184,
+          783631,
+          751235,
+          754361,
+          766042
+        ]
+      ],
+      "vm_medians_ns": [
+        750153,
+        769182,
+        747702,
+        769132,
+        758313,
+        766042
+      ],
+      "median_ns": 762177.5
+    }
+  ],
+  "boundaries": [
+    {
+      "target": "erlang",
+      "token": "1.00e-9007199254740991",
+      "before": "Ok:1e-9007199254740991",
+      "after": "Ok:1e-9007199254740991"
+    },
+    {
+      "target": "erlang",
+      "token": "100e-9007199254740993",
+      "before": "Ok:1e-9007199254740991",
+      "after": "Ok:1e-9007199254740991"
+    },
+    {
+      "target": "javascript",
+      "token": "1.00e-9007199254740991",
+      "before": "Ok:1e-9007199254740990",
+      "after": "Ok:1e-9007199254740991"
+    },
+    {
+      "target": "javascript",
+      "token": "100e-9007199254740993",
+      "before": "Ok:1e-9007199254740990",
+      "after": "Error:ExponentOutOfRange"
+    }
+  ],
+  "order": [
+    [
+      "erlang",
+      "ordinary_decimal",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_decimal",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_decimal",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_decimal",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_decimal",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_decimal",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_exponent",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_exponent",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_exponent",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_exponent",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_exponent",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "ordinary_exponent",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "large_safe_exponent",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "large_safe_exponent",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "large_safe_exponent",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "large_safe_exponent",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "large_safe_exponent",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "large_safe_exponent",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "record_20",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "record_20",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "record_20",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "record_20",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "record_20",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "record_20",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "record_100",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "record_100",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "record_100",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "record_100",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "erlang",
+      "record_100",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "erlang",
+      "record_100",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_decimal",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_decimal",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_decimal",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_decimal",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_decimal",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_decimal",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_exponent",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_exponent",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_exponent",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_exponent",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_exponent",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "ordinary_exponent",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "large_safe_exponent",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "large_safe_exponent",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "large_safe_exponent",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "large_safe_exponent",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "large_safe_exponent",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "large_safe_exponent",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "record_20",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "record_20",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "record_20",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "record_20",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "record_20",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "record_20",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "record_100",
+      0,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "record_100",
+      1,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "record_100",
+      2,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "record_100",
+      3,
+      [
+        "after",
+        "before"
+      ]
+    ],
+    [
+      "javascript",
+      "record_100",
+      4,
+      [
+        "before",
+        "after"
+      ]
+    ],
+    [
+      "javascript",
+      "record_100",
+      5,
+      [
+        "after",
+        "before"
+      ]
+    ]
+  ]
+}
