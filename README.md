@@ -6,9 +6,9 @@ publish a Draft 2020-12 schema from the same definition.
 [![Package Version](https://img.shields.io/hexpm/v/json_blueprint)](https://hex.pm/packages/json_blueprint)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
 
-This checkout prepares JSON Blueprint 2.0.0, including codecs, runtime
-contracts, and source generation. Until 2.0.0 is published to Hex, use the Git
-or path dependency below. Published 1.7.1 provides the legacy 1.x API.
+JSON Blueprint 2.0 includes typed codecs, exact JSON values, runtime schema
+contracts, and build-time source generators in one package. The legacy decoder
+and schema modules remain available for applications upgrading from 1.x.
 
 ## When to use it
 
@@ -43,6 +43,8 @@ authorization, protocol policy, and effects in custom callbacks.
   values only with a codec whose schema matches.
 - Opaque schemas can be rendered as JSON or inspected with `codec.view` for
   consumer-side translation.
+- Included source generators produce specialized functions for an existing
+  native type, or native records and a codec from a supported schema.
 
 ## Core model
 
@@ -62,27 +64,22 @@ acceptance, while a `Codec(a)` owns conversion to and from an application type.
 
 ## Installation
 
-Before the 2.0.0 Hex release, use the repository's `main` branch:
-
-```toml
-[dependencies]
-json_blueprint = { git = "https://github.com/lostbean/json_blueprint.git", ref = "main" }
-```
-
-Gleam records the resolved Git commit in `manifest.toml`; commit that file to
-keep builds pinned to the same revision.
-
-After 2.0.0 is published, install the major version with:
+The 2.x APIs require JSON Blueprint 2.0.0 or later. Once 2.0.0 is available on
+Hex, install it with:
 
 ```sh
 gleam add json_blueprint@2
 ```
-
-To stay on published 1.x in `json/blueprint` and `json/blueprint/schema`:
+Published 1.7.1 provides the legacy `json/blueprint` and
+`json/blueprint/schema` modules. To stay on that API:
 
 ```sh
 gleam add json_blueprint@1.7.1
 ```
+
+Before upgrading an existing application, follow the
+[2.0 migration guide](https://github.com/lostbean/json_blueprint/blob/main/docs/MIGRATION.md).
+The package upgrade and adopting codecs are separate changes.
 
 ## Define a codec
 
@@ -176,7 +173,9 @@ pub fn shape_codec() -> Codec(Shape) {
 The wire forms are `{"tag":"circle","value":2}` and `{"tag":"empty"}`.
 Gleam checks that the `case` covers every constructor.
 
-## Defaults
+<a id="defaults"></a>
+
+## Parsing and runtime requirements
 
 `value.default_limits()` admits at most 1 MiB of UTF-8 text. Change this with
 `value.with_max_bytes` and pass the result to `codec.decode_json_with_limits`,
@@ -242,14 +241,9 @@ Your build task writes, formats, and compiles the returned source. Both paths us
 JSON Blueprint at runtime.
 
 The generators are included in `json_blueprint` under
-`json/blueprint/codegen` and `json/blueprint/codegen/schema`. They share the
-2.0.0 package and need no separate generator dependency. Before the Hex release,
-you can use a local checkout:
-
-```toml
-[dependencies]
-json_blueprint = { path = "../json_blueprint" }
-```
+`json/blueprint/codegen` and `json/blueprint/codegen/schema`. The same dependency
+supplies the runtime and generators; no separate `json_blueprint_codegen`
+package is needed. Choose a dependency from [Installation](#installation).
 
 <!-- prettier-ignore-start -->
 
