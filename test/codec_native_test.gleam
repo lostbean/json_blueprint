@@ -6,6 +6,19 @@ import json/blueprint/codec
 import json/blueprint/number
 import json/blueprint/value
 
+@target(erlang)
+@external(erlang, "erts_debug", "flat_size")
+fn copied_words(term: a) -> Int
+
+// Sending a codec to another process copies its callback environments. Extra
+// list layers must not repeatedly capture every unused callback of the child.
+@target(erlang)
+pub fn nested_list_codec_callback_copy_cost_grows_linearly_test() {
+  let three = codec.list(codec.list(codec.list(codec.int())))
+  let six = codec.list(codec.list(codec.list(three)))
+  { copied_words(six) < copied_words(three) * 5 } |> should.be_true
+}
+
 pub type Record {
   Record(first: Int, total: Int, note: Option(Option(String)))
 }

@@ -1018,36 +1018,43 @@ pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
 
 /// A JSON array of items.
 pub fn list(of item: Codec(a)) -> Codec(List(a)) {
+  // Each escaping callback retains only the child operation it uses. Retaining
+  // the whole child codec in every callback multiplies process-copy cost at
+  // every collection layer.
+  let encode_item = item.encode
+  let decode_item = item.decode
+  let decode_native_item = item.native_decode
+  let item_definition = item.definition
   Codec(
     text_encode: None,
     encode: fn(items) {
       list.index_map(items, fn(entry, index) { #(index, entry) })
       |> list.try_map(fn(pair) {
-        item.encode(pair.1) |> at_encode(Index(pair.0))
+        encode_item(pair.1) |> at_encode(Index(pair.0))
       })
       |> result.map(value.Array)
     },
     decode: fn(raw) {
       case raw {
-        value.Array(items) -> decode_items(item, items, 0, [])
+        value.Array(items) -> decode_items(decode_item, items, 0, [])
         _ -> fail(ExpectedArray)
       }
     },
     native_decode: fn(raw) {
       native.array_decode(
         raw,
-        fn(raw, index) { item.native_decode(raw) |> at_decode(Index(index)) },
+        fn(raw, index) { decode_native_item(raw) |> at_decode(Index(index)) },
         DecodeError([], ExpectedArray),
       )
     },
-    definition: fn() { item.definition() |> map_schema(tree.ListSchema) },
+    definition: fn() { item_definition() |> map_schema(tree.ListSchema) },
     placeholder: fn() { [] },
     fields: None,
   )
 }
 
 fn decode_items(
-  item: Codec(a),
+  decode_item: fn(Value) -> Result(a, DecodeError),
   items: List(Value),
   index: Int,
   done: List(a),
@@ -1055,8 +1062,9 @@ fn decode_items(
   case items {
     [] -> Ok(list.reverse(done))
     [raw, ..rest] ->
-      case item.decode(raw) |> at_decode(Index(index)) {
-        Ok(decoded) -> decode_items(item, rest, index + 1, [decoded, ..done])
+      case decode_item(raw) |> at_decode(Index(index)) {
+        Ok(decoded) ->
+          decode_items(decode_item, rest, index + 1, [decoded, ..done])
         Error(error) -> Error(error)
       }
   }

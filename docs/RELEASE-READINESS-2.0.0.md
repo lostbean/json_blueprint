@@ -6,7 +6,7 @@ The specialized generated-code adoption is locally validated and has no known
 unresolved correctness blocker in the reviewed paths. This is a release
 candidate with a successful local package preview. No release or tag has been cut.
 
-- Full repository gate: 382 Erlang and 387 JavaScript root tests; 24 example
+- Full repository gate: 384 Erlang and 388 JavaScript root tests; 24 example
   tests and 10 generated-consumer tests per target; fresh generated compilation,
   isolated production compilation, and all independent oracles pass.
 - Host formatting, README snippet synchronization and rendered design checks
@@ -22,6 +22,9 @@ candidate with a successful local package preview. No release or tag has been cu
   conversions. Pure mappings are required: cached metadata skips placeholder
   introspection. Generated objects cannot finish record-builder continuations.
   These limits and migration details are in [MIGRATION.md](MIGRATION.md).
+- Nested-list callbacks retain only the child operation they use. The native
+  callback-copy regression test passes, and an isolated current-source Fabric
+  consumer passes its unchanged nested-runtime and work-copy bounds.
 - [ADR 0016](adr/0016-specialize-generated-codecs-with-runtime-semantics.md)
   records the specialization decision. Maintained benchmarks compare current
   implementations with vanilla native paths.
