@@ -10,12 +10,19 @@ import gleam/io
 import json/blueprint/codegen
 import materialize_fixtures
 import option_fixtures
+import unicode_codegen_fixtures
 
 @external(erlang, "file_test_ffi", "write_file")
 @external(javascript, "./file_test_ffi.mjs", "write_file")
 fn write_file(path: String, content: String) -> Result(Nil, String)
 
 pub fn main() {
+  let assert Ok(_) =
+    write_generated(
+      "generated/unicode_codec",
+      "unicode",
+      unicode_codegen_fixtures.definition(),
+    )
   case
     write_generated(
       "generated/order_codec",

@@ -159,17 +159,20 @@ fn is_digit(ch: String) -> Bool {
 }
 
 pub fn escape_string_literal(raw: String) -> String {
-  let graphemes = string.to_graphemes(raw)
+  // Escape codepoints: a quote or backslash can share a grapheme with a mark.
+  let codepoints = string.to_utf_codepoints(raw)
   let escaped_chars =
-    list.map(graphemes, fn(g) {
-      case g {
-        "\"" -> "\\\""
-        "\\" -> "\\\\"
-        "\n" -> "\\n"
-        "\r" -> "\\r"
-        "\t" -> "\\t"
-        "\f" -> "\\f"
-        other -> other
+    list.map(codepoints, fn(point) {
+      let code = string.utf_codepoint_to_int(point)
+      case code {
+        34 -> "\\\""
+        92 -> "\\\\"
+        10 -> "\\n"
+        13 -> "\\r"
+        9 -> "\\t"
+        12 -> "\\f"
+        code if code < 32 -> "\\u{" <> int.to_base16(code) <> "}"
+        _ -> string.from_utf_codepoints([point])
       }
     })
   "\"" <> string.join(escaped_chars, "") <> "\""

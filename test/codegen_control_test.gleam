@@ -3,6 +3,7 @@
 
 import generated/option_codec
 import generated/order_codec
+import generated/unicode_codec
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
@@ -11,6 +12,7 @@ import json/blueprint/codec.{DecodeError, Field}
 import json/blueprint/codegen
 import json/blueprint/value
 import option_fixtures
+import unicode_codegen_fixtures
 
 pub fn codegen_description_preserves_runtime_and_generated_schema_test() {
   let definition = codegen.describe(codegen.string(), "A quoted \"name\"")
@@ -113,4 +115,26 @@ pub fn generated_and_mapped_json_use_strict_admission_test() {
     [],
     codec.InvalidJson(value.ParseError(_, value.DuplicateObjectKey)),
   )) = codec.decode_json(generated, duplicate)
+}
+
+// Exercise compiled output, including literal preservation in schema and both
+// conversion paths. The gate also recompiles freshly generated fixtures.
+pub fn generated_combining_marks_preserve_literal_data_test() {
+  let runtime = codegen.runtime(unicode_codegen_fixtures.definition())
+  let generated = unicode_codec.unicode_codec()
+  let raw =
+    value.Object([#(unicode_codegen_fixtures.wire_name, value.String("ok"))])
+  codec.schema(generated) |> should.equal(codec.schema(runtime))
+  codec.encode(generated, "ok") |> should.equal(Ok(raw))
+  codec.decode(generated, raw) |> should.equal(Ok("ok"))
+  let assert Ok(text) = codec.encode_json(runtime, "ok")
+  codec.encode_json(generated, "ok") |> should.equal(Ok(text))
+  codec.decode_json(generated, text) |> should.equal(Ok("ok"))
+  let assert Ok(compiled) =
+    codegen.compile(
+      "generated/unicode_codec",
+      "unicode",
+      unicode_codegen_fixtures.definition(),
+    )
+  compiled.fingerprint |> should.equal(unicode_codec.generated_fingerprint)
 }
