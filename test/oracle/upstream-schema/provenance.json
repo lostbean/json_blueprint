@@ -1,0 +1,34 @@
+{
+  "upstream": "https://github.com/json-schema-org/JSON-Schema-Test-Suite",
+  "revision": "89e83a74014617ffbe79a56d83d14d054cd11417",
+  "license": "MIT",
+  "license_sha256": "837402bd25fad9b704265801ca3f92566a98157c1f9a7acd6f446299ba1c305a",
+  "sources": {
+    "type": {
+      "path": "tests/draft2020-12/type.json",
+      "sha256": "4c5cbe6cbcd28af73761091367b20e07d0403847e236c06c31fc27061bd81192"
+    },
+    "items": {
+      "path": "tests/draft2020-12/items.json",
+      "sha256": "d924a8171f1f1d04ff026a4e3491d1376297145563158543005b7073b69ab913"
+    },
+    "enum": {
+      "path": "tests/draft2020-12/enum.json",
+      "sha256": "1abe7eb883bde4a78c62f08e484e16f32b72ca5c1be725aa54d85cc4546b5031"
+    },
+    "minimum": {
+      "path": "tests/draft2020-12/minimum.json",
+      "sha256": "f6a29cb574b76621da23636a636cf12cb31b01646b89543e6ce1a813376439a3"
+    },
+    "maximum": {
+      "path": "tests/draft2020-12/maximum.json",
+      "sha256": "dfbc88ef4ede2966250fb2ad44076856d51481ea01ce679cca70efe47606ee90"
+    },
+    "required": {
+      "path": "tests/draft2020-12/required.json",
+      "sha256": "3e3900dd0e546c1cb4aaab6b24ea0e06a8f7f8c05b272dcc87e85332501ed42e"
+    }
+  },
+  "scope": "Selected unchanged fixtures, explicit unsupported profile cases, and separately labelled finite-profile adaptations. No general Draft2020-12 conformance claim.",
+  "adaptation_oracle": "Python jsonschema Draft202012Validator, version pinned by flake.lock"
+}

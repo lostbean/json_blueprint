@@ -1,0 +1,33 @@
+{
+  "upstream": "https://github.com/tc39/test262",
+  "commit": "d53ebc8b1931d9f1541e43d59650776e4b766248",
+  "license": "BSD-3-Clause (retained LICENSE and per-file copyright)",
+  "adaptation": "Cases preserve JSON inputs and expected primitive source text from the three retained upstream tests. Native value assertions and public Blueprint text/byte/typed checks are locally authored. Exact-number and strict duplicate cases in the checker are local additions, not upstream claims.",
+  "files": [
+    {
+      "upstream_path": "LICENSE",
+      "local_path": "LICENSE",
+      "sha256": "4dd9244dfe8197c75348c4b24ab53d29d3b1cfad143ac76b5a3d8942aa354ce0"
+    },
+    {
+      "upstream_path": "test/built-ins/JSON/parse/reviver-context-source-primitive-literal.js",
+      "local_path": "reviver-context-source-primitive-literal.js.txt",
+      "sha256": "e82dd30f25f9238152a3b67c12f192bd0a6ea0cdd32194b36b1766e76daf7b1c"
+    },
+    {
+      "upstream_path": "test/built-ins/JSON/parse/reviver-context-source-array-literal.js",
+      "local_path": "reviver-context-source-array-literal.js.txt",
+      "sha256": "ea84b49e993be6e1b7b8617903daa54cc19dcf8b27cc6db0a0247a358f350a84"
+    },
+    {
+      "upstream_path": "test/built-ins/JSON/parse/reviver-context-source-object-literal.js",
+      "local_path": "reviver-context-source-object-literal.js.txt",
+      "sha256": "ed57958a6dde5b80e545731ddda59924b8ee3eacdef2fd18ec24f2b683fcb1ac"
+    },
+    {
+      "local_path": "cases.json",
+      "sha256": "29e21a63296f6e383a46871190569bb52f6fe109d4f3720f6b9f048f3b0c8954",
+      "origin": "locally adapted from retained upstream tests"
+    }
+  ]
+}

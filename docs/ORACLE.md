@@ -98,8 +98,49 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
    decoding. This simulates a missing capability; it does not certify an old
    browser release.
 
+9. **Codec and generated-code laws** ([`test/codec_laws_test.gleam`](../test/codec_laws_test.gleam))
+   exercise 128 deterministic varied records across handwritten, interpreted,
+   generated Value, generated strict text and representable native JSON paths.
+   Roundtrips, encoding parity, schema-document reload, schema validation,
+   witnesses, object permutation and whitespace are checked. Another 160
+   single-fault mutations check specified rejection paths, and 32 duplicate
+   documents check strict admission. These are bounded laws, not exhaustive
+   property testing or an independent JSON Schema implementation.
+
 Both parser corpora and the host-string tests run offline in the ordinary gate.
 They do not certify every JSON parser behavior, browser runtime or resource cost.
+
+## Additional upstream regressions, 2026-10-26
+
+[`test/upstream_schema_test.gleam`](../test/upstream_schema_test.gleam)
+checks selected official JSON Schema Test Suite cases on both targets. Five
+schema groups retain upstream constraints and verdicts (40 instances); eleven
+groups adapt schemas to the finite supported profile (44 instances), with
+adaptations explicitly identified. Another 26 schema cases assert an explicit
+unsupported-document failure. Supported cases compare contract validation,
+normalized-schema reload, and Value/text codec encoding and decoding.
+The [retained source files and provenance](../test/oracle/upstream-schema/)
+pin revision `89e83a74014617ffbe79a56d83d14d054cd11417` and the MIT license.
+[`test/upstream_schema_check.py`](../test/upstream_schema_check.py) verifies
+source integrity, fixture synchronization and independent Draft 2020-12
+verdicts in the ordinary gate. These selected cases do not establish support
+for the full official suite; adapted cases are not unchanged conformance cases.
+
+[`test/upstream_encoding_test.gleam`](../test/upstream_encoding_test.gleam)
+adapts the ten historical binary64 rounding counterexamples in Serde JSON's
+`test_roundtrip_f64`. Both targets check text decoding against the retained
+numeric constants, text encode/decode roundtrips, and Value encode/decode
+roundtrips. This does not prescribe identical JSON number spelling or establish
+exhaustive binary64 correctness. The [provenance and MIT license](../test/oracle/serde-json/)
+pin upstream revision `8c535a260ce561eaab4111aafc29038eb9f77ff3`.
+
+[`test/source_text_oracle_check.mjs`](../test/source_text_oracle_check.mjs)
+checks selected Test262-derived source-context cases and pairs them with public
+Value, byte-input and custom-codec checks. Exact-number extensions use independent
+BigInt coefficient/exponent normalization; strict duplicate refusals are local
+policy checks, not claimed Test262 expectations. The [pinned fixtures](../test/oracle/test262-source/)
+retain source hashes and licensing. This Node check runs in the ordinary gate;
+it does not add browser-engine certification or test the complete ECMAScript suite.
 
 ## Outcome classes
 

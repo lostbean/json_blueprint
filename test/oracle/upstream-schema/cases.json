@@ -1,0 +1,2280 @@
+[
+  {
+    "id": "type/0/unchanged",
+    "source_file": "type.json",
+    "source_group": 0,
+    "description": "integer type matches integers",
+    "kind": "unchanged",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "integer"
+    },
+    "tests": [
+      {
+        "description": "an integer is an integer",
+        "data": 1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a float with zero fractional part is an integer",
+        "data": 1.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a float is not an integer",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is not an integer",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is still not an integer, even if it looks like one",
+        "data": "1",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is not an integer",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is not an integer",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a boolean is not an integer",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is not an integer",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/1/unchanged",
+    "source_file": "type.json",
+    "source_group": 1,
+    "description": "number type matches numbers",
+    "kind": "unchanged",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "number"
+    },
+    "tests": [
+      {
+        "description": "an integer is a number",
+        "data": 1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a float with zero fractional part is a number (and an integer)",
+        "data": 1.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a float is a number",
+        "data": 1.1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a string is not a number",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is still not a number, even if it looks like one",
+        "data": "1",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is not a number",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is not a number",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a boolean is not a number",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is not a number",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/2/unchanged",
+    "source_file": "type.json",
+    "source_group": 2,
+    "description": "string type matches strings",
+    "kind": "unchanged",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string"
+    },
+    "tests": [
+      {
+        "description": "1 is not a string",
+        "data": 1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a float is not a string",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is a string",
+        "data": "foo",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a string is still a string, even if it looks like a number",
+        "data": "1",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "an empty string is still a string",
+        "data": "",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "an object is not a string",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is not a string",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a boolean is not a string",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is not a string",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/3/unsupported",
+    "source_file": "type.json",
+    "source_group": 3,
+    "description": "object type matches objects",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object"
+    },
+    "tests": [
+      {
+        "description": "an integer is not an object",
+        "data": 1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a float is not an object",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is not an object",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is an object",
+        "data": {},
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "an array is not an object",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a boolean is not an object",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is not an object",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/4/unsupported",
+    "source_file": "type.json",
+    "source_group": 4,
+    "description": "array type matches arrays",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array"
+    },
+    "tests": [
+      {
+        "description": "an integer is not an array",
+        "data": 1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a float is not an array",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is not an array",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is not an array",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is an array",
+        "data": [],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a boolean is not an array",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is not an array",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/5/unchanged",
+    "source_file": "type.json",
+    "source_group": 5,
+    "description": "boolean type matches booleans",
+    "kind": "unchanged",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "boolean"
+    },
+    "tests": [
+      {
+        "description": "an integer is not a boolean",
+        "data": 1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "zero is not a boolean",
+        "data": 0,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a float is not a boolean",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is not a boolean",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an empty string is not a boolean",
+        "data": "",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is not a boolean",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is not a boolean",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "true is a boolean",
+        "data": true,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "false is a boolean",
+        "data": false,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "null is not a boolean",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/6/unsupported",
+    "source_file": "type.json",
+    "source_group": 6,
+    "description": "null type matches only the null object",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "null"
+    },
+    "tests": [
+      {
+        "description": "an integer is not null",
+        "data": 1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a float is not null",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "zero is not null",
+        "data": 0,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a string is not null",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an empty string is not null",
+        "data": "",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is not null",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is not null",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "true is not null",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "false is not null",
+        "data": false,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is null",
+        "data": null,
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "type/7/unsupported",
+    "source_file": "type.json",
+    "source_group": 7,
+    "description": "multiple types can be specified in an array",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": [
+        "integer",
+        "string"
+      ]
+    },
+    "tests": [
+      {
+        "description": "an integer is valid",
+        "data": 1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a string is valid",
+        "data": "foo",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "a float is invalid",
+        "data": 1.1,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an object is invalid",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "an array is invalid",
+        "data": [],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "a boolean is invalid",
+        "data": true,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is invalid",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/8/unsupported",
+    "source_file": "type.json",
+    "source_group": 8,
+    "description": "type as array with one item",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": [
+        "string"
+      ]
+    },
+    "tests": [
+      {
+        "description": "string is valid",
+        "data": "foo",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "number is invalid",
+        "data": 123,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/9/unsupported",
+    "source_file": "type.json",
+    "source_group": 9,
+    "description": "type: array or object",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "tests": [
+      {
+        "description": "array is valid",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "object is valid",
+        "data": {
+          "foo": 123
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "number is invalid",
+        "data": 123,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "string is invalid",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "null is invalid",
+        "data": null,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "type/10/unsupported",
+    "source_file": "type.json",
+    "source_group": 10,
+    "description": "type: array, object or null",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": [
+        "array",
+        "object",
+        "null"
+      ]
+    },
+    "tests": [
+      {
+        "description": "array is valid",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "object is valid",
+        "data": {
+          "foo": 123
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "null is valid",
+        "data": null,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "number is invalid",
+        "data": 123,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "string is invalid",
+        "data": "foo",
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "items/0/unsupported",
+    "source_file": "items.json",
+    "source_group": 0,
+    "description": "a schema given for items",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "tests": [
+      {
+        "description": "valid items",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "wrong type of items",
+        "data": [
+          1,
+          "x"
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-arrays",
+        "data": {
+          "foo": "bar"
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "JavaScript pseudo-array is valid",
+        "data": {
+          "0": "invalid",
+          "length": 1
+        },
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/1/unsupported",
+    "source_file": "items.json",
+    "source_group": 1,
+    "description": "items with boolean schema (true)",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "items": true
+    },
+    "tests": [
+      {
+        "description": "any array is valid",
+        "data": [
+          1,
+          "foo",
+          true
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "empty array is valid",
+        "data": [],
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/2/unsupported",
+    "source_file": "items.json",
+    "source_group": 2,
+    "description": "items with boolean schema (false)",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "items": false
+    },
+    "tests": [
+      {
+        "description": "any non-empty array is invalid",
+        "data": [
+          1,
+          "foo",
+          true
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "empty array is valid",
+        "data": [],
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/3/unsupported",
+    "source_file": "items.json",
+    "source_group": 3,
+    "description": "items and subitems",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$defs": {
+        "item": {
+          "type": "array",
+          "items": false,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/sub-item"
+            },
+            {
+              "$ref": "#/$defs/sub-item"
+            }
+          ]
+        },
+        "sub-item": {
+          "type": "object",
+          "required": [
+            "foo"
+          ]
+        }
+      },
+      "type": "array",
+      "items": false,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/item"
+        },
+        {
+          "$ref": "#/$defs/item"
+        },
+        {
+          "$ref": "#/$defs/item"
+        }
+      ]
+    },
+    "tests": [
+      {
+        "description": "valid items",
+        "data": [
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ]
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "too many items",
+        "data": [
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ]
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "too many sub-items",
+        "data": [
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ]
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "wrong item",
+        "data": [
+          {
+            "foo": null
+          },
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ]
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "wrong sub-item",
+        "data": [
+          [
+            {},
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            },
+            {
+              "foo": null
+            }
+          ]
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "fewer items is valid",
+        "data": [
+          [
+            {
+              "foo": null
+            }
+          ],
+          [
+            {
+              "foo": null
+            }
+          ]
+        ],
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/4/unchanged",
+    "source_file": "items.json",
+    "source_group": 4,
+    "description": "nested items",
+    "kind": "unchanged",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "tests": [
+      {
+        "description": "valid nested array",
+        "data": [
+          [
+            [
+              [
+                1
+              ]
+            ],
+            [
+              [
+                2
+              ],
+              [
+                3
+              ]
+            ]
+          ],
+          [
+            [
+              [
+                4
+              ],
+              [
+                5
+              ],
+              [
+                6
+              ]
+            ]
+          ]
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "nested array with invalid type",
+        "data": [
+          [
+            [
+              [
+                "1"
+              ]
+            ],
+            [
+              [
+                2
+              ],
+              [
+                3
+              ]
+            ]
+          ],
+          [
+            [
+              [
+                4
+              ],
+              [
+                5
+              ],
+              [
+                6
+              ]
+            ]
+          ]
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "not deep enough",
+        "data": [
+          [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ]
+          ],
+          [
+            [
+              4
+            ],
+            [
+              5
+            ],
+            [
+              6
+            ]
+          ]
+        ],
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "items/5/unsupported",
+    "source_file": "items.json",
+    "source_group": 5,
+    "description": "prefixItems with no additional items allowed",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "prefixItems": [
+        {},
+        {},
+        {}
+      ],
+      "items": false
+    },
+    "tests": [
+      {
+        "description": "empty array",
+        "data": [],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "fewer number of items present (1)",
+        "data": [
+          1
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "fewer number of items present (2)",
+        "data": [
+          1,
+          2
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "equal number of items present",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "additional items are not permitted",
+        "data": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "items/6/unsupported",
+    "source_file": "items.json",
+    "source_group": 6,
+    "description": "items does not look in applicators, valid case",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "prefixItems": [
+            {
+              "minimum": 3
+            }
+          ]
+        }
+      ],
+      "items": {
+        "minimum": 5
+      }
+    },
+    "tests": [
+      {
+        "description": "prefixItems in allOf does not constrain items, invalid case",
+        "data": [
+          3,
+          5
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "prefixItems in allOf does not constrain items, valid case",
+        "data": [
+          5,
+          5
+        ],
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/7/unsupported",
+    "source_file": "items.json",
+    "source_group": 7,
+    "description": "prefixItems validation adjusts the starting index for items",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "items": {
+        "type": "integer"
+      }
+    },
+    "tests": [
+      {
+        "description": "valid items",
+        "data": [
+          "x",
+          2,
+          3
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "wrong type of second item",
+        "data": [
+          "x",
+          "y"
+        ],
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "items/8/unsupported",
+    "source_file": "items.json",
+    "source_group": 8,
+    "description": "items with heterogeneous array",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "prefixItems": [
+        {}
+      ],
+      "items": false
+    },
+    "tests": [
+      {
+        "description": "heterogeneous invalid instance",
+        "data": [
+          "foo",
+          "bar",
+          37
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "valid instance",
+        "data": [
+          null
+        ],
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/9/unsupported",
+    "source_file": "items.json",
+    "source_group": 9,
+    "description": "items with null instance elements",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "items": {
+        "type": "null"
+      }
+    },
+    "tests": [
+      {
+        "description": "allows null elements",
+        "data": [
+          null
+        ],
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "enum/4/unsupported",
+    "source_file": "enum.json",
+    "source_group": 4,
+    "description": "enum with escaped characters",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "enum": [
+        "foo\nbar",
+        "foo\rbar"
+      ]
+    },
+    "tests": [
+      {
+        "description": "member 1 is valid",
+        "data": "foo\nbar",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "member 2 is valid",
+        "data": "foo\rbar",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "another string is invalid",
+        "data": "abc",
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "enum/4/adapted",
+    "source_file": "enum.json",
+    "source_group": 4,
+    "description": "enum with escaped characters",
+    "kind": "adapted",
+    "adaptation": "Add explicit string type; upstream instance verdicts are unchanged.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "enum": [
+        "foo\nbar",
+        "foo\rbar"
+      ],
+      "type": "string"
+    },
+    "tests": [
+      {
+        "description": "member 1 is valid",
+        "data": "foo\nbar",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "member 2 is valid",
+        "data": "foo\rbar",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "another string is invalid",
+        "data": "abc",
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "minimum/0/unsupported",
+    "source_file": "minimum.json",
+    "source_group": 0,
+    "description": "minimum validation",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "minimum": 1.1
+    },
+    "tests": [
+      {
+        "description": "above the minimum is valid",
+        "data": 2.6,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point is valid",
+        "data": 1.1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "below the minimum is invalid",
+        "data": 0.6,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-numbers",
+        "data": "x",
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "minimum/0/adapted",
+    "source_file": "minimum.json",
+    "source_group": 0,
+    "description": "minimum validation",
+    "kind": "adapted",
+    "adaptation": "Add explicit number type and a nonbinding opposite bound. Non-number instances now reject; expected outcomes independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "minimum": 1.1,
+      "type": "number",
+      "maximum": 1000000
+    },
+    "tests": [
+      {
+        "description": "above the minimum is valid",
+        "data": 2.6,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point is valid",
+        "data": 1.1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "below the minimum is invalid",
+        "data": 0.6,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-numbers",
+        "data": "x",
+        "upstream_valid": true,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "minimum/1/unsupported",
+    "source_file": "minimum.json",
+    "source_group": 1,
+    "description": "minimum validation with signed integer",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "minimum": -2
+    },
+    "tests": [
+      {
+        "description": "negative above the minimum is valid",
+        "data": -1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "positive above the minimum is valid",
+        "data": 0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point is valid",
+        "data": -2,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point with float is valid",
+        "data": -2.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "float below the minimum is invalid",
+        "data": -2.0001,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "int below the minimum is invalid",
+        "data": -3,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-numbers",
+        "data": "x",
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "minimum/1/adapted",
+    "source_file": "minimum.json",
+    "source_group": 1,
+    "description": "minimum validation with signed integer",
+    "kind": "adapted",
+    "adaptation": "Add explicit number type and a nonbinding opposite bound. Non-number instances now reject; expected outcomes independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "minimum": -2,
+      "type": "number",
+      "maximum": 1000000
+    },
+    "tests": [
+      {
+        "description": "negative above the minimum is valid",
+        "data": -1,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "positive above the minimum is valid",
+        "data": 0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point is valid",
+        "data": -2,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point with float is valid",
+        "data": -2.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "float below the minimum is invalid",
+        "data": -2.0001,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "int below the minimum is invalid",
+        "data": -3,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-numbers",
+        "data": "x",
+        "upstream_valid": true,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "maximum/0/unsupported",
+    "source_file": "maximum.json",
+    "source_group": 0,
+    "description": "maximum validation",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "maximum": 3.0
+    },
+    "tests": [
+      {
+        "description": "below the maximum is valid",
+        "data": 2.6,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point is valid",
+        "data": 3.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "above the maximum is invalid",
+        "data": 3.5,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-numbers",
+        "data": "x",
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "maximum/0/adapted",
+    "source_file": "maximum.json",
+    "source_group": 0,
+    "description": "maximum validation",
+    "kind": "adapted",
+    "adaptation": "Add explicit number type and a nonbinding opposite bound. Non-number instances now reject; expected outcomes independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "maximum": 3.0,
+      "type": "number",
+      "minimum": -1000000
+    },
+    "tests": [
+      {
+        "description": "below the maximum is valid",
+        "data": 2.6,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point is valid",
+        "data": 3.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "above the maximum is invalid",
+        "data": 3.5,
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-numbers",
+        "data": "x",
+        "upstream_valid": true,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "maximum/1/unsupported",
+    "source_file": "maximum.json",
+    "source_group": 1,
+    "description": "maximum validation with unsigned integer",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "maximum": 300
+    },
+    "tests": [
+      {
+        "description": "below the maximum is valid",
+        "data": 299.97,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point integer is valid",
+        "data": 300,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point float is valid",
+        "data": 300.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "above the maximum is invalid",
+        "data": 300.5,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "maximum/1/adapted",
+    "source_file": "maximum.json",
+    "source_group": 1,
+    "description": "maximum validation with unsigned integer",
+    "kind": "adapted",
+    "adaptation": "Add explicit number type and a nonbinding opposite bound. Non-number instances now reject; expected outcomes independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "maximum": 300,
+      "type": "number",
+      "minimum": -1000000
+    },
+    "tests": [
+      {
+        "description": "below the maximum is valid",
+        "data": 299.97,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point integer is valid",
+        "data": 300,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "boundary point float is valid",
+        "data": 300.0,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "above the maximum is invalid",
+        "data": 300.5,
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "required/0/unsupported",
+    "source_file": "required.json",
+    "source_group": 0,
+    "description": "required validation",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "foo": {},
+        "bar": {}
+      },
+      "required": [
+        "foo"
+      ]
+    },
+    "tests": [
+      {
+        "description": "present required property is valid",
+        "data": {
+          "foo": 1
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "non-present required property is invalid",
+        "data": {
+          "bar": 1
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores arrays",
+        "data": [],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "ignores strings",
+        "data": "",
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "ignores other non-objects",
+        "data": 12,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "ignores null",
+        "data": null,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "ignores boolean",
+        "data": true,
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "required/0/adapted",
+    "source_file": "required.json",
+    "source_group": 0,
+    "description": "required validation",
+    "kind": "adapted",
+    "adaptation": "Add explicit object type, properties, required, and closed-object policy. Upstream instances are retained; changed acceptance independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "foo": {},
+        "bar": {}
+      },
+      "required": [
+        "foo"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "tests": [
+      {
+        "description": "present required property is valid",
+        "data": {
+          "foo": 1
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "non-present required property is invalid",
+        "data": {
+          "bar": 1
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores arrays",
+        "data": [],
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "ignores strings",
+        "data": "",
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "ignores other non-objects",
+        "data": 12,
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "ignores null",
+        "data": null,
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "ignores boolean",
+        "data": true,
+        "upstream_valid": true,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "required/1/unsupported",
+    "source_file": "required.json",
+    "source_group": 1,
+    "description": "required default validation",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "foo": {}
+      }
+    },
+    "tests": [
+      {
+        "description": "not required by default",
+        "data": {},
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "required/1/adapted",
+    "source_file": "required.json",
+    "source_group": 1,
+    "description": "required default validation",
+    "kind": "adapted",
+    "adaptation": "Add explicit object type, properties, required, and closed-object policy. Upstream instances are retained; changed acceptance independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "foo": {}
+      },
+      "type": "object",
+      "additionalProperties": false,
+      "required": []
+    },
+    "tests": [
+      {
+        "description": "not required by default",
+        "data": {},
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "required/2/unsupported",
+    "source_file": "required.json",
+    "source_group": 2,
+    "description": "required with empty array",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "foo": {}
+      },
+      "required": []
+    },
+    "tests": [
+      {
+        "description": "property not required",
+        "data": {},
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "required/2/adapted",
+    "source_file": "required.json",
+    "source_group": 2,
+    "description": "required with empty array",
+    "kind": "adapted",
+    "adaptation": "Add explicit object type, properties, required, and closed-object policy. Upstream instances are retained; changed acceptance independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "foo": {}
+      },
+      "required": [],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "tests": [
+      {
+        "description": "property not required",
+        "data": {},
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "required/3/unsupported",
+    "source_file": "required.json",
+    "source_group": 3,
+    "description": "required with escaped characters",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "required": [
+        "foo\nbar",
+        "foo\"bar",
+        "foo\\bar",
+        "foo\rbar",
+        "foo\tbar",
+        "foo\fbar"
+      ]
+    },
+    "tests": [
+      {
+        "description": "object with all properties present is valid",
+        "data": {
+          "foo\nbar": 1,
+          "foo\"bar": 1,
+          "foo\\bar": 1,
+          "foo\rbar": 1,
+          "foo\tbar": 1,
+          "foo\fbar": 1
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "object with some properties missing is invalid",
+        "data": {
+          "foo\nbar": "1",
+          "foo\"bar": "1"
+        },
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "required/3/adapted",
+    "source_file": "required.json",
+    "source_group": 3,
+    "description": "required with escaped characters",
+    "kind": "adapted",
+    "adaptation": "Add explicit object type, properties, required, and closed-object policy. Upstream instances are retained; changed acceptance independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "required": [
+        "foo\nbar",
+        "foo\"bar",
+        "foo\\bar",
+        "foo\rbar",
+        "foo\tbar",
+        "foo\fbar"
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "foo\nbar": {},
+        "foo\"bar": {},
+        "foo\\bar": {},
+        "foo\rbar": {},
+        "foo\tbar": {},
+        "foo\fbar": {}
+      }
+    },
+    "tests": [
+      {
+        "description": "object with all properties present is valid",
+        "data": {
+          "foo\nbar": 1,
+          "foo\"bar": 1,
+          "foo\\bar": 1,
+          "foo\rbar": 1,
+          "foo\tbar": 1,
+          "foo\fbar": 1
+        },
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "object with some properties missing is invalid",
+        "data": {
+          "foo\nbar": "1",
+          "foo\"bar": "1"
+        },
+        "upstream_valid": false,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "id": "required/4/unsupported",
+    "source_file": "required.json",
+    "source_group": 4,
+    "description": "required properties whose names are Javascript object property names",
+    "kind": "unsupported",
+    "adaptation": null,
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "required": [
+        "__proto__",
+        "toString",
+        "constructor"
+      ]
+    },
+    "tests": [
+      {
+        "description": "ignores arrays",
+        "data": [],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "ignores other non-objects",
+        "data": 12,
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "none of the properties mentioned",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "__proto__ present",
+        "data": {
+          "__proto__": "foo"
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "toString present",
+        "data": {
+          "toString": {
+            "length": 37
+          }
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "constructor present",
+        "data": {
+          "constructor": {
+            "length": 37
+          }
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "all present",
+        "data": {
+          "__proto__": 12,
+          "toString": {
+            "length": "foo"
+          },
+          "constructor": 37
+        },
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "required/4/adapted",
+    "source_file": "required.json",
+    "source_group": 4,
+    "description": "required properties whose names are Javascript object property names",
+    "kind": "adapted",
+    "adaptation": "Add explicit object type, properties, required, and closed-object policy. Upstream instances are retained; changed acceptance independently evaluated with Draft202012Validator.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "required": [
+        "__proto__",
+        "toString",
+        "constructor"
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "__proto__": {},
+        "toString": {},
+        "constructor": {}
+      }
+    },
+    "tests": [
+      {
+        "description": "ignores arrays",
+        "data": [],
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "ignores other non-objects",
+        "data": 12,
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "none of the properties mentioned",
+        "data": {},
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "__proto__ present",
+        "data": {
+          "__proto__": "foo"
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "toString present",
+        "data": {
+          "toString": {
+            "length": 37
+          }
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "constructor present",
+        "data": {
+          "constructor": {
+            "length": 37
+          }
+        },
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "all present",
+        "data": {
+          "__proto__": 12,
+          "toString": {
+            "length": "foo"
+          },
+          "constructor": 37
+        },
+        "upstream_valid": true,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "id": "items/0/adapted",
+    "source_file": "items.json",
+    "source_group": 0,
+    "description": "a schema given for items",
+    "kind": "adapted",
+    "adaptation": "Add explicit array type; non-array instances now reject, other upstream verdicts unchanged.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "tests": [
+      {
+        "description": "valid items",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "upstream_valid": true,
+        "valid": true
+      },
+      {
+        "description": "wrong type of items",
+        "data": [
+          1,
+          "x"
+        ],
+        "upstream_valid": false,
+        "valid": false
+      },
+      {
+        "description": "ignores non-arrays",
+        "data": {
+          "foo": "bar"
+        },
+        "upstream_valid": true,
+        "valid": false
+      },
+      {
+        "description": "JavaScript pseudo-array is valid",
+        "data": {
+          "0": "invalid",
+          "length": 1
+        },
+        "upstream_valid": true,
+        "valid": false
+      }
+    ]
+  }
+]

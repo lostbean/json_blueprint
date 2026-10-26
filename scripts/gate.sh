@@ -17,6 +17,7 @@ gleam build --target=javascript --warnings-as-errors
 gleam test --target=erlang
 gleam test --target=javascript
 node test/unsupported_runtime_check.mjs
+node test/source_text_oracle_check.mjs
 
 # Compile freshly regenerated typed and schema fixtures without modifying the
 # committed fixtures used by the parity tests above.
@@ -47,6 +48,7 @@ sh scripts/check-schema-consumer.sh
 
 python3 test/schema_check.py
 python3 test/schema_profile_check.py
+python3 test/upstream_schema_check.py
 
 python3 test/number_check.py
 

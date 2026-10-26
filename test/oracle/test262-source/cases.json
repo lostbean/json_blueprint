@@ -1,0 +1,169 @@
+[
+  {
+    "id": "primitive-1",
+    "source": "1",
+    "primitive_sources": [
+      "1"
+    ]
+  },
+  {
+    "id": "primitive-2",
+    "source": "1.1",
+    "primitive_sources": [
+      "1.1"
+    ]
+  },
+  {
+    "id": "primitive-3",
+    "source": "-1",
+    "primitive_sources": [
+      "-1"
+    ]
+  },
+  {
+    "id": "primitive-4",
+    "source": "-1.1",
+    "primitive_sources": [
+      "-1.1"
+    ]
+  },
+  {
+    "id": "primitive-5",
+    "source": "1.1e1",
+    "primitive_sources": [
+      "1.1e1"
+    ]
+  },
+  {
+    "id": "primitive-6",
+    "source": "1.1e+1",
+    "primitive_sources": [
+      "1.1e+1"
+    ]
+  },
+  {
+    "id": "primitive-7",
+    "source": "1.1e-1",
+    "primitive_sources": [
+      "1.1e-1"
+    ]
+  },
+  {
+    "id": "primitive-8",
+    "source": "1.1E1",
+    "primitive_sources": [
+      "1.1E1"
+    ]
+  },
+  {
+    "id": "primitive-9",
+    "source": "1.1E+1",
+    "primitive_sources": [
+      "1.1E+1"
+    ]
+  },
+  {
+    "id": "primitive-10",
+    "source": "1.1E-1",
+    "primitive_sources": [
+      "1.1E-1"
+    ]
+  },
+  {
+    "id": "primitive-11",
+    "source": "null",
+    "primitive_sources": [
+      "null"
+    ]
+  },
+  {
+    "id": "primitive-12",
+    "source": "true",
+    "primitive_sources": [
+      "true"
+    ]
+  },
+  {
+    "id": "primitive-13",
+    "source": "false",
+    "primitive_sources": [
+      "false"
+    ]
+  },
+  {
+    "id": "primitive-14",
+    "source": "\"foo\"",
+    "primitive_sources": [
+      "\"foo\""
+    ]
+  },
+  {
+    "id": "array-1",
+    "source": "[1.0]",
+    "primitive_sources": [
+      "1.0"
+    ]
+  },
+  {
+    "id": "array-2",
+    "source": "[1.1]",
+    "primitive_sources": [
+      "1.1"
+    ]
+  },
+  {
+    "id": "array-3",
+    "source": "[]",
+    "primitive_sources": []
+  },
+  {
+    "id": "array-4",
+    "source": "[1, \"2\", true, null, {\"x\": 1, \"y\": 1}]",
+    "primitive_sources": [
+      "1",
+      "\"2\"",
+      "true",
+      "null",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "id": "object-1",
+    "source": "{}",
+    "primitive_sources": []
+  },
+  {
+    "id": "object-2",
+    "source": "{\"42\":37}",
+    "primitive_sources": [
+      "37"
+    ]
+  },
+  {
+    "id": "object-3",
+    "source": "{\"x\": 1, \"y\": 2}",
+    "primitive_sources": [
+      "1",
+      "2"
+    ]
+  },
+  {
+    "id": "object-4",
+    "source": "{\"x\": [1,2], \"y\": [2,3]}",
+    "primitive_sources": [
+      "1",
+      "2",
+      "2",
+      "3"
+    ]
+  },
+  {
+    "id": "object-5",
+    "source": "{\"x\": {\"x\": 1, \"y\": 2}}",
+    "primitive_sources": [
+      "1",
+      "2"
+    ]
+  }
+]

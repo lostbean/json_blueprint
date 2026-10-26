@@ -1,0 +1,12 @@
+{
+  "upstream": "https://github.com/serde-rs/json",
+  "revision": "8c535a260ce561eaab4111aafc29038eb9f77ff3",
+  "source": "tests/test.rs",
+  "source_sha256": "43125417578728da2687e3e560d07c2ee899114073637fc0af32ea31624f801b",
+  "license": "MIT (chosen from MIT OR Apache-2.0)",
+  "adapted_tests": [
+    "test_roundtrip_f64"
+  ],
+  "case_count": 10,
+  "adaptation": "Ten binary64 regression constants retained. Both native-target codec decode and encode roundtrip are checked; JSON textual formatting is not prescribed. This is an adapted fixture corpus, not execution of serde_json."
+}
