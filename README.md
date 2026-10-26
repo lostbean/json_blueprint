@@ -64,12 +64,12 @@ acceptance, while a `Codec(a)` owns conversion to and from an application type.
 
 ## Installation
 
-The 2.x APIs require JSON Blueprint 2.0.0 or later. Once 2.0.0 is available on
-Hex, install it with:
+Install JSON Blueprint 2 from Hex:
 
 ```sh
 gleam add json_blueprint@2
 ```
+
 Published 1.7.1 provides the legacy `json/blueprint` and
 `json/blueprint/schema` modules. To stay on that API:
 
