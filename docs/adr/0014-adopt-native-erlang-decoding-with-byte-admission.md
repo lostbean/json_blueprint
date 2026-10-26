@@ -7,3 +7,10 @@
 - **Rationale.** Native parsing and avoiding the intermediate Value tree reduced runtime and peak memory in the local prototypes. Retaining global structural admission required another scan and recovered much of the overhead. The owner selected byte-only admission on 2026-10-25; consumers such as llm_wire may inspect decoded structure.
 - **Consequences.** A byte bound is not a memory or recursion quota. Erlang object source order and detailed old parser locations are not retained. Complete syntax admission precedes typed callbacks; duplicate names reject before typed decoding. JavaScript exponents remain constrained by its exact native integer representation. Custom callbacks and Value parsing still allocate Value nodes.
 - **Evidence.** `experiment/MITIGATION.md` and the dated benchmark artifacts record the prototypes. Production integration must be evaluated separately; prototype timings are not a release performance guarantee.
+
+## Evidence consolidation, 2026-10-26
+
+The original `experiment/` paths above are historical. Their bytes and source
+revision are retained in the [checksummed archive](../benchmarks/history/README.md).
+Current behavior and validation are documented in the design, migration guide
+and release-readiness assessment. This relocation does not change the decision.

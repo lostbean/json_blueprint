@@ -8,3 +8,10 @@
 - **Rationale.** The prototype materially reduced ordinary typed-decoding time and transient allocation. Native grammar ownership avoids maintaining another JSON grammar; a narrow scanner retains evidence native parsing otherwise discards.
 - **Consequences.** Native syntax and raw Unicode diagnostics have unavailable locations. Malformed escaped surrogates report NativeSyntax. Multiply-invalid error precedence and integer-like object member order change. JavaScript retains its numeric representation limits. Native parsing allocates a complete tree before duplicate rejection; public Value parsing and custom callbacks still allocate Value nodes. The byte bound is not a heap quota.
 - **Evidence.** The JavaScript hybrid capture and independent review in `experiment/js-hybrid-report.md` distinguish typed-codec gains from whole-Value behavior. Timings are observations, not release guarantees. Browser execution and final adoption measurements are recorded separately from the prototype.
+
+## Evidence consolidation, 2026-10-26
+
+The original `experiment/` paths above are historical. Their bytes and source
+revision are retained in the [checksummed archive](../benchmarks/history/README.md).
+Current behavior and validation are documented in the design, migration guide
+and release-readiness assessment. This relocation does not change the decision.

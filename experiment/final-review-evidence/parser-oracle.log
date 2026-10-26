@@ -1,5 +1,0 @@
-warning: Git tree '/Users/edgar/.codex/worktrees/native-direct-decoding/json_blueprint' is dirty
-Gleam magic
-1 file reformatted
-PASS: erlang: 318 upstream + 1179 generated parser cases (seed 20261025)
-PASS: javascript: 318 upstream + 1179 generated parser cases (seed 20261025)

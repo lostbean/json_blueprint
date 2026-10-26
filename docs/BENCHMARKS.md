@@ -362,7 +362,7 @@ supersedes that implementation choice.
 A fresh comparison against the frozen optimized-parser worktree used three
 separate VM timing and memory trials per workload. Source hashes stayed unchanged.
 The integrated adapter includes copies of escaping strings and object keys to
-avoid retaining unrelated input bytes. [Raw measurements](../experiment/adoption-results.json)
+avoid retaining unrelated input bytes. [Raw measurements](https://github.com/lostbean/json_blueprint/blob/db21f3b41e77dda2a3fe56b99e60ca33054f5b64/experiment/adoption-results.json)
 include toolchain versions, source and input hashes, all samples and memory snapshots.
 
 Erlang small records improved from 2.07 to 1.25 µs and 50-record responses from
@@ -376,7 +376,7 @@ to 387.25 µs, and 10,000 integers from 10.20 to 10.02 ms. This does not establi
 a broad JavaScript gain. RSS includes the complete runtime and is not retained
 JSON allocation. Timings and memory observations never gate a change.
 
-The [adoption report](NATIVE-DECODING-ADOPTION.md) records the complete comparison,
+The [adoption report](https://github.com/lostbean/json_blueprint/blob/db21f3b41e77dda2a3fe56b99e60ca33054f5b64/docs/NATIVE-DECODING-ADOPTION.md) records the complete comparison,
 accepted behavior changes, consumer consequences and release checks. The
 [independent oracle](ORACLE.md) remains separate from these performance observations.
 
@@ -507,3 +507,13 @@ from 92.88 to 88.92 MiB and 87.80 to 80.12 MiB respectively. Small-record encodi
 through the generated Codec also benefits from specialization. The report
 retains methods, ranges, source hashes, prototype comparisons and limitations;
 native parsing alone does not provide equivalent guarantees.
+
+## Historical experiment archive
+
+Older parser experiments and native adoption reports are preserved in the
+[checksummed archive](benchmarks/history/README.md). Commands above that refer to
+`experiment/` describe the original capture workspace: extract the archive into a
+disposable directory and restore its recorded source revisions before reuse.
+They are not commands against the current checkout. Immutable links retain the
+original reports and raw evidence without treating abandoned prototypes as code
+to maintain.
