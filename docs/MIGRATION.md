@@ -27,6 +27,7 @@ oracle dependency merely to make it match the application dependency.
 ## Keep the legacy API first
 
 The `json/blueprint` combinators and `json/blueprint/schema` remain available.
+They are frozen, not formally deprecated, and have no `@deprecated` annotations.
 Existing legacy union, enum, optional, tuple, and recursive forms can stay on
 that API while you review a codec migration. Address these package-upgrade
 changes before changing the application's wire format:
@@ -108,7 +109,7 @@ JavaScript strict parsing requires reviver `context.source` support. The old
 portable parser fallback has been removed. Runtimes without this capability
 return `UnsupportedRuntime`, not a syntax error or rounded values. This applies
 to strict text/byte parsing and codec JSON decoding; the frozen legacy API is
-unchanged. See [browser/runtime requirements and executed checks](BROWSER-SUPPORT.md).
+unchanged. See [browser/runtime requirements and executed checks](https://github.com/lostbean/json_blueprint/blob/main/docs/BROWSER-SUPPORT.md).
 
 ### Diagnostics and object order
 
@@ -118,7 +119,7 @@ contract. Do not match native error wording or depend on source-order errors:
 - Native syntax, duplicate-key and raw Unicode-scalar failures have
   `Location(0, 0, 0)`, meaning unavailable, rather than precise byte/line/column
   coordinates. Typed field/index paths remain available.
-- Malformed syntax and escaped surrogate pairs return `NativeSyntax`; raw
+- Malformed syntax and unpaired escaped surrogates return `NativeSyntax`; raw
   unpaired UTF-16 surrogates return `InvalidUnicodeScalar`. They are rejected
   before UTF-8 conversion can replace them. Errors retain no source text.
 - A multiply-invalid document may report a different first failure. Native

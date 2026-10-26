@@ -191,8 +191,8 @@ and requires runtime support for source text; older runtimes return
 `UnsupportedRuntime`. No portable parser fallback is included.
 Exact numbers and duplicate rejection are retained. Custom callbacks receive a
 converted subtree. Native parsing changes object order and precise parse
-locations; typed field/index errors remain. See [the migration guide](docs/MIGRATION.md)
-and [browser support and executed checks](docs/BROWSER-SUPPORT.md).
+locations; typed field/index errors remain. See [the migration guide](https://github.com/lostbean/json_blueprint/blob/main/docs/MIGRATION.md)
+and [browser support and executed checks](https://github.com/lostbean/json_blueprint/blob/main/docs/BROWSER-SUPPORT.md).
 
 ## Schema support
 
@@ -200,7 +200,7 @@ The runtime contract loader supports the finite profile described by codecs:
 closed objects, homogeneous lists, pairs, nullable values, bounded integers
 and numbers, string enums, tagged unions, and any JSON value. It refuses other
 schema forms instead of silently dropping constraints; this is not general
-JSON Schema validation. See the [oracle and its limits](docs/ORACLE.md).
+JSON Schema validation. See the [oracle and its limits](https://github.com/lostbean/json_blueprint/blob/main/docs/ORACLE.md).
 
 `codec.int()` accepts at most 24 digits and, on JavaScript, must stay within the
 safe integer range. Use `codec.number()` for larger exact values.
@@ -209,10 +209,11 @@ behavior.
 
 ## Upgrading from 1.x
 
-Follow the [2.0 migration guide](docs/MIGRATION.md) when upgrading from
+Follow the [2.0 migration guide](https://github.com/lostbean/json_blueprint/blob/main/docs/MIGRATION.md) when upgrading from
 published 1.7.1. You can keep using `json/blueprint` and
 `json/blueprint/schema`; adopting the codec API is a separate application
-change. Keep the legacy decoder for recursive types.
+change. Keep the legacy decoder for recursive types. The legacy API is frozen,
+not formally deprecated; it has no `@deprecated` annotations.
 
 1. Build `Decoder` and `FieldDecoder` with the published combinators. Their
    constructors and record fields are now opaque.
@@ -226,7 +227,7 @@ change. Keep the legacy decoder for recursive types.
    records reject unknown fields, optional fields distinguish absence from
    `null`, and union/enum wire forms differ from the legacy encoders.
 
-The [compiled migration example](examples/test/migration_test.gleam) exercises
+The [compiled migration example](https://github.com/lostbean/json_blueprint/blob/main/examples/test/migration_test.gleam) exercises
 both APIs and their wire differences on Erlang and JavaScript. The guide covers
 parser limits, schema support, exact numbers, and source generation as well.
 
@@ -282,7 +283,7 @@ pub fn example() {
   using generated functions need JSON Blueprint and generated source.
 - `compile(module_path, name, definition)` returns the module source. Write
   it under `src/`, run `gleam format` on it, and add a test that compiles it
-  again and compares, as the [compiled fixture test](test/compiled_codec_test.gleam)
+  again and compares, as the [compiled fixture test](https://github.com/lostbean/json_blueprint/blob/main/test/compiled_codec_test.gleam)
   does here. Generation does not write files or start a process.
 - A generated module exports `encode_<name>`, `decode_<name>`,
   `encode_<name>_json`, `decode_<name>_json` (strict parser),
@@ -317,7 +318,7 @@ gleam run -m schema_codegen_runner
 gleam format test/generated
 ```
 
-From the repository root, `nix develop --command sh scripts/benchmark.sh` runs the timing harness on both targets and writes a fresh evidence directory. [ADR 0008](docs/adr/0008-development-time-source-generation.md) records generation ownership and the remaining scope, and [ADR 0010](docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the measurement policy; method, provenance and retained results are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+From the repository root, `nix develop --command sh scripts/benchmark.sh` runs the timing harness on both targets and writes a fresh evidence directory. [ADR 0008](https://github.com/lostbean/json_blueprint/blob/main/docs/adr/0008-development-time-source-generation.md) records generation ownership and the remaining scope, and [ADR 0010](https://github.com/lostbean/json_blueprint/blob/main/docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the measurement policy; method, provenance and retained results are in [docs/BENCHMARKS.md](https://github.com/lostbean/json_blueprint/blob/main/docs/BENCHMARKS.md).
 
 ### Generate native records from a schema
 
@@ -326,12 +327,12 @@ From the repository root, `nix develop --command sh scripts/benchmark.sh` runs t
 - Supported children include closed records, strings, booleans, native integers and integer ranges, exact numbers and number ranges, lists, pairs, nullable values, and optional properties. Constraints and descriptions survive generation; supported structure is checked by Gleam on outbound native values while ordinary codecs check value constraints.
 - Wire names are preserved. Native names are deterministic; invalid names, name collisions, and unsupported shapes return typed failures with logical schema locations instead of partial source.
 - Enums, tagged unions, unconstrained values, shared or recursive definitions, and non-object roots are outside this generation slice. Runtime-schema admission does not imply generation support.
-- The [separate order consumer](examples/codegen/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and freshly generated-code integration tests. Its production package depends only on JSON Blueprint and compiled source.
-- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. [ADR 0010](docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the separate construction, conversion, and build-time generation costs.
+- The [separate order consumer](https://github.com/lostbean/json_blueprint/blob/main/examples/codegen/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and freshly generated-code integration tests. Its production package depends only on JSON Blueprint and compiled source.
+- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. [ADR 0010](https://github.com/lostbean/json_blueprint/blob/main/docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the separate construction, conversion, and build-time generation costs.
 
 ## Examples and references
 
-The [examples](examples/README.md) compile and run on Erlang and JavaScript.
-The [design](docs/design/design-layer.pdf) records behavior and ownership. The
-[benchmark report](docs/BENCHMARKS.md) retains local observations without
+The [examples](https://github.com/lostbean/json_blueprint/blob/main/examples/README.md) compile and run on Erlang and JavaScript.
+The [design](https://github.com/lostbean/json_blueprint/blob/main/docs/design/design-layer.pdf) records behavior and ownership. The
+[benchmark report](https://github.com/lostbean/json_blueprint/blob/main/docs/BENCHMARKS.md) retains local observations without
 performance guarantees.
