@@ -13,7 +13,9 @@
 ////
 //// Generated modules call `json/blueprint/internal/generated`, whose names
 //// json_blueprint keeps stable within a major version. They decode text with
-//// the strict parser; `decode_<name>_json_native` uses `gleam/json` instead,
+//// the shared strict parser and decode its retained native evidence directly.
+//// The codec accessor also retains the specialized text encoder and schema.
+//// `decode_<name>_json_native` uses `gleam/json` instead,
 //// returns `json.DecodeError`, and rejects text above 1 MiB before parsing.
 ////
 //// ```gleam
@@ -109,7 +111,7 @@ type Lowered {
     encoder: String,
     decoder: String,
     native_encoder: String,
-    native_decoder: String,
+    decoder_prefix: String,
     native_supported: Bool,
     declarations: List(String),
     imports: List(String),
@@ -122,12 +124,70 @@ type LoweredProperties {
     encoder: String,
     decoder: String,
     native_encoder: String,
-    native_decoder: String,
+    decoder_prefix: String,
     native_supported: Bool,
     declarations: List(String),
     imports: List(String),
     placeholder: String,
   )
+}
+
+// The same lowering emits decoders for strict parser evidence and for the
+// explicitly weaker gleam/json API. Types, helper names and child references
+// are selected before emission; caller references and wire literals stay data.
+type DecoderMode {
+  StandardNative
+  StrictNative
+}
+
+fn native_decoder_name(prefix: String, mode: DecoderMode) -> String {
+  prefix
+  <> case mode {
+    StandardNative -> "_native_decode"
+    StrictNative -> "_strict_decode"
+  }
+}
+
+fn decoder_helper(mode: DecoderMode, operation: String) -> String {
+  let prefix = case mode {
+    StandardNative -> "generated.decode_native_"
+    StrictNative -> "generated.decode_strict_"
+  }
+  prefix <> operation
+}
+
+fn decoder_input(mode: DecoderMode, fields: Bool) -> String {
+  case mode, fields {
+    StrictNative, _ -> "native.Raw"
+    StandardNative, False -> "dynamic.Dynamic"
+    StandardNative, True -> "dict.Dict(String, dynamic.Dynamic)"
+  }
+}
+
+fn emit_decoders(
+  prefix: String,
+  output_type: String,
+  fields: Bool,
+  body: fn(DecoderMode) -> String,
+) -> String {
+  let argument = case fields {
+    True -> "fields"
+    False -> "raw"
+  }
+  [StandardNative, StrictNative]
+  |> list.map(fn(mode) {
+    "fn "
+    <> native_decoder_name(prefix, mode)
+    <> "("
+    <> argument
+    <> ": "
+    <> decoder_input(mode, fields)
+    <> ") -> Result("
+    <> output_type
+    <> ", codec.DecodeError) {\n"
+    <> body(mode)
+  })
+  |> string.join("\n\n")
 }
 
 pub fn named_mapping(
@@ -163,7 +223,7 @@ pub fn string() -> Definition(String) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: True,
       declarations: [
         "fn "
@@ -178,10 +238,9 @@ pub fn string() -> Definition(String) {
           <> prefix
           <> "_native_encode(item: String) -> Result(json.Json, codec.EncodeError) {\n"
           <> "  Ok(json.string(item))\n}",
-        "fn "
-          <> prefix
-          <> "_native_decode(raw: dynamic.Dynamic) -> Result(String, codec.DecodeError) {\n"
-          <> "  generated.decode_native_string(raw)\n}",
+        emit_decoders(prefix, "String", False, fn(mode) {
+          "  " <> decoder_helper(mode, "string") <> "(raw)\n}"
+        }),
       ],
       imports: ["gleam/dynamic"],
       placeholder: "\"\"",
@@ -195,7 +254,7 @@ pub fn int() -> Definition(Int) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: True,
       declarations: [
         "fn "
@@ -210,10 +269,9 @@ pub fn int() -> Definition(Int) {
           <> prefix
           <> "_native_encode(item: Int) -> Result(json.Json, codec.EncodeError) {\n"
           <> "  generated.encode_native_int(item)\n}",
-        "fn "
-          <> prefix
-          <> "_native_decode(raw: dynamic.Dynamic) -> Result(Int, codec.DecodeError) {\n"
-          <> "  generated.decode_native_int(raw)\n}",
+        emit_decoders(prefix, "Int", False, fn(mode) {
+          "  " <> decoder_helper(mode, "int") <> "(raw)\n}"
+        }),
       ],
       imports: ["gleam/dynamic"],
       placeholder: "0",
@@ -227,7 +285,7 @@ pub fn number() -> Definition(number.Number) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: False,
       declarations: [
         "fn "
@@ -251,7 +309,7 @@ pub fn bool() -> Definition(Bool) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: True,
       declarations: [
         "fn "
@@ -266,10 +324,9 @@ pub fn bool() -> Definition(Bool) {
           <> prefix
           <> "_native_encode(item: Bool) -> Result(json.Json, codec.EncodeError) {\n"
           <> "  Ok(json.bool(item))\n}",
-        "fn "
-          <> prefix
-          <> "_native_decode(raw: dynamic.Dynamic) -> Result(Bool, codec.DecodeError) {\n"
-          <> "  generated.decode_native_bool(raw)\n}",
+        emit_decoders(prefix, "Bool", False, fn(mode) {
+          "  " <> decoder_helper(mode, "bool") <> "(raw)\n}"
+        }),
       ],
       imports: ["gleam/dynamic"],
       placeholder: "False",
@@ -288,7 +345,7 @@ pub fn integer_between(min: Int, max: Int) -> Definition(Int) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: True,
       declarations: [
         "fn "
@@ -309,12 +366,13 @@ pub fn integer_between(min: Int, max: Int) -> Definition(Int) {
           <> "  generated.encode_native_integer_between("
           <> bounds
           <> ", item)\n}",
-        "fn "
-          <> prefix
-          <> "_native_decode(raw: dynamic.Dynamic) -> Result(Int, codec.DecodeError) {\n"
-          <> "  generated.decode_native_integer_between("
+        emit_decoders(prefix, "Int", False, fn(mode) {
+          "  "
+          <> decoder_helper(mode, "integer_between")
+          <> "("
           <> bounds
-          <> ", raw)\n}",
+          <> ", raw)\n}"
+        }),
       ],
       imports: ["gleam/dynamic"],
       placeholder: min_text,
@@ -335,7 +393,7 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
-        native_decoder: prefix <> "_native_decode",
+        decoder_prefix: prefix,
         native_supported: left_lowered.native_supported
           && right_lowered.native_supported,
         declarations: list.append(
@@ -376,18 +434,20 @@ pub fn pair(left: Definition(a), right: Definition(b)) -> Definition(#(a, b)) {
               <> ", "
               <> right_lowered.native_encoder
               <> ", item)\n}",
-            "fn "
-              <> prefix
-              <> "_native_decode(raw: dynamic.Dynamic) -> Result(#("
-              <> left_type
-              <> ", "
-              <> right_type
-              <> "), codec.DecodeError) {\n"
-              <> "  generated.decode_native_pair("
-              <> left_lowered.native_decoder
-              <> ", "
-              <> right_lowered.native_decoder
-              <> ", raw)\n}",
+            emit_decoders(
+              prefix,
+              "#(" <> left_type <> ", " <> right_type <> ")",
+              False,
+              fn(mode) {
+                "  "
+                <> decoder_helper(mode, "pair")
+                <> "("
+                <> native_decoder_name(left_lowered.decoder_prefix, mode)
+                <> ", "
+                <> native_decoder_name(right_lowered.decoder_prefix, mode)
+                <> ", raw)\n}"
+              },
+            ),
           ]),
         ),
         imports: list.append(left_lowered.imports, right_lowered.imports),
@@ -409,7 +469,7 @@ pub fn list(inner: Definition(a)) -> Definition(List(a)) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: inner_lowered.native_supported,
       declarations: list.append(inner_lowered.declarations, [
         "fn "
@@ -436,14 +496,13 @@ pub fn list(inner: Definition(a)) -> Definition(List(a)) {
           <> "  generated.encode_native_list("
           <> inner_lowered.native_encoder
           <> ", items)\n}",
-        "fn "
-          <> prefix
-          <> "_native_decode(raw: dynamic.Dynamic) -> Result(List("
-          <> inner_type
-          <> "), codec.DecodeError) {\n"
-          <> "  generated.decode_native_list("
-          <> inner_lowered.native_decoder
-          <> ", raw)\n}",
+        emit_decoders(prefix, "List(" <> inner_type <> ")", False, fn(mode) {
+          "  "
+          <> decoder_helper(mode, "list")
+          <> "("
+          <> native_decoder_name(inner_lowered.decoder_prefix, mode)
+          <> ", raw)\n}"
+        }),
       ]),
       imports: inner_lowered.imports,
       placeholder: "[]",
@@ -462,7 +521,7 @@ pub fn nullable(inner: Definition(a)) -> Definition(Option(a)) {
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
-        native_decoder: prefix <> "_native_decode",
+        decoder_prefix: prefix,
         native_supported: inner_lowered.native_supported,
         declarations: list.append(inner_lowered.declarations, [
           "fn "
@@ -489,14 +548,18 @@ pub fn nullable(inner: Definition(a)) -> Definition(Option(a)) {
             <> "  generated.encode_native_nullable("
             <> inner_lowered.native_encoder
             <> ", item)\n}",
-          "fn "
-            <> prefix
-            <> "_native_decode(raw: dynamic.Dynamic) -> Result(option.Option("
-            <> inner_type
-            <> "), codec.DecodeError) {\n"
-            <> "  generated.decode_native_nullable("
-            <> inner_lowered.native_decoder
-            <> ", raw)\n}",
+          emit_decoders(
+            prefix,
+            "option.Option(" <> inner_type <> ")",
+            False,
+            fn(mode) {
+              "  "
+              <> decoder_helper(mode, "nullable")
+              <> "("
+              <> native_decoder_name(inner_lowered.decoder_prefix, mode)
+              <> ", raw)\n}"
+            },
+          ),
         ]),
         imports: ["gleam/option", ..inner_lowered.imports],
         placeholder: "option.None",
@@ -541,7 +604,7 @@ pub fn string_enum(
               encoder: prefix <> "_encode",
               decoder: prefix <> "_decode",
               native_encoder: prefix <> "_native_encode",
-              native_decoder: prefix <> "_native_decode",
+              decoder_prefix: prefix,
               native_supported: True,
               declarations: [
                 "fn "
@@ -567,16 +630,15 @@ pub fn string_enum(
                   <> ") -> Result(json.Json, codec.EncodeError) {\n  case item {\n"
                   <> string.join(native_encoder_arms, "\n")
                   <> "\n    _ -> generated.unknown_enum_value()\n  }\n}",
-                "fn "
-                  <> prefix
-                  <> "_native_decode(raw: dynamic.Dynamic) -> Result("
-                  <> type_name
-                  <> ", codec.DecodeError) {\n"
-                  <> "  case generated.decode_native_string(raw) {\n"
+                emit_decoders(prefix, "" <> type_name <> "", False, fn(mode) {
+                  "  case "
+                  <> decoder_helper(mode, "string")
+                  <> "(raw) {\n"
                   <> "    Error(error) -> Error(error)\n"
                   <> "    Ok(label) -> case label {\n"
                   <> string.join(native_decoder_arms, "\n")
-                  <> "\n      _ -> generated.unknown_enum_label()\n    }\n  }\n}",
+                  <> "\n      _ -> generated.unknown_enum_label()\n    }\n  }\n}"
+                }),
               ],
               imports: ["gleam/dynamic", ..imports],
               placeholder:,
@@ -602,7 +664,7 @@ pub fn required(name: String, inner: Definition(a)) -> Properties(r, a) {
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
-        native_decoder: prefix <> "_native_decode",
+        decoder_prefix: prefix,
         native_supported: inner_lowered.native_supported,
         declarations: list.append(inner_lowered.declarations, [
           "fn "
@@ -635,16 +697,15 @@ pub fn required(name: String, inner: Definition(a)) -> Properties(r, a) {
             <> ", "
             <> inner_lowered.native_encoder
             <> ", item)\n}",
-          "fn "
-            <> prefix
-            <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
-            <> inner_type
-            <> ", codec.DecodeError) {\n"
-            <> "  generated.decode_native_required("
+          emit_decoders(prefix, "" <> inner_type <> "", True, fn(mode) {
+            "  "
+            <> decoder_helper(mode, "required")
+            <> "("
             <> quoted
             <> ", fields, "
-            <> inner_lowered.native_decoder
-            <> ")\n}",
+            <> native_decoder_name(inner_lowered.decoder_prefix, mode)
+            <> ")\n}"
+          }),
         ]),
         imports: ["gleam/dict", "gleam/dynamic", ..inner_lowered.imports],
         placeholder: inner_lowered.placeholder,
@@ -675,7 +736,7 @@ pub fn optional(
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
-        native_decoder: prefix <> "_native_decode",
+        decoder_prefix: prefix,
         native_supported: inner_lowered.native_supported,
         declarations: list.append(inner_lowered.declarations, [
           "fn "
@@ -708,16 +769,15 @@ pub fn optional(
             <> ", "
             <> inner_lowered.native_encoder
             <> ", item)\n}",
-          "fn "
-            <> prefix
-            <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
-            <> optional_type
-            <> ", codec.DecodeError) {\n"
-            <> "  generated.decode_native_optional("
+          emit_decoders(prefix, "" <> optional_type <> "", True, fn(mode) {
+            "  "
+            <> decoder_helper(mode, "optional")
+            <> "("
             <> quoted
             <> ", fields, "
-            <> inner_lowered.native_decoder
-            <> ")\n}",
+            <> native_decoder_name(inner_lowered.decoder_prefix, mode)
+            <> ")\n}"
+          }),
         ]),
         imports: [
           "gleam/dict",
@@ -757,7 +817,7 @@ pub fn combine(
         encoder: prefix <> "_encode",
         decoder: prefix <> "_decode",
         native_encoder: prefix <> "_native_encode",
-        native_decoder: prefix <> "_native_decode",
+        decoder_prefix: prefix,
         native_supported: left_lowered.native_supported
           && right_lowered.native_supported,
         declarations: list.flatten([
@@ -793,16 +853,15 @@ pub fn combine(
               <> ", "
               <> right_lowered.native_encoder
               <> ", item)\n}",
-            "fn "
-              <> prefix
-              <> "_native_decode(fields: dict.Dict(String, dynamic.Dynamic)) -> Result("
-              <> pair_type
-              <> ", codec.DecodeError) {\n"
-              <> "  generated.decode_native_fields_pair("
-              <> left_lowered.native_decoder
+            emit_decoders(prefix, "" <> pair_type <> "", True, fn(mode) {
+              "  "
+              <> decoder_helper(mode, "fields_pair")
+              <> "("
+              <> native_decoder_name(left_lowered.decoder_prefix, mode)
               <> ", "
-              <> right_lowered.native_decoder
-              <> ", fields)\n}",
+              <> native_decoder_name(right_lowered.decoder_prefix, mode)
+              <> ", fields)\n}"
+            }),
           ],
         ]),
         imports: list.append(left_lowered.imports, right_lowered.imports),
@@ -827,7 +886,7 @@ pub fn object(properties: Properties(a, a)) -> Definition(a) {
       encoder: prefix <> "_encode",
       decoder: prefix <> "_decode",
       native_encoder: prefix <> "_native_encode",
-      native_decoder: prefix <> "_native_decode",
+      decoder_prefix: prefix,
       native_supported: lowered.native_supported,
       declarations: [
         "const " <> names_name <> ": List(String) = " <> emit_string_list(names),
@@ -858,16 +917,15 @@ pub fn object(properties: Properties(a, a)) -> Definition(a) {
             <> "  generated.encode_native_object("
             <> lowered.native_encoder
             <> ", item)\n}",
-          "fn "
-            <> prefix
-            <> "_native_decode(raw: dynamic.Dynamic) -> Result("
-            <> object_type
-            <> ", codec.DecodeError) {\n"
-            <> "  generated.decode_native_object("
+          emit_decoders(prefix, "" <> object_type <> "", False, fn(mode) {
+            "  "
+            <> decoder_helper(mode, "object")
+            <> "("
             <> names_name
             <> ", "
-            <> lowered.native_decoder
-            <> ", raw)\n}",
+            <> native_decoder_name(lowered.decoder_prefix, mode)
+            <> ", raw)\n}"
+          }),
         ])
       ],
       imports: lowered.imports,
@@ -899,7 +957,7 @@ pub fn imap(
             encoder: prefix <> "_encode",
             decoder: prefix <> "_decode",
             native_encoder: prefix <> "_native_encode",
-            native_decoder: prefix <> "_native_decode",
+            decoder_prefix: prefix,
             native_supported: inner_lowered.native_supported,
             declarations: list.append(inner_lowered.declarations, [
               "fn "
@@ -932,16 +990,13 @@ pub fn imap(
                 <> "("
                 <> to_expr
                 <> "(item))\n}",
-              "fn "
-                <> prefix
-                <> "_native_decode(raw: dynamic.Dynamic) -> Result("
-                <> output_type
-                <> ", codec.DecodeError) {\n"
-                <> "  case "
-                <> inner_lowered.native_decoder
+              emit_decoders(prefix, "" <> output_type <> "", False, fn(mode) {
+                "  case "
+                <> native_decoder_name(inner_lowered.decoder_prefix, mode)
                 <> "(raw) {\n    Ok(item) -> Ok("
                 <> from_expr
-                <> "(item))\n    Error(error) -> Error(error)\n  }\n}",
+                <> "(item))\n    Error(error) -> Error(error)\n  }\n}"
+              }),
             ]),
             imports: list.append(inner_lowered.imports, modules),
             placeholder: from_expr <> "(" <> inner_lowered.placeholder <> ")",
@@ -1038,9 +1093,9 @@ fn compile_supported(
       [
         "gleam/dynamic",
         "gleam/json",
-        "gleam/option",
         "json/blueprint/codec",
         "json/blueprint/internal/generated",
+        "json/blueprint/internal/native",
         "json/blueprint/internal/schema_tree",
         "json/blueprint/value",
       ],
@@ -1112,7 +1167,7 @@ fn compile_supported(
             <> type_reference.expression
             <> ", json.DecodeError) {\n"
             <> "  generated.decode_json_native(source, "
-            <> lowered.native_decoder
+            <> native_decoder_name(lowered.decoder_prefix, StandardNative)
             <> ", "
             <> lowered.placeholder
             <> ")\n}\n\n"
@@ -1125,15 +1180,19 @@ fn compile_supported(
             <> codec_name
             <> "() -> codec.Codec("
             <> type_reference.expression
-            <> ") {\n  codec.custom(\n    encode: "
+            <> ") {\n  codec.generated(\n    encode: "
             <> encoder_name
             <> ",\n    decode: "
             <> decoder_name
-            <> ",\n    schema: option.Some("
+            <> ",\n    strict_decode: "
+            <> native_decoder_name(lowered.decoder_prefix, StrictNative)
+            <> ",\n    text_encode: "
+            <> json_encoder_name
+            <> ",\n    schema: "
             <> schema_name
-            <> "()),\n    placeholder: "
+            <> "(),\n    placeholder: fn() { "
             <> lowered.placeholder
-            <> ",\n  )\n}\n"
+            <> " },\n  )\n}\n"
           let fingerprint = fingerprint(body)
           let content =
             string.replace(

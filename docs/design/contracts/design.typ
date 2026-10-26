@@ -169,7 +169,7 @@
   ])
 
   #section(title: "Typed codecs", lead: [This unit composes bidirectional conversion for caller-owned native types and discovers the supported schema.], body: [
-    #answers(title: "Codec boundary", responsibility: [Encode and decode native a using one retained definition and known wire shape.], interface: [Primitive codecs, collection codecs, record and union builders, mapping, custom, encode/decode, schema, check, placeholder.], interactions: [On both targets, strict text admission builds a native tree for direct built-in decoding; custom callbacks convert their subtree to Value. Schema publication exposes an opaque schema for consumer admission.], invariants: [Built-in constructors preserve their declared wire shape. Unknown child schema propagates through every enclosing schema query.], failure: [Value failures return path and Reason. Source definition mistakes panic at first affected use; check returns DefinitionError instead.])
+    #answers(title: "Codec boundary", responsibility: [Encode and decode native a using one retained definition and known wire shape.], interface: [Primitive codecs, collection codecs, record and union builders, mapping, custom, encode/decode, schema, check, placeholder.], interactions: [On both targets, strict text admission builds a native tree for direct built-in and generated decoding; custom callbacks convert their subtree to Value. Schema publication exposes an opaque schema for consumer admission.], invariants: [Built-in constructors preserve their declared wire shape. Unknown child schema propagates through every enclosing schema query.], failure: [Value failures return path and Reason. Source definition mistakes panic at first affected use; check returns DefinitionError instead.])
     #subsection(title: "Constructor acceptance")[
       #md-table(3, (
         [Constructor], [Native and JSON shape], [Acceptance and encoding rule],
@@ -187,6 +187,7 @@
         [success], [r / empty object], [Decode the retained r from a closed empty object; encoder ignores input],
       ))
       #points(
+        [Generated codecs may register a specialized text encoder and native-tree decoder through the versioned internal registration seam. Ordinary codec operations dispatch to those functions; composing a new ordinary container or mapping retains Value encoding semantics rather than propagating the text shortcut. The generation context owns emitted source. #adr(16)],
         [A codec's accepted native domain can be narrower than its schema. Native Int digit limits and Float overflow are projections, not mathematical schema constraints. try_map may impose application checks that its preserved schema cannot express.],
         [For caller-authored mappings, a successful encode/decode roundtrip is a caller law. The type system proves neither inverse mappings nor equality to a schema language. A constant success codec has the retained constant as its valid native domain.],
         [DefinitionError distinguishes duplicate names/tags, empty union/enum, duplicate enum native values, reversed bounds, unsafe JavaScript integer bounds, and a field continuation that does not finish a record. Diagnostics name definition data rather than untrusted input.],

@@ -7,7 +7,10 @@
 ////
 //// The `encode_*` and `decode_*` functions mirror the codec combinators over
 //// `Value`; the `*_native_*` functions do the same over `gleam/json` values
-//// and the `Dynamic` data that `json.parse` produces.
+//// and the `Dynamic` data that `json.parse` produces. The `decode_strict_*`
+//// helpers consume the shared strict parser's retained native evidence,
+//// preserving its exact numbers and duplicate-key rejection without a Value
+//// conversion. These decoder families have distinct input guarantees.
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
@@ -22,6 +25,7 @@ import gleam/string
 import json/blueprint/codec.{
   type DecodeError, type EncodeError, DecodeError, EncodeError, Field, Index,
 }
+import json/blueprint/internal/native
 import json/blueprint/internal/schema_tree.{type Tree}
 import json/blueprint/internal/text
 import json/blueprint/number.{type Number}
@@ -170,29 +174,36 @@ pub fn decode_integer_between(
   raw: Value,
 ) -> Result(Int, DecodeError) {
   case raw {
-    value.Number(item) ->
-      case
-        number.is_integer(item),
-        number.from_int(minimum),
-        number.from_int(maximum)
-      {
-        False, _, _ -> fail(codec.ExpectedInt)
-        True, Ok(lower), Ok(upper) ->
-          case
-            number.compare(item, lower) != order.Lt
-            && number.compare(item, upper) != order.Gt
-          {
-            True ->
-              number.to_int(
-                item,
-                int.max(digit_count(minimum), digit_count(maximum)),
-              )
-              |> result.replace_error(DecodeError([], codec.ExpectedInt))
-            False -> fail(codec.IntegerOutsideRange(minimum, maximum))
-          }
-        True, _, _ -> fail(codec.IntegerOutsideRange(minimum, maximum))
-      }
+    value.Number(item) -> decode_bounded_integer(minimum, maximum, item)
     _ -> fail(codec.ExpectedInt)
+  }
+}
+
+fn decode_bounded_integer(
+  minimum: Int,
+  maximum: Int,
+  item: Number,
+) -> Result(Int, DecodeError) {
+  case
+    number.is_integer(item),
+    number.from_int(minimum),
+    number.from_int(maximum)
+  {
+    False, _, _ -> fail(codec.ExpectedInt)
+    True, Ok(lower), Ok(upper) ->
+      case
+        number.compare(item, lower) != order.Lt
+        && number.compare(item, upper) != order.Gt
+      {
+        True ->
+          number.to_int(
+            item,
+            int.max(digit_count(minimum), digit_count(maximum)),
+          )
+          |> result.replace_error(DecodeError([], codec.ExpectedInt))
+        False -> fail(codec.IntegerOutsideRange(minimum, maximum))
+      }
+    True, _, _ -> fail(codec.IntegerOutsideRange(minimum, maximum))
   }
 }
 
@@ -338,8 +349,8 @@ pub fn encode_object(
   encode_fields(item) |> result.map(value.Object)
 }
 
-/// Decode a closed object: an unknown or repeated key fails before any field
-/// decodes.
+/// Decode fields before rejecting unknown or repeated keys, matching runtime
+/// record error precedence.
 pub fn decode_object(
   names: List(String),
   decode_fields: fn(Members) -> Result(a, DecodeError),
@@ -347,10 +358,9 @@ pub fn decode_object(
 ) -> Result(a, DecodeError) {
   case raw {
     value.Object(members) -> {
-      use Nil <- result.try(
-        check_members(list.map(members, fn(member) { member.0 }), names, []),
-      )
-      decode_fields(members)
+      use decoded <- result.try(decode_fields(members))
+      check_members(list.map(members, fn(member) { member.0 }), names, [])
+      |> result.replace(decoded)
     }
     _ -> fail(codec.ExpectedObject)
   }
@@ -512,7 +522,7 @@ pub fn decode_native_integer_between(
   raw: Dynamic,
 ) -> Result(Int, DecodeError) {
   case native_number(raw) {
-    Ok(item) -> decode_integer_between(minimum, maximum, value.Number(item))
+    Ok(item) -> decode_bounded_integer(minimum, maximum, item)
     Error(Nil) -> fail(codec.ExpectedInt)
   }
 }
@@ -663,5 +673,165 @@ pub fn decode_json_native(
         ]),
       )
     False -> json.parse(source, native_decoder(decode_native, placeholder))
+  }
+}
+
+// Strict decoder helpers consume evidence admitted by the shared parser.
+// They never parse source or weaken duplicate-key and numeric guarantees.
+fn strict_numeric_failure(
+  error: native.NumericError,
+  reason: codec.Reason,
+) -> DecodeError {
+  case error {
+    native.ProjectionCapacity ->
+      DecodeError(
+        [],
+        codec.InvalidJson(value.ParseError(
+          value.Location(0, 0, 0),
+          value.RuntimeCapacityExceeded,
+        )),
+      )
+    _ -> DecodeError([], reason)
+  }
+}
+
+pub fn decode_strict_string(raw: native.Raw) -> Result(String, DecodeError) {
+  native.string(raw)
+  |> result.replace_error(DecodeError([], codec.ExpectedString))
+}
+
+pub fn decode_strict_int(raw: native.Raw) -> Result(Int, DecodeError) {
+  native.int(raw)
+  |> result.map_error(fn(error) {
+    strict_numeric_failure(error, codec.ExpectedInt)
+  })
+}
+
+pub fn decode_strict_integer_between(
+  minimum: Int,
+  maximum: Int,
+  raw: native.Raw,
+) -> Result(Int, DecodeError) {
+  // Most bounded values are representable native integers. Their exact
+  // projection has already checked token integrality, so bounds need no
+  // temporary Number values. Wider integers/fractions retain exact fallback.
+  case native.int(raw) {
+    Ok(item) ->
+      case item >= minimum && item <= maximum {
+        True -> Ok(item)
+        False -> fail(codec.IntegerOutsideRange(minimum, maximum))
+      }
+    Error(_) -> {
+      use item <- result.try(
+        native.number(raw)
+        |> result.map_error(fn(error) {
+          strict_numeric_failure(error, codec.ExpectedInt)
+        }),
+      )
+      decode_bounded_integer(minimum, maximum, item)
+    }
+  }
+}
+
+pub fn decode_strict_bool(raw: native.Raw) -> Result(Bool, DecodeError) {
+  native.bool(raw) |> result.replace_error(DecodeError([], codec.ExpectedBool))
+}
+
+pub fn decode_strict_pair(
+  left: fn(native.Raw) -> Result(a, DecodeError),
+  right: fn(native.Raw) -> Result(b, DecodeError),
+  raw: native.Raw,
+) -> Result(#(a, b), DecodeError) {
+  case native.array_items(raw) {
+    Error(_) -> fail(codec.ExpectedArray)
+    Ok([a, b]) -> {
+      use a <- result.try(left(a) |> at_decode(Index(0)))
+      use b <- result.map(right(b) |> at_decode(Index(1)))
+      #(a, b)
+    }
+    Ok(items) -> fail(codec.WrongLength(2, list.length(items)))
+  }
+}
+
+pub fn decode_strict_list(
+  decode_item: fn(native.Raw) -> Result(a, DecodeError),
+  raw: native.Raw,
+) -> Result(List(a), DecodeError) {
+  native.array_decode(
+    raw,
+    fn(item, index) { decode_item(item) |> at_decode(Index(index)) },
+    DecodeError([], codec.ExpectedArray),
+  )
+}
+
+pub fn decode_strict_nullable(
+  decode_inner: fn(native.Raw) -> Result(a, DecodeError),
+  raw: native.Raw,
+) -> Result(Option(a), DecodeError) {
+  case native.is_null(raw) {
+    True -> Ok(None)
+    False -> decode_inner(raw) |> result.map(Some)
+  }
+}
+
+pub fn decode_strict_required(
+  name: String,
+  members: native.Raw,
+  decode_item: fn(native.Raw) -> Result(a, DecodeError),
+) -> Result(a, DecodeError) {
+  case native.field(members, name) {
+    Error(_) -> Error(DecodeError([Field(name)], codec.MissingField))
+    Ok(raw) -> decode_item(raw) |> at_decode(Field(name))
+  }
+}
+
+pub fn decode_strict_optional(
+  name: String,
+  members: native.Raw,
+  decode_item: fn(native.Raw) -> Result(a, DecodeError),
+) -> Result(Option(a), DecodeError) {
+  case native.field(members, name) {
+    Error(_) -> Ok(None)
+    Ok(raw) -> decode_item(raw) |> at_decode(Field(name)) |> result.map(Some)
+  }
+}
+
+pub fn decode_strict_fields_pair(
+  left: fn(native.Raw) -> Result(a, DecodeError),
+  right: fn(native.Raw) -> Result(b, DecodeError),
+  raw: native.Raw,
+) -> Result(#(a, b), DecodeError) {
+  use a <- result.try(left(raw))
+  use b <- result.map(right(raw))
+  #(a, b)
+}
+
+pub fn decode_strict_object(
+  names: List(String),
+  decode_fields: fn(native.Raw) -> Result(a, DecodeError),
+  raw: native.Raw,
+) -> Result(a, DecodeError) {
+  case native.keys(raw) {
+    Error(_) -> fail(codec.ExpectedObject)
+    Ok(keys) -> {
+      use item <- result.try(decode_fields(raw))
+      // Raw comes only from the strict parser, which has already rejected
+      // duplicate decoded names. Retain field-first unknown-key diagnostics.
+      check_strict_keys(keys, names) |> result.replace(item)
+    }
+  }
+}
+
+fn check_strict_keys(
+  keys: List(String),
+  names: List(String),
+) -> Result(Nil, DecodeError) {
+  case keys {
+    [] -> Ok(Nil)
+    [key, ..rest] ->
+      case list.contains(names, key) {
+        True -> check_strict_keys(rest, names)
+        False -> Error(DecodeError([Field(key)], codec.UnknownField))
+      }
   }
 }

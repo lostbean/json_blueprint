@@ -729,9 +729,6 @@ pub fn codec_generation_is_deterministic_test() {
   |> should.be_true
   contains("import materialize_fixtures") |> should.be_true
   contains("import json/blueprint/internal/generated") |> should.be_true
-  contains("codec.custom(") |> should.be_true
-  contains("placeholder: materialize_fixtures.order_from_fields(")
-  |> should.be_true
   contains("generated.encode_native_integer_between(1, 999_999, item)")
   |> should.be_true
   contains("codec.decode_json(order_codec(), source)") |> should.be_true
@@ -899,9 +896,6 @@ pub fn nullable_definitions_are_options_test() {
   |> string.contains(
     "pub fn encode_maybe(item: option.Option(Int)) -> Result(value.Value, codec.EncodeError)",
   )
-  |> should.be_true
-  content
-  |> string.contains("placeholder: option.None")
   |> should.be_true
 }
 

@@ -288,6 +288,26 @@ pub fn example() {
   `encode_<name>_json`, `decode_<name>_json` (strict parser),
   `decode_<name>_json_native` (`gleam/json`, 1 MiB pre-check),
   `<name>_schema()` and `<name>_codec()`.
+- The generated codec accessor uses specialized text encoding and direct typed
+  decoding through ordinary `codec.encode_json` and `codec.decode_json` calls.
+  Strict decoding shares the runtime parser, including duplicate-key rejection,
+  exact numeric conversion, Unicode checks, and byte limits. No extra parser or
+  global cache is installed.
+- Generated schema structures avoid rediscovering the definition; schema JSON
+  still renders on demand. Wrapping a generated codec in an ordinary container
+  or mapping preserves behavior and direct child decoding, but text encoding
+  uses the ordinary Value path. Generate the whole definition to specialize it.
+- A generated object codec can be a field or collection element, but cannot
+  finish a `codec.field` or `codec.optional_field` record continuation. Use an
+  ordinary runtime record builder when extending a record; the generated codec
+  replaces value, text, and schema operations, not the builder capability.
+- Named source callbacks must be pure and agree with their supplied runtime
+  functions. Generated schema and known-field metadata do not replay runtime
+  placeholder introspection; equal conversion results do not imply equal
+  callback effects during schema or field discovery.
+  Exact `Number` definitions work through `runtime`, but typed `compile` still
+  returns `NativeNumberUnsupported`; the schema-driven generator below supports
+  exact numbers through ordinary codecs.
 
 From the repository root in its Nix shell, regenerate its fixtures with:
 

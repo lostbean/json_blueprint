@@ -369,6 +369,7 @@ pub fn encode_failure(message: String) -> EncodeError {
 /// Encodes `a` to JSON, decodes JSON to `a`, and describes the JSON.
 pub opaque type Codec(a) {
   Codec(
+    text_encode: Option(fn(a) -> Result(String, EncodeError)),
     encode: fn(a) -> Result(Value, EncodeError),
     decode: fn(Value) -> Result(a, DecodeError),
     native_decode: fn(native.Raw) -> Result(a, DecodeError),
@@ -449,7 +450,10 @@ pub fn decode(codec: Codec(a), raw: Value) -> Result(a, DecodeError) {
 
 /// Encode to compact JSON text.
 pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
-  encode(codec, item) |> result.map(value.to_string)
+  case codec.text_encode {
+    Some(encode) -> encode(item)
+    None -> encode(codec, item) |> result.map(value.to_string)
+  }
 }
 
 /// Parse JSON text within the default byte bound and decode it.
@@ -582,6 +586,7 @@ fn leaf(
   placeholder: a,
 ) -> Codec(a) {
   Codec(
+    None,
     encode,
     decode,
     native_decode,
@@ -806,6 +811,7 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
   let upper = number.from_int(maximum) |> result.unwrap(zero())
   let digits = int.max(digit_count(minimum), digit_count(maximum))
   Codec(
+    text_encode: None,
     encode: fn(item) {
       ensure(defect)
       case item >= minimum && item <= maximum {
@@ -877,6 +883,7 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
     _ -> None
   }
   Codec(
+    text_encode: None,
     encode: fn(item) {
       ensure(defect)
       case within(item, minimum, maximum) {
@@ -925,6 +932,7 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
   }
   let labels = list.map(variants, fn(variant) { variant.0 })
   Codec(
+    text_encode: None,
     encode: fn(item) {
       ensure(defect)
       case list.find(variants, fn(variant) { variant.1 == item }) {
@@ -1011,6 +1019,7 @@ pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
 /// A JSON array of items.
 pub fn list(of item: Codec(a)) -> Codec(List(a)) {
   Codec(
+    text_encode: None,
     encode: fn(items) {
       list.index_map(items, fn(entry, index) { #(index, entry) })
       |> list.try_map(fn(pair) {
@@ -1056,6 +1065,7 @@ fn decode_items(
 /// A two-item JSON array.
 pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
   Codec(
+    text_encode: None,
     encode: fn(items: #(a, b)) {
       use first <- result.try(left.encode(items.0) |> at_encode(Index(0)))
       use second <- result.try(right.encode(items.1) |> at_encode(Index(1)))
@@ -1105,6 +1115,7 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
 /// would decode as `None`.
 pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
   Codec(
+    text_encode: None,
     encode: fn(item) {
       case item {
         None -> Ok(value.Null)
@@ -1357,6 +1368,7 @@ fn record_fields(after: String, codec: Codec(r)) -> Fields(r) {
 
 fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
   Codec(
+    text_encode: None,
     encode: fn(item) {
       fields.encode(item, dict.new()) |> result.map(value.Object)
     },
@@ -1496,6 +1508,7 @@ pub fn union(variants: Union(t)) -> Codec(t) {
     None, _ -> None
   }
   Codec(
+    text_encode: None,
     encode: fn(item) {
       ensure(defect)
       let Tagged(tag, payload) = variants.encode(item)
@@ -1684,6 +1697,7 @@ pub fn map(
   encode to: fn(b) -> a,
 ) -> Codec(b) {
   Codec(
+    text_encode: None,
     encode: fn(item) { codec.encode(to(item)) },
     decode: fn(raw) { codec.decode(raw) |> result.map(from) },
     native_decode: fn(raw) { codec.native_decode(raw) |> result.map(from) },
@@ -1721,6 +1735,7 @@ pub fn try_map(
   placeholder placeholder: b,
 ) -> Codec(b) {
   Codec(
+    text_encode: None,
     encode: fn(item) {
       case to(item) {
         Ok(inner) -> codec.encode(inner)
@@ -1758,6 +1773,7 @@ pub fn custom(
   placeholder placeholder: a,
 ) -> Codec(a) {
   Codec(
+    text_encode: None,
     encode:,
     decode:,
     native_decode: fn(raw) {
@@ -2069,4 +2085,27 @@ fn variant_schema_value(variant: tree.VariantSchema) -> Value {
     Some(payload) ->
       closed_object([tag, #("value", tree_value(payload))], ["tag", "value"])
   }
+}
+
+/// Register compiler-checked generated operations and their checked schema.
+/// Generated modules share the strict parser and decode its retained evidence
+/// directly. The placeholder stays lazy, as it is for ordinary codecs.
+@internal
+pub fn generated(
+  encode encode: fn(a) -> Result(Value, EncodeError),
+  decode decode: fn(Value) -> Result(a, DecodeError),
+  strict_decode strict_decode: fn(native.Raw) -> Result(a, DecodeError),
+  text_encode text_encode: fn(a) -> Result(String, EncodeError),
+  schema schema: Schema,
+  placeholder placeholder: fn() -> a,
+) -> Codec(a) {
+  Codec(
+    text_encode: Some(text_encode),
+    encode:,
+    decode:,
+    native_decode: strict_decode,
+    definition: fn() { Ok(Some(schema.tree)) },
+    placeholder:,
+    fields: None,
+  )
 }

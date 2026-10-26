@@ -183,6 +183,35 @@ generator, review the diff, and rerun parity and application tests before
 committing the output. The schema generator's attribution header now names
 JSON Blueprint. Do not edit generator output by hand to make a drift check pass.
 
+Typed-definition output now registers specialized text encoding and direct
+strict decoding on its codec accessor. Ordinary `codec.encode_json` and
+`codec.decode_json` therefore use those functions. Strict decoding shares the
+runtime parser and its duplicate-key, Unicode, exact-number and byte guarantees;
+it no longer constructs an intermediate complete `Value` tree. The explicitly
+named `decode_<name>_json_native` remains the weaker standard-JSON entry point.
+
+Two observable details now align with runtime codecs. The shared generated
+Value decoder checks declared fields before unknown or repeated members, including
+for existing generated modules. Regenerated codec accessor construction no longer
+evaluates mapped placeholders eagerly.
+Placeholder mappings run when a placeholder is needed. Strict text duplicates
+still fail before typed callbacks. Replay multi-error fixtures and any mapping
+callbacks with observable effects; source references must match the supplied
+runtime functions. Mappings should be pure: generated schema and known-field
+metadata do not replay runtime placeholder introspection. Conversion order is
+preserved, but introspection callback counts are not an equivalence guarantee.
+
+Specialization does not expand the typed generator's supported shapes. Exact
+`Number` compilation still returns `NativeNumberUnsupported`. Schema-driven
+codecs retain exact-number support through ordinary runtime combinators.
+Generated schema structures are retained, but schema JSON text is rendered on
+demand. Ordinary composition around a generated codec preserves semantics and
+direct child decoding; its outer text encoder uses the ordinary Value path.
+As before, a typed-generated object codec can be nested as a child, but cannot
+finish a `codec.field` or `codec.optional_field` record continuation. Use an
+ordinary runtime record builder to extend a record. Replacement equivalence
+covers value, text, and schema operations, not record-builder capability.
+
 Schema-driven generation supports a narrower closed-object subset than runtime
 contracts. Admitting a schema as a contract does not guarantee generation support.
 

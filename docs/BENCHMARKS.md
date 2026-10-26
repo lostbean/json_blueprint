@@ -11,6 +11,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 
 | Capture | Question | Decision record |
 | --- | --- | --- |
+| Generated specialization, 2026-10-26 | Does direct typed generation retain the prototype's runtime and memory gains? | [ADR 0016](adr/0016-specialize-generated-codecs-with-runtime-semantics.md) |
 | Strict and native parsing, 2026-10-25 | What do strict admission and its Value tree cost on representative and near-limit inputs? | [ADR 0003](adr/0003-strict-parsing-and-independent-resource-bounds.md), existing parser guarantees unchanged |
 | Contract encoding, 2026-10-08 | What does symmetric validation in `contract.value_codec` cost on encoding? | [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) |
 | Object validation, 2026-10-08 | What does indexing objects above 40 members change? | [ADR 0009](adr/0009-index-object-validation-above-forty-members.md) |
@@ -432,3 +433,77 @@ output. Plain native rows lack strict guarantees and are only a cost reference.
 [ADR 0015](adr/0015-adopt-javascript-native-hybrid.md) owns the decision;
 [the migration guide](MIGRATION.md) describes diagnostic changes and
 [browser validation](BROWSER-SUPPORT.md) records executed engines.
+
+## Broader release-readiness comparison, 2026-10-25
+
+Runtime source is commit `5525c90`. The only code changes in this capture are
+additional correctness laws and schema benchmark operations. [General results](benchmarks/release-readiness-2026-10-25/general-results.json)
+retain each process mean and post-capture source hashes. Three fresh processes
+per backend each warm up 200 times and measure 1,000 samples per operation;
+the table is the median of those three means, in microseconds. Order is fixed,
+there is no CPU affinity/frequency control, and these are local observations.
+
+The same representable Order record is used for the following complete-text
+conversions. Vanilla is a handwritten `gleam/json` encoder/typed decoder.
+Its native parser does not retain strict duplicate/number evidence. Generated
+strict decoding uses the custom-codec Value path; generated direct encoding
+uses specialized checked JSON construction. These are not equivalent policies
+for arbitrary hostile or unrepresentable input.
+
+| Operation | Erlang/OTP 29, µs | Node 24.21, µs |
+| --- | ---: | ---: |
+| Reused runtime codec: strict decode | 2.799 | 10.677 |
+| Generated strict decode | 3.207 | 20.237 |
+| Generated standard-JSON decode | 3.383 | 13.394 |
+| Vanilla typed decode | 2.476 | 6.950 |
+| Reused runtime codec: encode | 3.206 | 9.359 |
+| Generated direct encode | 1.477 | 7.914 |
+| Vanilla encode | 1.035 | 1.621 |
+| Runtime schema discovery | 0.521 | 5.187 |
+| Generated schema accessor | 0.018 | 0.098 |
+| Runtime schema JSON rendering | 13.288 | 16.329 |
+| Generated schema JSON rendering | 13.282 | 12.611 |
+
+Strict runtime decoding costs about 1.13× the vanilla baseline on Erlang and
+1.54× on Node for this fixture. Runtime encoding costs about 3.10×/5.77×;
+specialized generated encoding improves that to about 1.43×/4.88×. Generated
+strict decoding is slower than the reused runtime codec, particularly on JS,
+because its custom wrapper materializes Values. Generation is not a blanket
+optimization. Constructing a typed-definition codec per call costs approximately
+36/71 µs before conversion; retain codecs and schema documents when reusable.
+
+A separate three-process [schema-consumer capture](benchmarks/release-readiness-2026-10-25/schema-results.json)
+uses the existing adaptive benchmark and its own
+[source fingerprints](benchmarks/release-readiness-2026-10-25/schema-inputs.sha256.json)
+and [environment](benchmarks/release-readiness-2026-10-25/schema-environment.json).
+For 100 items, schema-generated versus handwritten encode-text is 417/411 µs
+on Erlang and 1,282/1,257 µs on JS; decode-text is 212/218 and 868/868 µs.
+This generator emits ordinary codec combinators, with broadly similar cost.
+Generating the Gleam source itself takes approximately 0.140 ms on Erlang and
+0.202 ms on JS; these figures exclude file I/O and Gleam compilation.
+
+Validation of the already-built 100-item Value takes approximately 51 µs on
+Erlang and 382 µs on JS through the runtime-contract adapter. It does not build
+native records or parse JSON, so it must not be compared as equivalent work to
+typed text decoding. Plain native JSON has no schema-validation equivalent.
+The tiny three-field validation fixture in the general harness is 0.272/2.476 µs;
+that is a different workload. All schema claims remain within the finite
+Draft 2020-12 profile documented in [ORACLE.md](ORACLE.md).
+
+Reproduce the general capture with `sh scripts/benchmark.sh` in three fresh
+Nix-shell runs, and the schema capture with
+`python3 scripts/schema_generation_benchmark.py --output /tmp/fresh-schema-capture`
+in the Nix shell. On macOS, clear `DEVELOPER_DIR` and `SDKROOT` if system Git
+cannot resolve its executable in the benchmark subprocess.
+
+## Generated specialization adoption, 2026-10-26
+
+The [adoption capture](benchmarks/generated-specialization-2026-10-26/REPORT.md)
+compares the final direct emitter with the previous generated implementation,
+ordinary runtime codecs and vanilla JSON decoding on both targets. On the
+50-record fixture, generated decoding changed from 238 to 176 µs on Erlang and
+801 to 396 µs on JavaScript. For 5,000 records, whole-process peak RSS changed
+from 92.88 to 88.92 MiB and 87.80 to 80.12 MiB respectively. Small-record encoding
+through the generated Codec also benefits from specialization. The report
+retains methods, ranges, source hashes, prototype comparisons and limitations;
+native parsing alone does not provide equivalent guarantees.

@@ -31,7 +31,7 @@
     ), edges: (
       (from: "generation", to: "contracts", relation: "dependency", label: "codec, schema, runtime helpers"),
       (from: "generation", to: "output", relation: "dataflow", label: "returns source"),
-      (from: "output", to: "contracts", relation: "dependency", label: "public codec combinators"),
+      (from: "output", to: "contracts", relation: "dependency", label: "codec and specialized helpers"),
     ))
     #points(
       [The package exports pure values and synchronous conversion operations. It starts no process, owns no connection, and stores no mutable runtime state.],

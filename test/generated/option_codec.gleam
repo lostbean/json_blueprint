@@ -5,11 +5,12 @@ import gleam/json
 import gleam/option
 import json/blueprint/codec
 import json/blueprint/internal/generated
+import json/blueprint/internal/native
 import json/blueprint/internal/schema_tree
 import json/blueprint/value
 
 pub const generated_fingerprint: String =
-  "EFCBAE4911113C0C3F1E3A6D22C07F4C294F5D63"
+  "4EF1D6010027C4EA32DA9EA04DD694A3AE132887"
 
 const option_schema_value: schema_tree.Tree =
   schema_tree.ObjectSchema(
@@ -48,6 +49,12 @@ fn option_compiled_properties_value_inner_native_decode(
   generated.decode_native_string(raw)
 }
 
+fn option_compiled_properties_value_inner_strict_decode(
+  raw: native.Raw,
+) -> Result(String, codec.DecodeError) {
+  generated.decode_strict_string(raw)
+}
+
 fn option_compiled_properties_value_encode(
   item: option.Option(String),
 ) -> Result(value.Value, codec.EncodeError) {
@@ -74,6 +81,15 @@ fn option_compiled_properties_value_native_decode(
 ) -> Result(option.Option(String), codec.DecodeError) {
   generated.decode_native_nullable(
     option_compiled_properties_value_inner_native_decode,
+    raw,
+  )
+}
+
+fn option_compiled_properties_value_strict_decode(
+  raw: native.Raw,
+) -> Result(option.Option(String), codec.DecodeError) {
+  generated.decode_strict_nullable(
+    option_compiled_properties_value_inner_strict_decode,
     raw,
   )
 }
@@ -118,6 +134,16 @@ fn option_compiled_properties_native_decode(
   )
 }
 
+fn option_compiled_properties_strict_decode(
+  fields: native.Raw,
+) -> Result(option.Option(option.Option(String)), codec.DecodeError) {
+  generated.decode_strict_optional(
+    "note",
+    fields,
+    option_compiled_properties_value_strict_decode,
+  )
+}
+
 fn option_compiled_encode(
   item: option.Option(option.Option(String)),
 ) -> Result(value.Value, codec.EncodeError) {
@@ -146,6 +172,16 @@ fn option_compiled_native_decode(
   generated.decode_native_object(
     option_compiled_property_names,
     option_compiled_properties_native_decode,
+    raw,
+  )
+}
+
+fn option_compiled_strict_decode(
+  raw: native.Raw,
+) -> Result(option.Option(option.Option(String)), codec.DecodeError) {
+  generated.decode_strict_object(
+    option_compiled_property_names,
+    option_compiled_properties_strict_decode,
     raw,
   )
 }
@@ -192,10 +228,12 @@ pub fn option_schema() -> codec.Schema {
 }
 
 pub fn option_codec() -> codec.Codec(option.Option(option.Option(String))) {
-  codec.custom(
+  codec.generated(
     encode: encode_option,
     decode: decode_option,
-    schema: option.Some(option_schema()),
-    placeholder: option.None,
+    strict_decode: option_compiled_strict_decode,
+    text_encode: encode_option_json,
+    schema: option_schema(),
+    placeholder: fn() { option.None },
   )
 }

@@ -5,12 +5,13 @@ import gleam/json
 import gleam/option
 import json/blueprint/codec
 import json/blueprint/internal/generated
+import json/blueprint/internal/native
 import json/blueprint/internal/schema_tree
 import json/blueprint/value
 import materialize_fixtures
 
 pub const generated_fingerprint: String =
-  "6AEC872050FE749233BFB01021B48A346BFEBE5C"
+  "A0C42B67853701BF9E6EB805CB6E8C82A28A07C7"
 
 const order_schema_value: schema_tree.Tree =
   schema_tree.ObjectSchema(
@@ -83,6 +84,12 @@ fn order_compiled_inner_properties_left_left_left_left_value_native_decode(
   generated.decode_native_integer_between(1, 999_999, raw)
 }
 
+fn order_compiled_inner_properties_left_left_left_left_value_strict_decode(
+  raw: native.Raw,
+) -> Result(Int, codec.DecodeError) {
+  generated.decode_strict_integer_between(1, 999_999, raw)
+}
+
 fn order_compiled_inner_properties_left_left_left_left_encode(
   item: Int,
 ) -> Result(List(#(String, value.Value)), codec.EncodeError) {
@@ -123,6 +130,16 @@ fn order_compiled_inner_properties_left_left_left_left_native_decode(
   )
 }
 
+fn order_compiled_inner_properties_left_left_left_left_strict_decode(
+  fields: native.Raw,
+) -> Result(Int, codec.DecodeError) {
+  generated.decode_strict_required(
+    "order_id",
+    fields,
+    order_compiled_inner_properties_left_left_left_left_value_strict_decode,
+  )
+}
+
 fn order_compiled_inner_properties_left_left_left_right_value_item_left_encode(
   item: String,
 ) -> Result(value.Value, codec.EncodeError) {
@@ -147,6 +164,12 @@ fn order_compiled_inner_properties_left_left_left_right_value_item_left_native_d
   generated.decode_native_string(raw)
 }
 
+fn order_compiled_inner_properties_left_left_left_right_value_item_left_strict_decode(
+  raw: native.Raw,
+) -> Result(String, codec.DecodeError) {
+  generated.decode_strict_string(raw)
+}
+
 fn order_compiled_inner_properties_left_left_left_right_value_item_right_encode(
   item: Int,
 ) -> Result(value.Value, codec.EncodeError) {
@@ -169,6 +192,12 @@ fn order_compiled_inner_properties_left_left_left_right_value_item_right_native_
   raw: dynamic.Dynamic,
 ) -> Result(Int, codec.DecodeError) {
   generated.decode_native_int(raw)
+}
+
+fn order_compiled_inner_properties_left_left_left_right_value_item_right_strict_decode(
+  raw: native.Raw,
+) -> Result(Int, codec.DecodeError) {
+  generated.decode_strict_int(raw)
 }
 
 fn order_compiled_inner_properties_left_left_left_right_value_item_encode(
@@ -211,6 +240,16 @@ fn order_compiled_inner_properties_left_left_left_right_value_item_native_decode
   )
 }
 
+fn order_compiled_inner_properties_left_left_left_right_value_item_strict_decode(
+  raw: native.Raw,
+) -> Result(#(String, Int), codec.DecodeError) {
+  generated.decode_strict_pair(
+    order_compiled_inner_properties_left_left_left_right_value_item_left_strict_decode,
+    order_compiled_inner_properties_left_left_left_right_value_item_right_strict_decode,
+    raw,
+  )
+}
+
 fn order_compiled_inner_properties_left_left_left_right_value_encode(
   items: List(#(String, Int)),
 ) -> Result(value.Value, codec.EncodeError) {
@@ -243,6 +282,15 @@ fn order_compiled_inner_properties_left_left_left_right_value_native_decode(
 ) -> Result(List(#(String, Int)), codec.DecodeError) {
   generated.decode_native_list(
     order_compiled_inner_properties_left_left_left_right_value_item_native_decode,
+    raw,
+  )
+}
+
+fn order_compiled_inner_properties_left_left_left_right_value_strict_decode(
+  raw: native.Raw,
+) -> Result(List(#(String, Int)), codec.DecodeError) {
+  generated.decode_strict_list(
+    order_compiled_inner_properties_left_left_left_right_value_item_strict_decode,
     raw,
   )
 }
@@ -287,6 +335,16 @@ fn order_compiled_inner_properties_left_left_left_right_native_decode(
   )
 }
 
+fn order_compiled_inner_properties_left_left_left_right_strict_decode(
+  fields: native.Raw,
+) -> Result(List(#(String, Int)), codec.DecodeError) {
+  generated.decode_strict_required(
+    "items_\"list\"",
+    fields,
+    order_compiled_inner_properties_left_left_left_right_value_strict_decode,
+  )
+}
+
 fn order_compiled_inner_properties_left_left_left_encode(
   item: #(Int, List(#(String, Int))),
 ) -> Result(List(#(String, value.Value)), codec.EncodeError) {
@@ -327,6 +385,16 @@ fn order_compiled_inner_properties_left_left_left_native_decode(
   )
 }
 
+fn order_compiled_inner_properties_left_left_left_strict_decode(
+  fields: native.Raw,
+) -> Result(#(Int, List(#(String, Int))), codec.DecodeError) {
+  generated.decode_strict_fields_pair(
+    order_compiled_inner_properties_left_left_left_left_strict_decode,
+    order_compiled_inner_properties_left_left_left_right_strict_decode,
+    fields,
+  )
+}
+
 fn order_compiled_inner_properties_left_left_right_value_inner_encode(
   item: String,
 ) -> Result(value.Value, codec.EncodeError) {
@@ -349,6 +417,12 @@ fn order_compiled_inner_properties_left_left_right_value_inner_native_decode(
   raw: dynamic.Dynamic,
 ) -> Result(String, codec.DecodeError) {
   generated.decode_native_string(raw)
+}
+
+fn order_compiled_inner_properties_left_left_right_value_inner_strict_decode(
+  raw: native.Raw,
+) -> Result(String, codec.DecodeError) {
+  generated.decode_strict_string(raw)
 }
 
 fn order_compiled_inner_properties_left_left_right_value_encode(
@@ -383,6 +457,15 @@ fn order_compiled_inner_properties_left_left_right_value_native_decode(
 ) -> Result(option.Option(String), codec.DecodeError) {
   generated.decode_native_nullable(
     order_compiled_inner_properties_left_left_right_value_inner_native_decode,
+    raw,
+  )
+}
+
+fn order_compiled_inner_properties_left_left_right_value_strict_decode(
+  raw: native.Raw,
+) -> Result(option.Option(String), codec.DecodeError) {
+  generated.decode_strict_nullable(
+    order_compiled_inner_properties_left_left_right_value_inner_strict_decode,
     raw,
   )
 }
@@ -424,6 +507,16 @@ fn order_compiled_inner_properties_left_left_right_native_decode(
     "customer\n\r\f\t\\note",
     fields,
     order_compiled_inner_properties_left_left_right_value_native_decode,
+  )
+}
+
+fn order_compiled_inner_properties_left_left_right_strict_decode(
+  fields: native.Raw,
+) -> Result(option.Option(option.Option(String)), codec.DecodeError) {
+  generated.decode_strict_optional(
+    "customer\n\r\f\t\\note",
+    fields,
+    order_compiled_inner_properties_left_left_right_value_strict_decode,
   )
 }
 
@@ -473,6 +566,19 @@ fn order_compiled_inner_properties_left_left_native_decode(
   )
 }
 
+fn order_compiled_inner_properties_left_left_strict_decode(
+  fields: native.Raw,
+) -> Result(
+  #(#(Int, List(#(String, Int))), option.Option(option.Option(String))),
+  codec.DecodeError,
+) {
+  generated.decode_strict_fields_pair(
+    order_compiled_inner_properties_left_left_left_strict_decode,
+    order_compiled_inner_properties_left_left_right_strict_decode,
+    fields,
+  )
+}
+
 fn order_compiled_inner_properties_left_right_value_encode(
   item: Bool,
 ) -> Result(value.Value, codec.EncodeError) {
@@ -495,6 +601,12 @@ fn order_compiled_inner_properties_left_right_value_native_decode(
   raw: dynamic.Dynamic,
 ) -> Result(Bool, codec.DecodeError) {
   generated.decode_native_bool(raw)
+}
+
+fn order_compiled_inner_properties_left_right_value_strict_decode(
+  raw: native.Raw,
+) -> Result(Bool, codec.DecodeError) {
+  generated.decode_strict_bool(raw)
 }
 
 fn order_compiled_inner_properties_left_right_encode(
@@ -534,6 +646,16 @@ fn order_compiled_inner_properties_left_right_native_decode(
     "type",
     fields,
     order_compiled_inner_properties_left_right_value_native_decode,
+  )
+}
+
+fn order_compiled_inner_properties_left_right_strict_decode(
+  fields: native.Raw,
+) -> Result(Bool, codec.DecodeError) {
+  generated.decode_strict_required(
+    "type",
+    fields,
+    order_compiled_inner_properties_left_right_value_strict_decode,
   )
 }
 
@@ -585,6 +707,19 @@ fn order_compiled_inner_properties_left_native_decode(
   generated.decode_native_fields_pair(
     order_compiled_inner_properties_left_left_native_decode,
     order_compiled_inner_properties_left_right_native_decode,
+    fields,
+  )
+}
+
+fn order_compiled_inner_properties_left_strict_decode(
+  fields: native.Raw,
+) -> Result(
+  #(#(#(Int, List(#(String, Int))), option.Option(option.Option(String))), Bool),
+  codec.DecodeError,
+) {
+  generated.decode_strict_fields_pair(
+    order_compiled_inner_properties_left_left_strict_decode,
+    order_compiled_inner_properties_left_right_strict_decode,
     fields,
   )
 }
@@ -647,6 +782,22 @@ fn order_compiled_inner_properties_right_value_native_decode(
   }
 }
 
+fn order_compiled_inner_properties_right_value_strict_decode(
+  raw: native.Raw,
+) -> Result(materialize_fixtures.OrderStatus, codec.DecodeError) {
+  case generated.decode_strict_string(raw) {
+    Error(error) -> Error(error)
+    Ok(label) ->
+      case label {
+        "pending" -> Ok(materialize_fixtures.Pending)
+        "processing" -> Ok(materialize_fixtures.Processing)
+        "shipped\n\r\f\t\"quoted\"" -> Ok(materialize_fixtures.ShippedQuoted)
+        "delivered 🚀 fn" -> Ok(materialize_fixtures.DeliveredUnicode)
+        _ -> generated.unknown_enum_label()
+      }
+  }
+}
+
 fn order_compiled_inner_properties_right_encode(
   item: materialize_fixtures.OrderStatus,
 ) -> Result(List(#(String, value.Value)), codec.EncodeError) {
@@ -684,6 +835,16 @@ fn order_compiled_inner_properties_right_native_decode(
     "status",
     fields,
     order_compiled_inner_properties_right_value_native_decode,
+  )
+}
+
+fn order_compiled_inner_properties_right_strict_decode(
+  fields: native.Raw,
+) -> Result(materialize_fixtures.OrderStatus, codec.DecodeError) {
+  generated.decode_strict_required(
+    "status",
+    fields,
+    order_compiled_inner_properties_right_value_strict_decode,
   )
 }
 
@@ -757,6 +918,25 @@ fn order_compiled_inner_properties_native_decode(
   )
 }
 
+fn order_compiled_inner_properties_strict_decode(
+  fields: native.Raw,
+) -> Result(
+  #(
+    #(
+      #(#(Int, List(#(String, Int))), option.Option(option.Option(String))),
+      Bool,
+    ),
+    materialize_fixtures.OrderStatus,
+  ),
+  codec.DecodeError,
+) {
+  generated.decode_strict_fields_pair(
+    order_compiled_inner_properties_left_strict_decode,
+    order_compiled_inner_properties_right_strict_decode,
+    fields,
+  )
+}
+
 fn order_compiled_inner_encode(
   item: #(
     #(
@@ -822,6 +1002,25 @@ fn order_compiled_inner_native_decode(
   )
 }
 
+fn order_compiled_inner_strict_decode(
+  raw: native.Raw,
+) -> Result(
+  #(
+    #(
+      #(#(Int, List(#(String, Int))), option.Option(option.Option(String))),
+      Bool,
+    ),
+    materialize_fixtures.OrderStatus,
+  ),
+  codec.DecodeError,
+) {
+  generated.decode_strict_object(
+    order_compiled_inner_property_names,
+    order_compiled_inner_properties_strict_decode,
+    raw,
+  )
+}
+
 fn order_compiled_encode(
   item: materialize_fixtures.Order,
 ) -> Result(value.Value, codec.EncodeError) {
@@ -852,6 +1051,15 @@ fn order_compiled_native_decode(
   raw: dynamic.Dynamic,
 ) -> Result(materialize_fixtures.Order, codec.DecodeError) {
   case order_compiled_inner_native_decode(raw) {
+    Ok(item) -> Ok(materialize_fixtures.order_from_fields(item))
+    Error(error) -> Error(error)
+  }
+}
+
+fn order_compiled_strict_decode(
+  raw: native.Raw,
+) -> Result(materialize_fixtures.Order, codec.DecodeError) {
+  case order_compiled_inner_strict_decode(raw) {
     Ok(item) -> Ok(materialize_fixtures.order_from_fields(item))
     Error(error) -> Error(error)
   }
@@ -902,13 +1110,17 @@ pub fn order_schema() -> codec.Schema {
 }
 
 pub fn order_codec() -> codec.Codec(materialize_fixtures.Order) {
-  codec.custom(
+  codec.generated(
     encode: encode_order,
     decode: decode_order,
-    schema: option.Some(order_schema()),
-    placeholder: materialize_fixtures.order_from_fields(#(
-      #(#(#(1, []), option.None), False),
-      materialize_fixtures.Pending,
-    )),
+    strict_decode: order_compiled_strict_decode,
+    text_encode: encode_order_json,
+    schema: order_schema(),
+    placeholder: fn() {
+      materialize_fixtures.order_from_fields(#(
+        #(#(#(1, []), option.None), False),
+        materialize_fixtures.Pending,
+      ))
+    },
   )
 }

@@ -379,6 +379,18 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
   should.equal(order_codec.decode_order(blueprint_input), Ok(order))
 
   let construction_benchmarks = [
+    run_construction_benchmark("order_runtime_schema_discovery", fn() {
+      codec.schema(runtime_codec)
+    }),
+    run_construction_benchmark("order_generated_schema_discovery", fn() {
+      order_codec.order_schema()
+    }),
+    run_construction_benchmark("order_runtime_schema_document", fn() {
+      codec.schema_json(runtime_codec)
+    }),
+    run_construction_benchmark("order_generated_schema_document", fn() {
+      codec.schema_json(generated_codec)
+    }),
     run_construction_benchmark(
       "order_runtime_definition_codec_construction",
       fn() { codegen.runtime(materialize_fixtures.order_definition()) },

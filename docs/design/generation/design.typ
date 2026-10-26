@@ -15,12 +15,11 @@
   #pagebreak(weak: true)
   #pending-ledger(
     pending-entry(title: "Broader runtime-schema generation is not designed", kind: "build", since: "2026-10-08", adr: [#adr(8)])[Selected naming overrides, shared named definitions, string and numeric enums, tagged and broader unions, aliases, recursive forms, and a general command-line workflow are outside generation. The build compiler creates each native type, so parsing a schema at application runtime cannot supply a typed codec. Formatter integration and upgrade fixtures remain tooling work beyond the focused consumer integration tests; committed-output freshness is reviewed manually.],
-    pending-entry(title: "Check the generated-record claims against code", kind: "verify", since: "2026-10-17")[The optional, nullable and absent three-state rule, the exact Number against native Int projection and the naming rules for nested stems were carried over from the retired consumer guide. The compiled consumer exercises them, but no check compares each design statement with the generator source.],
   )
 
   #pagebreak(weak: true)
   #section(title: "System at a glance", lead: [Three generators lower definitions and schemas to source; each returns a module and starts no process.], body: [
-    #diagram(altitude: "L3", viewpoint: "dataflow", title: "Generators and output", caption: [Generators run at build time. Generated source calls the public codec combinators of the contracts runtime.], flow: "top-to-bottom", nodes: (
+    #diagram(altitude: "L3", viewpoint: "dataflow", title: "Generators and output", caption: [Generators run at build time. Generated source uses specialized typed functions or public codec combinators, with shared contracts-runtime admission and conversion helpers.], flow: "top-to-bottom", nodes: (
       (id: "typed", label: "Typed-definition generator", kind: "component", tint: "violet"),
       (id: "schema", label: "Schema-driven generator", kind: "component", tint: "violet"),
       (id: "materializer", label: "Schema materializer", kind: "component", tint: "violet"),
@@ -56,7 +55,10 @@
         [compile validates module path and accessor name, parses native type references, calls codec.check, lowers the definition, checks native support and import agreement, then returns a #term("term-generated-module"). The result contains relative .gleam path, content, and SHA-1 content fingerprint.],
         [Generated schema helpers trust generator-checked trees. Direct caller construction through internal tree helpers bypasses ordinary schema admission and owns the resulting invariants.],
         [Qualified callback/constructor names and type/import references are validated as source forms. Compilation checks referenced function types; same-typed callbacks paired with different source references remain a caller trust boundary. Parity tests must compare interpreted and generated behavior.],
-        [A generated module exports Value encode/decode, strict text encode/decode, the explicitly distinct native JSON decoder, a schema accessor, and a codec accessor. Strict generated decoding uses the common Value parser; native decoding uses gleam/json after a 1 MiB byte check and does not inherit strict depth/number policies.],
+        [A generated module exports Value encode/decode, strict text encode/decode, the explicitly distinct standard-native JSON decoder, a schema accessor, and a codec accessor. The codec accessor registers specialized text encoding and typed decoding of the shared strict parser's native tree. Strict admission retains duplicate-key rejection, Unicode validation, exact numeric evidence and the configurable byte bound before invoking typed callbacks. The explicit standard-native decoder uses gleam/json after a 1 MiB byte check and does not inherit strict duplicate or number guarantees. #adr(16)],
+        [The typed generator emits specialized functions directly from its lowering model. It neither rewrites emitted source nor introduces another parser. Generated schema structure avoids rediscovering the definition; schema JSON is still rendered when requested. Codec accessors construct immutable wrappers without a global cache.],
+        [Ordinary codec.encode_json and codec.decode_json use the registered fast paths. Enclosing an existing generated codec in an ordinary map or container preserves behavior and direct child decoding, but text encoding uses the ordinary Value path. Generate the complete definition to specialize its whole text encoder. A generated object codec can be a field or collection element, but cannot finish a record continuation: it has no record-builder capability. Extending a record requires an ordinary runtime record builder.],
+        [Generated conversion follows runtime results, field paths and conversion callback order for supported definitions with faithful named mappings. Mappings must be pure: generated schema and known-field metadata do not replay runtime placeholder introspection, so introspection callback counts are not equivalent. Value decoding checks declared fields before unused or repeated members; strict text parsing rejects duplicates before typed callbacks. Placeholder mappings run on demand rather than during codec accessor construction. Explicit standard-native decoding remains a separate contract.],
         [Generation returns source only. The caller owns file writing, formatting, compiling, reviewing, committing generated output, and drift checks. Package internal/generated helper names/signatures consumed by checked-in output remain stable within a major version; internal marking alone does not eliminate that compatibility obligation.],
         [Sources: #lnk("../../../src/json/blueprint/codegen.gleam")[generator], #lnk("../../../src/json/blueprint/internal/generated.gleam")[runtime helper contract], #lnk("../../../test/compiled_codec_test.gleam")[compiled source fixtures], and #lnk("../../../README.md")[build workflow]. #adr(8) records ownership.],
       )
@@ -136,6 +138,13 @@
       )
     ]
     #subsection(title: "Generated parity and verification")[
+      #behavior(title: "A specialized codec preserves runtime conversion", level: "boundary", area: "Typed generation")[
+        #given[A supported typed definition has pure named callbacks that agree with their runtime functions.]
+        #when[An application replaces its runtime codec with the compiled generated codec for value, text or schema operations.]
+        #then[Value and strict JSON conversion preserve accepted values, failures and paths, optionality, and conversion callback order.]
+        #then[Strict JSON admission rejects duplicate names, malformed JSON and invalid Unicode before typed callbacks under the same byte policy; numeric projection uses the same exact evidence.]
+        #then[Schema queries preserve the definition's supported structure and constraints.]
+      ]
       #points(
         [Generated fixture tests format and compare regenerated source, compile retained modules, compare schema bytes and behavior, and run both targets. Named mapping references need parity evidence beyond source type checking.],
         [A separate consumer regenerates its module, compares it with committed output, runs its tests on both targets, and builds an isolated production copy without development dependencies. The same consumer owns the acceptance corpus and the comparison harness for cost measurements.],

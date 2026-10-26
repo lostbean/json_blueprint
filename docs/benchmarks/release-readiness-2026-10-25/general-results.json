@@ -1,0 +1,1083 @@
+{
+  "revision": "5525c902a35d5bc9fe6d768523b0a71a851ec00b",
+  "method": "Three sequential fresh processes per backend; 200 warmups, 1000 timed samples per operation. Summary is median of three process means. Fixed operation order; no CPU affinity/frequency control. Runtime source unchanged; only tests/benchmark operations and documentation dirty. Source hashes recorded after capture. Different representation/policy paths are not universally equivalent.",
+  "source_hashes": {
+    "src/json_number_ffi.erl": "d171005d9671dd04bb08f9d50c6b16c17429fc137c572803e26fe616ee1a4282",
+    "src/json_number_ffi.mjs": "c11356dfaad655e3bc22796ad04f60e70353dcd324fc1fa8f8e3065cba224305",
+    "src/gleam_dynamic.erl": "c8d9cca03a3a4b453fae6d9a4cae742a1ed2bcac2d83e237fe7afbec699b0918",
+    "src/gleam_dynamic.mjs": "363c90897aead01e825c1e3e7118a8804aba0dad176b19831dc79019606570e9",
+    "src/json_blueprint_native_ffi.mjs": "ac54484dc92d162c49ff8c562fe10613dc83b193b8d0a977033d489c603b2d28",
+    "src/json_blueprint_ffi.mjs": "8a678cdad93716d47bb340ae3645d43cd39083b5f44ddd3e00d3ce957e6a0476",
+    "src/json_blueprint_ffi.erl": "9be9be638321a5069c4a87cf3e870ce92f3f026ca1206bca3619264bddef2a86",
+    "src/json_blueprint_native_ffi.erl": "527117eb5b375f0e9f5efef6610d194792c9247c1d125189abfdc12fe3c820e5",
+    "src/json/blueprint.gleam": "7ffadc649d2e2ea2afd2bb9c57b79ad2c5bdc592c57c7badb5469fece15e7d4c",
+    "src/json/blueprint/contract.gleam": "0466ff18abc6b78c1e8d8c2256a5eb6c93d987e07628d395485a70104851b166",
+    "src/json/blueprint/schema.gleam": "baae6b577eceded9b98f52f73b993231cfb32389fc7b785e02767c93ed70783c",
+    "src/json/blueprint/codegen.gleam": "d1c11309911ab4bcf100c18dca68f4ea23e85d7489e47b6365244dae526e79df",
+    "src/json/blueprint/value.gleam": "836f53bedd3c3b4a6b852fcc26c25db5c81fed0220d23093169f5bcfd9787e93",
+    "src/json/blueprint/codec.gleam": "62797fa0d59602c5835e98012cc3988d542cbd0badd84681a3ab749567cc657e",
+    "src/json/blueprint/number.gleam": "8e16b327cdecf1a0d0f249db2c8d1a9e3b897de4e5c89f8ad2e2ba9342c3e9f0",
+    "src/json/blueprint/internal/schema_tree.gleam": "bfaec45d6a049b03d832a6a017d6d85d6382ff8bf1baf758e2a518ce3476a61d",
+    "src/json/blueprint/internal/generated.gleam": "1815b5c523d8a6875a64a66a2c3f274950ea7fc1343db3dbf5d63e2dfe8dd57a",
+    "src/json/blueprint/internal/text.gleam": "475fd207b0725fa8e4abdfe1f876c54027508ed217e27d320ef7f7749fb0f719",
+    "src/json/blueprint/internal/native.gleam": "4ae2cf761f222b786d02fe008210075cac69947d78b0a4e5b501d2c809964877",
+    "src/json/blueprint/internal/dynamic.gleam": "044ca0106a7769891a38a0b0a6b327a33ddefae218d6c06605b2fe7ecf740b56",
+    "src/json/blueprint/codegen/schema.gleam": "395c18de87fea206acebe2f8f26c13c89fbc4afb0c85088234f4c362c750d99f",
+    "src/json/blueprint/codegen/internal/schema_materialize.gleam": "aafe1a845294590a48e156c42c00c285500b346c3cd2bbf40867d6fdf5e88949",
+    "test/bench_test.gleam": "204dff8194351d10315df99136fde86a474e0739faf4f36146fe90a581a89997",
+    "test/materialize_fixtures.gleam": "5d410832e6c27ca6973ebf0c445e72888724785cba16b49408c4a4da3aa1d03c",
+    "test/vanilla_order.gleam": "5796ced2815ee7dc9223e72d7fd786b9db5e11011e8b47d4d86ad1d1429bd7f0",
+    "test/generated/order_codec.gleam": "437bf35b9e7a564b40a5598b97daf86b33602709900fa46b53e9101594c2e4e4",
+    "test/bench_ffi.erl": "8e4e49868724cfa4cb0a5d8800fe26a1a7df9c18866de640580bb21e2d51851d",
+    "test/bench_ffi.mjs": "2ba6127ad7123b143f32513083fd7c6d0b5fe8ae472ab6635c02d4aa549b12f8",
+    "gleam.toml": "27e33377064e2b79781430ff65421de6fce6152f7a06c960baaab2c6270ab2dc",
+    "manifest.toml": "b88ef54ea6fc687c922f8ba3011de9adab5265496e04ae677a6fc6f0f6ac6a77",
+    "scripts/benchmark.sh": "35011eef81489009d124a4e071ea6f95a3b6fb08168f6ee626eb7f4928f5325d"
+  },
+  "rows": [
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "number_parse_canonical_7_token_batch",
+      "ns_per_op": 2366
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "parser_document_admission",
+      "ns_per_op": 1347
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "runtime_contract_validation",
+      "ns_per_op": 255
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "codec_encode_decode_roundtrip",
+      "ns_per_op": 865
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_schema_discovery",
+      "ns_per_op": 532
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_schema_discovery",
+      "ns_per_op": 18
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_schema_document",
+      "ns_per_op": 13479
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_schema_document",
+      "ns_per_op": 13282
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_definition_codec_construction",
+      "ns_per_op": 36312
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_codec_wrapper_construction",
+      "ns_per_op": 26
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_decoder_construction",
+      "ns_per_op": 23
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_inline_encode",
+      "ns_per_op": 39051
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_reused_encode",
+      "ns_per_op": 854
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_inline_decode",
+      "ns_per_op": 36370
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_reused_decode",
+      "ns_per_op": 737
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_inline_complete_text_encode",
+      "ns_per_op": 41411
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_inline_complete_text_decode",
+      "ns_per_op": 41660
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_reused_complete_text_encode",
+      "ns_per_op": 3256
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_reused_complete_text_decode",
+      "ns_per_op": 2850
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_native_direct_complete_text_encode",
+      "ns_per_op": 1485
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_native_direct_complete_text_decode",
+      "ns_per_op": 3383
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_strict_direct_complete_text_decode",
+      "ns_per_op": 3207
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_wrapper_complete_text_encode",
+      "ns_per_op": 2832
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_wrapper_complete_text_decode",
+      "ns_per_op": 3232
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_complete_text_encode",
+      "ns_per_op": 1035
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_complete_text_decode",
+      "ns_per_op": 2546
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "native_gleam_json_dynamic_parse",
+      "ns_per_op": 1334
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "native_dynamic_object_dict_materialization",
+      "ns_per_op": 521
+    },
+    {
+      "trial": 1,
+      "runtime": "Erlang/OTP 29",
+      "operation": "vanilla_parsed_dynamic_typed_decode",
+      "ns_per_op": 1008
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "number_parse_canonical_7_token_batch",
+      "ns_per_op": 19658
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "parser_document_admission",
+      "ns_per_op": 8399
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "runtime_contract_validation",
+      "ns_per_op": 2515
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "codec_encode_decode_roundtrip",
+      "ns_per_op": 8309
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_schema_discovery",
+      "ns_per_op": 5187
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_schema_discovery",
+      "ns_per_op": 99
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_schema_document",
+      "ns_per_op": 16329
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_schema_document",
+      "ns_per_op": 12453
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_definition_codec_construction",
+      "ns_per_op": 71072
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_codec_wrapper_construction",
+      "ns_per_op": 383
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_decoder_construction",
+      "ns_per_op": 190
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_inline_encode",
+      "ns_per_op": 75111
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_reused_encode",
+      "ns_per_op": 7830
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_inline_decode",
+      "ns_per_op": 72029
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_reused_decode",
+      "ns_per_op": 5740
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_inline_complete_text_encode",
+      "ns_per_op": 74293
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_inline_complete_text_decode",
+      "ns_per_op": 76021
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_reused_complete_text_encode",
+      "ns_per_op": 9116
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_reused_complete_text_decode",
+      "ns_per_op": 10608
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_native_direct_complete_text_encode",
+      "ns_per_op": 7498
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_native_direct_complete_text_decode",
+      "ns_per_op": 12914
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_strict_direct_complete_text_decode",
+      "ns_per_op": 19823
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_wrapper_complete_text_encode",
+      "ns_per_op": 9028
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_wrapper_complete_text_decode",
+      "ns_per_op": 19197
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_complete_text_encode",
+      "ns_per_op": 1549
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_complete_text_decode",
+      "ns_per_op": 7097
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "native_gleam_json_dynamic_parse",
+      "ns_per_op": 871
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "native_dynamic_object_dict_materialization",
+      "ns_per_op": 1516
+    },
+    {
+      "trial": 1,
+      "runtime": "Node.js v24.21.0",
+      "operation": "vanilla_parsed_dynamic_typed_decode",
+      "ns_per_op": 5253
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "number_parse_canonical_7_token_batch",
+      "ns_per_op": 2561
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "parser_document_admission",
+      "ns_per_op": 1384
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "runtime_contract_validation",
+      "ns_per_op": 272
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "codec_encode_decode_roundtrip",
+      "ns_per_op": 973
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_schema_discovery",
+      "ns_per_op": 521
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_schema_discovery",
+      "ns_per_op": 17
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_schema_document",
+      "ns_per_op": 13288
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_schema_document",
+      "ns_per_op": 13271
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_definition_codec_construction",
+      "ns_per_op": 36206
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_codec_wrapper_construction",
+      "ns_per_op": 26
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_decoder_construction",
+      "ns_per_op": 23
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_inline_encode",
+      "ns_per_op": 39784
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_reused_encode",
+      "ns_per_op": 830
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_inline_decode",
+      "ns_per_op": 35178
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_reused_decode",
+      "ns_per_op": 736
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_inline_complete_text_encode",
+      "ns_per_op": 41140
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_inline_complete_text_decode",
+      "ns_per_op": 41084
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_reused_complete_text_encode",
+      "ns_per_op": 3206
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_reused_complete_text_decode",
+      "ns_per_op": 2796
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_native_direct_complete_text_encode",
+      "ns_per_op": 1457
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_native_direct_complete_text_decode",
+      "ns_per_op": 3318
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_strict_direct_complete_text_decode",
+      "ns_per_op": 3208
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_wrapper_complete_text_encode",
+      "ns_per_op": 2867
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_wrapper_complete_text_decode",
+      "ns_per_op": 3198
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_complete_text_encode",
+      "ns_per_op": 1084
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_complete_text_decode",
+      "ns_per_op": 2476
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "native_gleam_json_dynamic_parse",
+      "ns_per_op": 1348
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "native_dynamic_object_dict_materialization",
+      "ns_per_op": 513
+    },
+    {
+      "trial": 2,
+      "runtime": "Erlang/OTP 29",
+      "operation": "vanilla_parsed_dynamic_typed_decode",
+      "ns_per_op": 982
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "number_parse_canonical_7_token_batch",
+      "ns_per_op": 19748
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "parser_document_admission",
+      "ns_per_op": 8391
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "runtime_contract_validation",
+      "ns_per_op": 2461
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "codec_encode_decode_roundtrip",
+      "ns_per_op": 8117
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_schema_discovery",
+      "ns_per_op": 5171
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_schema_discovery",
+      "ns_per_op": 98
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_schema_document",
+      "ns_per_op": 16165
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_schema_document",
+      "ns_per_op": 12611
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_definition_codec_construction",
+      "ns_per_op": 70111
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_codec_wrapper_construction",
+      "ns_per_op": 379
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_decoder_construction",
+      "ns_per_op": 180
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_inline_encode",
+      "ns_per_op": 74085
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_reused_encode",
+      "ns_per_op": 8206
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_inline_decode",
+      "ns_per_op": 73099
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_reused_decode",
+      "ns_per_op": 5782
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_inline_complete_text_encode",
+      "ns_per_op": 74574
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_inline_complete_text_decode",
+      "ns_per_op": 76663
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_reused_complete_text_encode",
+      "ns_per_op": 9504
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_reused_complete_text_decode",
+      "ns_per_op": 10717
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_native_direct_complete_text_encode",
+      "ns_per_op": 7914
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_native_direct_complete_text_decode",
+      "ns_per_op": 13394
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_strict_direct_complete_text_decode",
+      "ns_per_op": 20237
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_wrapper_complete_text_encode",
+      "ns_per_op": 8676
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_wrapper_complete_text_decode",
+      "ns_per_op": 18262
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_complete_text_encode",
+      "ns_per_op": 1621
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_complete_text_decode",
+      "ns_per_op": 6865
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "native_gleam_json_dynamic_parse",
+      "ns_per_op": 802
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "native_dynamic_object_dict_materialization",
+      "ns_per_op": 1452
+    },
+    {
+      "trial": 2,
+      "runtime": "Node.js v24.21.0",
+      "operation": "vanilla_parsed_dynamic_typed_decode",
+      "ns_per_op": 5124
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "number_parse_canonical_7_token_batch",
+      "ns_per_op": 2444
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "parser_document_admission",
+      "ns_per_op": 1309
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "runtime_contract_validation",
+      "ns_per_op": 279
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "codec_encode_decode_roundtrip",
+      "ns_per_op": 905
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_schema_discovery",
+      "ns_per_op": 505
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_schema_discovery",
+      "ns_per_op": 18
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_schema_document",
+      "ns_per_op": 13164
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_schema_document",
+      "ns_per_op": 13614
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_definition_codec_construction",
+      "ns_per_op": 36284
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_codec_wrapper_construction",
+      "ns_per_op": 27
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_decoder_construction",
+      "ns_per_op": 24
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_inline_encode",
+      "ns_per_op": 40423
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_reused_encode",
+      "ns_per_op": 893
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_inline_decode",
+      "ns_per_op": 36140
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "legacy_value_runtime_reused_decode",
+      "ns_per_op": 752
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_inline_complete_text_encode",
+      "ns_per_op": 41193
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_inline_complete_text_decode",
+      "ns_per_op": 41398
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_reused_complete_text_encode",
+      "ns_per_op": 3182
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_runtime_reused_complete_text_decode",
+      "ns_per_op": 2799
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_native_direct_complete_text_encode",
+      "ns_per_op": 1477
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_native_direct_complete_text_decode",
+      "ns_per_op": 3385
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_strict_direct_complete_text_decode",
+      "ns_per_op": 2914
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_wrapper_complete_text_encode",
+      "ns_per_op": 2809
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_generated_wrapper_complete_text_decode",
+      "ns_per_op": 3108
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_complete_text_encode",
+      "ns_per_op": 963
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "order_vanilla_complete_text_decode",
+      "ns_per_op": 2398
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "native_gleam_json_dynamic_parse",
+      "ns_per_op": 1404
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "native_dynamic_object_dict_materialization",
+      "ns_per_op": 522
+    },
+    {
+      "trial": 3,
+      "runtime": "Erlang/OTP 29",
+      "operation": "vanilla_parsed_dynamic_typed_decode",
+      "ns_per_op": 935
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "number_parse_canonical_7_token_batch",
+      "ns_per_op": 19660
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "parser_document_admission",
+      "ns_per_op": 8519
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "runtime_contract_validation",
+      "ns_per_op": 2476
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "codec_encode_decode_roundtrip",
+      "ns_per_op": 8252
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_schema_discovery",
+      "ns_per_op": 5309
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_schema_discovery",
+      "ns_per_op": 95
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_schema_document",
+      "ns_per_op": 16431
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_schema_document",
+      "ns_per_op": 12645
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_definition_codec_construction",
+      "ns_per_op": 70535
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_codec_wrapper_construction",
+      "ns_per_op": 382
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_decoder_construction",
+      "ns_per_op": 196
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_inline_encode",
+      "ns_per_op": 74875
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_reused_encode",
+      "ns_per_op": 8143
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_inline_decode",
+      "ns_per_op": 72783
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "legacy_value_runtime_reused_decode",
+      "ns_per_op": 5934
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_inline_complete_text_encode",
+      "ns_per_op": 76154
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_inline_complete_text_decode",
+      "ns_per_op": 77668
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_reused_complete_text_encode",
+      "ns_per_op": 9359
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_runtime_reused_complete_text_decode",
+      "ns_per_op": 10677
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_native_direct_complete_text_encode",
+      "ns_per_op": 8110
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_native_direct_complete_text_decode",
+      "ns_per_op": 13706
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_strict_direct_complete_text_decode",
+      "ns_per_op": 20336
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_wrapper_complete_text_encode",
+      "ns_per_op": 9096
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_generated_wrapper_complete_text_decode",
+      "ns_per_op": 18324
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_complete_text_encode",
+      "ns_per_op": 1663
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "order_vanilla_complete_text_decode",
+      "ns_per_op": 6950
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "native_gleam_json_dynamic_parse",
+      "ns_per_op": 812
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "native_dynamic_object_dict_materialization",
+      "ns_per_op": 1440
+    },
+    {
+      "trial": 3,
+      "runtime": "Node.js v24.21.0",
+      "operation": "vanilla_parsed_dynamic_typed_decode",
+      "ns_per_op": 5212
+    }
+  ]
+}

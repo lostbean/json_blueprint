@@ -1,5 +1,50 @@
 # JSON Blueprint 2.0.0 release-readiness review
 
+## Current assessment — 2026-10-26
+
+The specialized generated-code adoption is locally validated and has no known
+unresolved correctness blocker in the reviewed paths. This is a release
+candidate with a successful local package preview. No release or tag has been cut.
+
+- Full repository gate: 382 Erlang and 387 JavaScript root tests; 24 example
+  tests and 10 generated-consumer tests per target; fresh generated compilation,
+  isolated production compilation, and all independent oracles pass.
+- Host formatting, README snippet synchronization and rendered design checks
+  pass. Browser execution evidence for the JavaScript hybrid is retained in
+  [BROWSER-SUPPORT.md](BROWSER-SUPPORT.md); the subsequent generated-code change
+  has been executed on Erlang and Node, not rerun in browsers.
+- Local `gleam export hex-tarball` and `gleam docs build` pass. The package
+  contains runtime/generator source and both FFI targets, excludes tests and
+  experiment evidence, and the generated documentation includes the migration
+  page. The manifest declares MIT, but no root license text is present; add
+  the appropriate license file as release packaging cleanup.
+- Runtime/generated parity tests cover strict duplicate admission, numeric
+  projection, Unicode, byte limits, located errors, optional fields and mapping
+  conversions. Pure mappings are required: cached metadata skips placeholder
+  introspection. Generated objects cannot finish record-builder continuations.
+  These limits and migration details are in [MIGRATION.md](MIGRATION.md).
+- The [adoption benchmarks](benchmarks/generated-specialization-2026-10-26/REPORT.md)
+  retain the prototype's runtime and memory gains with direct source emission.
+
+Before publication, validate the exact committed candidate in CI, then update
+llm_wire to that candidate, reconcile all
+affected manifests through Gleam, and rerun its full gate. At this review its
+root dependency and manifest still pin `2c6df6148c9357b03041be2c95a3a46a6694120d`,
+before the JavaScript hybrid, added oracles and generated-code adoption.
+The older downstream gate below therefore does not certify this candidate.
+
+Further parser rewrites, removal of the frozen legacy API, and removal of
+explicit Value/standard-native generated APIs are not release prerequisites.
+Historical experiment evidence can be consolidated later without deleting
+referenced provenance. Installation text should switch from prerelease Git
+instructions to Hex only after publication succeeds.
+
+## Historical correction review — 2026-10-25
+
+The remainder records the earlier snapshot. Its test counts, downstream evidence
+and browser-scope statements are historical; the assessment above supersedes
+them for the current candidate.
+
 Review and correction date: 2026-10-25. Initial production revision: `ce233eed218e5bc7a68e171a23c60075c2a389a7` (native implementation `909ceb74864898082bf0c6323bb9b3a3af8346ab`). The follow-up repairs the reviewed correctness defects and retains the verification evidence; no release is cut.
 
 ## Current status after corrections
