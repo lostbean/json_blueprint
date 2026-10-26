@@ -10,3 +10,13 @@
 - **Findings, schema generation.** At 100 items, generated and handwritten native encoding cost 135.05 and 134.39 µs on Erlang and 1,882.75 and 1,830.32 µs on Node, with similar allocation, so generation supplies types and maintained codec source rather than speed. Constructing a generated codec costs 3.84 µs and 6.49 KiB on Erlang and 66.38 µs and an estimated 26.66 KiB on Node; retaining the codec keeps that cost out of conversion. Pure source generation takes 0.332 ms per module on Erlang and 0.820 ms on Node. A dynamic contract over prebuilt values often allocates less because it validates instead of constructing, which does not justify a second dynamic validation pass.
 - **Findings, parsing.** The 2026-09-20 harness measured document parsing at 9,847 ns on Erlang/OTP 28 and 41,057 ns on Node 24.15.0, with 200 warmup calls and 1,000 timed calls and no distribution or machine record. A parsed array of 262,143 integers peaked near 42 MB of Erlang process heap and grew a Node heap by about 120 MB; the original record carries no run date, sample count or hardware. Both sets size inputs and are not baselines or heap quotas.
 - **Consequences.** `scripts/benchmark.sh`, `scripts/contract_encoding_benchmark.py` and `scripts/schema_generation_benchmark.py` create a fresh evidence directory and refuse to reuse one. The weekly `Benchmark observations` workflow runs the harness on both targets. A new capture adds a dated section to BENCHMARKS.md instead of rewriting an older one, and an older section keeps its own stated limits. The package gate keeps the benchmark fixtures' semantic tests.
+
+## Engine experiment retention, 2026-10-26
+
+For the new parsing and generated-code engines, the owner selected a leaner
+retention policy: design conclusions remain in ADRs 0014–0016, and maintained
+benchmarks compare current implementations with vanilla parsers/codecs. Engine
+prototypes, historical captures, archives and adoption reports are removed from
+the checkout. This supersedes the per-capture retention policy above for those
+experiments only. Existing schema, contract and object-validation observations
+and all correctness oracles remain unchanged. Timing continues to be non-gating.

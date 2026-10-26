@@ -1,9 +1,0 @@
-{
-  "gleam": "gleam 1.19.2",
-  "node": "v24.21.0",
-  "erlang": "OTP 29 ERTS 17.1.1 word bytes 8",
-  "revision": "5525c902a35d5bc9fe6d768523b0a71a851ec00b",
-  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
-  "cpu_count": 12,
-  "erlang_flags": "+S 1:1"
-}

@@ -22,8 +22,9 @@ candidate with a successful local package preview. No release or tag has been cu
   conversions. Pure mappings are required: cached metadata skips placeholder
   introspection. Generated objects cannot finish record-builder continuations.
   These limits and migration details are in [MIGRATION.md](MIGRATION.md).
-- The [adoption benchmarks](benchmarks/generated-specialization-2026-10-26/REPORT.md)
-  retain the prototype's runtime and memory gains with direct source emission.
+- [ADR 0016](adr/0016-specialize-generated-codecs-with-runtime-semantics.md)
+  records the specialization decision. Maintained benchmarks compare current
+  implementations with vanilla native paths.
 
 Publication requires CI on the selected Blueprint commit and a passing llm_wire
 full gate against that same dependency commit. Reconcile its root and nested
@@ -33,13 +34,6 @@ downstream gates do not certify a newer candidate.
 
 Further parser rewrites, removal of the frozen legacy API, and removal of
 explicit Value/standard-native generated APIs are not release prerequisites.
-Historical experiment evidence is consolidated in a verified archive without
-discarding referenced provenance. Installation text should switch from prerelease Git
+Engine experiment records are retained only as ADR conclusions in the checkout.
+Installation text should switch from prerelease Git
 instructions to Hex only after publication succeeds.
-
-## Historical evidence
-
-The earlier correction review and native adoption report are retained in the
-[checksummed history archive](benchmarks/history/README.md). Current behavior is
-defined by the design and migration guide; historical measurements do not replace
-validation of the release candidate.

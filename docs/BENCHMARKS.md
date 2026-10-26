@@ -7,25 +7,29 @@ never gate a change. The [oracle](ORACLE.md) is the companion document for
 correctness evidence. The [design](design/design.typ#repository-verification)
 states the verification model, and [AGENTS.md](../AGENTS.md#references) points here.
 
-## Scope
+## Maintained comparisons
 
-| Capture | Question | Decision record |
-| --- | --- | --- |
-| Generated specialization, 2026-10-26 | Does direct typed generation retain the prototype's runtime and memory gains? | [ADR 0016](adr/0016-specialize-generated-codecs-with-runtime-semantics.md) |
-| Strict and native parsing, 2026-10-25 | What do strict admission and its Value tree cost on representative and near-limit inputs? | [ADR 0003](adr/0003-strict-parsing-and-independent-resource-bounds.md), existing parser guarantees unchanged |
-| Contract encoding, 2026-10-08 | What does symmetric validation in `contract.value_codec` cost on encoding? | [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) |
-| Object validation, 2026-10-08 | What does indexing objects above 40 members change? | [ADR 0009](adr/0009-index-object-validation-above-forty-members.md) |
-| Schema-driven generation, 2026-10-08 | How do generated, handwritten and dynamic codecs compare, and what does generation cost? | [ADR 0008](adr/0008-development-time-source-generation.md) |
-| Timed calls, 2026-09-20 | Historical baselines of the first harness | [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) |
+| Runner | Comparison |
+| --- | --- |
+| `scripts/benchmark.sh` | Runtime and generated codecs versus vanilla native encoding/decoding; construction and schema operations |
+| `scripts/parser_benchmark.py` | Current strict Value parsing versus native parsing, on both targets; fresh-process timing and peak RSS |
+| `scripts/contract_encoding_benchmark.py` | Contract validation and encoding costs |
+| `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
 
-Summaries and provenance sit beside each capture under
-[`benchmarks/`](benchmarks/) and are not markdown. A summary holds every VM
-median and its range, and the schema-generation `results.json` holds every
-trial, so the tables here do not depend on raw logs. Raw per-run logs and command
-output are not retained in the tree; they remain in repository history at commit
-`c79211d`.
+Native parsing does not enforce the same duplicate-key, exact-number or schema
+contracts. Compare equivalent successful values, and report these differences
+alongside timing. Peak RSS includes the VM and is not an isolated allocation
+measurement. Inputs are representative fixtures, not a production distribution.
 
-## Method
+Engine experiments, archives and adoption captures are no longer retained in the
+checkout. Their design conclusions live in [ADR 0014](adr/0014-adopt-native-erlang-decoding-with-byte-admission.md),
+[ADR 0015](adr/0015-adopt-javascript-native-hybrid.md) and
+[ADR 0016](adr/0016-specialize-generated-codecs-with-runtime-semantics.md).
+Use the maintained runners for fresh measurements; keep local output in
+`.ci-results/` or a temporary directory. Correctness tests and independent oracle
+fixtures remain maintained separately.
+
+## Method of the retained 2026-10-08 captures
 
 - Each target (Erlang and JavaScript) starts three fresh VMs per capture. Each VM
   runs timed batches per operation after an untimed warmup. A table cell is the
@@ -72,66 +76,6 @@ collection, JIT, scheduling and frequency can change end-to-end figures, so smal
 deltas are not causal estimates.
 
 ## Retained results
-
-### Strict and native parsing, 2026-10-25
-
-The [capture](benchmarks/parser-2026-10-25/) retains all 264 observations,
-source and fixture hashes, commands, toolchain and host identity. It includes
-the handwritten codec's symmetric plain-integer encoding repair and JavaScript
-host-string Unicode check on top of revision `7875416`; the dirty source
-fingerprints identify the measured implementation. The subsequent generated
-integer-helper parity repair is outside these measured parser paths.
-
-This capture used macOS 27.0.1 on arm64, Gleam 1.19.2, Erlang/OTP 29 with
-`+S 1:1`, and Node 24.21.0. Each fixture/backend/target has three fresh sequential
-timing processes and three separate one-parse memory processes. Timing uses one
-warmup batch and five timed batches, with fewer iterations for larger inputs.
-The table reports the median of the three process medians. Full ranges and
-iteration counts remain in the artifacts. No CPU pinning or host isolation was
-used; repository builds and tests were paused during the capture.
-
-Both parsers receive the same text. Before timing, accepted fixtures compare
-exact values after normalizing object order; rejected fixtures must fail in both
-parsers. Every timed parse result reaches an observable sink. Strict parsing
-returns exact `Value` trees with duplicate and resource checks. Native parsing
-returns `Dynamic` through `gleam/json`, with different guarantees and
-representations. These are parser observations, not typed codec or equivalent-work
-comparisons. Fixture loading and semantic checks are outside the timing.
-
-| Fixture | Erlang strict / native, µs | Node strict / native, µs |
-| --- | ---: | ---: |
-| Small record | 1.330 / 0.366 | 8.302 / 0.760 |
-| 100-field object | 70.279 / 13.328 | 187.822 / 3.044 |
-| 500-field object | 332.643 / 82.525 | 1,029.490 / 47.069 |
-| 1,000 decimals | 856.100 / 139.591 | 4,239.725 / 27.683 |
-| 262,143 zeroes (524,287 bytes) | 235,273.041 / 7,755.292 | 265,235.084 / 1,474.417 |
-| Invalid first character, near-limit text | 0.292 / 0.375 | 2,175.125 / 8.167 |
-| Invalid final value, near-limit array | 221,936.875 / 7,645.500 | 284,629.042 / 2,358.417 |
-
-The JavaScript strict text path validates host-string scalar values and converts
-to UTF-8 before syntax parsing. An early syntax error therefore still incurs
-whole-input work. The 10-field object, 10,000-element array and escaped-Unicode
-cases are also retained in the summary.
-
-Memory processes invoke only the selected parser once, retaining its result.
-`wait4` records each process's high-water RSS, converted to bytes according to
-the operating system's units. This is **total process RSS**, including the VM,
-source and result; it is neither allocation nor isolated parser heap. No baseline
-subtraction is performed.
-
-| Fixture / target | Strict peak RSS, MiB | Native peak RSS, MiB |
-| --- | ---: | ---: |
-| Null / Erlang | 66.77 | 67.19 |
-| Null / Node | 49.78 | 49.64 |
-| Near-limit zero array / Erlang | 163.42 | 88.62 |
-| Near-limit zero array / Node | 241.73 | 54.16 |
-
-The near-limit case demonstrates substantial latency and memory costs even for
-half a MiB of text. Limits bound admission, not acceptable service latency or
-concurrency. The capture does not establish a consumer capacity budget, browser
-behavior, or that strict and native parsing are interchangeable. It supports
-further optimization work and explicit workload budgets, not a speed claim or
-a change to parser policy.
 
 ### Contract encoding, 2026-10-08
 
@@ -218,43 +162,6 @@ measures different work. µs per operation, 100 items:
   The interrupted first capture is excluded; the final capture starts after the
   implementation was frozen.
 
-### Timed calls recorded on 2026-09-20
-
-The first harness ran 200 untimed warmup calls and timed 1,000 calls in one
-interval; the reported mean is the integer quotient of elapsed nanoseconds. It
-recorded no distribution, hardware, OS, compiler version or raw output, and later
-parser, codec and API changes prevent treating the figures as current baselines.
-The retired report for that run named starting commit
-`cf378926647ed83dc0669f49d4bb8591b5e1381f`; the figures below are the only
-retained record of it.
-
-| Workload | Unit | Erlang/OTP 28 | Node 24.15.0 |
-| --- | --- | ---: | ---: |
-| `number_parse_canonical_7_token_batch` | ns per seven-token batch | 2,247 | 17,712 |
-| `parser_document_admission` | ns per parsed document | 9,847 | 41,057 |
-| `runtime_contract_validation` | ns per validated value | 295 | 4,450 |
-| `codec_encode_decode_roundtrip` | ns per `Value` encode and decode pair | 346 | 6,581 |
-
-### Historical memory observations
-
-Recorded for `value.parse` at the defaults (README of commit
-[`94438b9`](https://github.com/lostbean/json_blueprint/blob/94438b93b638a2ecf2e4443bd9c2c3cbf97b7713/README.md#defaults),
-implementation change dated 2026-10-02). Erlang figures are peak process heap with
-old and new heaps counted together at garbage-collection events; Node figures are
-heap growth. They are different measurements.
-
-| Input at the defaults | Text | Peak heap, OTP 28 | Parsed value, OTP 28 | Heap growth, Node 24 |
-| --- | --- | ---: | ---: | ---: |
-| 262,143 integers (the value limit) | 512 KiB | 42 MB | 16 MB | about 120 MB |
-| 262,143 strings | 1 MiB | 40 MB | 16 MB | about 75 MB |
-| 87,001 small objects | 680 KiB | 32 MB | 13 MB | about 75 MB |
-| 61,001 fifteen-digit decimals | 1 MiB | 16 MB | 6 MB | about 80 MB |
-
-With the value limit raised, 1 MiB of 524,288 integers peaked at an 80 MB Erlang
-heap by the same method. The record has no retained command, run date, sample
-count, hardware or raw allocation trace, and the `MB` convention was not recorded.
-Parser limits are admission bounds, not heap quotas.
-
 ## Limits of these claims
 
 - Three fresh VMs identify large differences and variation; they do not establish
@@ -264,256 +171,3 @@ Parser limits are admission bounds, not heap quotas.
 - To reconstruct a baseline, use an isolated checkout of the baseline commit, copy
   the retained harness and runner into their current paths and apply
   [the formatting-only runner patch](benchmarks/contract-encoding-2026-10-08/before/runner-formatting.patch).
-
-
-## Strict string-scanning optimization, 2026-10-25
-
-This behavior-preserving pass keeps the strict Value parser. It scans ordinary
-string bytes in pairs and avoids chunk-list construction and concatenation for
-unescaped strings. Escape decoding, exact numbers, duplicate-key admission,
-resource limits, error locations and copied-string ownership are unchanged.
-There is no new FFI, dependency, parsing mode or public API.
-
-The existing parser harness now accepts `--workloads representative`. Its seven
-fixtures cover a small record, a response containing 50 records, a tagged event,
-plain/escaped/multilingual text, and a schema-shaped document. They are synthetic
-application-shaped inputs, not a measured production distribution. The default
-`stress` workload remains unchanged. This measures parsing into Value, not
-end-to-end application decoding or encoding.
-
-```sh
-nix develop --command python3 scripts/parser_benchmark.py \
-  --workloads representative --output /tmp/parser-observation
-```
-
-The capture used Gleam 1.19.2, OTP 29 and Node 24.21.0 on macOS arm64. Each
-backend/fixture/mode used three fresh sequential VMs; timing used a warmup batch
-and five timed batches. Peak RSS came from separate one-parse processes with the
-result retained. It includes the runtime and input and is not an allocation or
-retained-heap measurement. The installed Git binary was placed on PATH because
-the system Git shim was unavailable inside this machine's Nix shell.
-
-The [before](benchmarks/parser-optimization-2026-10-25/before/summary.json) and
-[final](benchmarks/parser-optimization-2026-10-25/after/summary.json) captures give
-these strict-parser medians, in microseconds:
-
-| Workload | Erlang before | Erlang after | JavaScript before | JavaScript after |
-| --- | ---: | ---: | ---: | ---: |
-| `record` | 6.48 | 6.80 | 28.45 | 25.57 |
-| `response_50` | 277.92 | 295.11 | 1244.07 | 1094.74 |
-| `tagged_event` | 9.64 | 9.53 | 39.38 | 35.12 |
-| `text_plain` | 90.57 | 70.84 | 517.57 | 311.81 |
-| `text_escaped` | 137.19 | 121.46 | 732.00 | 597.59 |
-| `text_unicode` | 52.89 | 46.16 | 318.52 | 198.61 |
-| `schema_document` | 11.69 | 11.82 | 49.11 | 41.23 |
-
-Text-heavy gains were repeatable across captures. Small Erlang record results
-were variable: this final sequential capture is slower for the record and
-50-record response, while the alternating capture improved the record and left
-the response close to baseline. Do not claim a reliable Erlang record speedup.
-The [alternating results](benchmarks/parser-optimization-2026-10-25/alternating/summary.json)
-rotate baseline, four-byte (`batched`) and selected two-byte (`pair`) variants
-between fresh VMs to reduce ordering bias. The two-byte variant avoids the
-four-byte variant's observed wide-object regression. Its source differs from the
-final file only in the scanner comment. Timing remains observational, never a
-correctness gate.
-
-In the separate [memory stress comparison](benchmarks/parser-optimization-2026-10-25/memory.json),
-the dense 262,143-zero array stayed at approximately 165 MiB total peak RSS on
-Erlang and 242 MiB on JavaScript. The heavily escaped fixture was also effectively
-unchanged. This optimization does not resolve the memory cost of large Value
-trees. Representative fixture RSS differences were small.
-
-Erlang `eprof` and Node CPU profiles identified string scanning, byte-array slices
-and string assembly as relevant costs. For the same record profiling run,
-`scan_string` calls fell from 351,117 to 207,069, and the 48,016 concatenation calls
-for unescaped strings disappeared. Node's plain-text profile decreased from 623
-to 369 samples, with `bitArraySlice` samples falling from 445 to 226. These are
-instrumented diagnostics, not independent speed or allocation estimates.
-[Profile summaries](benchmarks/parser-optimization-2026-10-25/javascript-profiles.json)
-and the [raw profiles, source snapshots, rerun scripts and validation log](benchmarks/parser-optimization-2026-10-25/profile-and-source-evidence.zip)
-retain the evidence. Early captures used the same harness before formatting;
-the exact measured harness is in the archive.
-
-Rejected variants included four-byte scanning, index-based scanning, and a narrow
-JavaScript run-scanning FFI with a Gleam fallback. Some improved long JavaScript
-text more, but introduced Erlang regressions or extra maintained code. Skipping
-unescaped-string assembly alone had little clear benefit; combined with two-byte
-scanning it is retained as a small reduction in per-string allocation.
-
-Validation: 301 root tests on each target, generated-code and schema consumers,
-compiled examples, the finite schema and profile oracles, 62 independent number
-cases, and all 318 JSONTestSuite plus 901 generated parser cases on each target
-passed through `sh scripts/gate.sh` in the Nix shell. Added tests compare parsed
-values and exact failure locations across varying string lengths, UTF-8 text,
-escapes and literal controls through both text and byte entry points. The
-existing input-retention tests remain in the gate. See [ORACLE.md](ORACLE.md) for
-the limits of the correctness claims.
-
-## Native Erlang adoption (2026-10-25)
-
-At this capture, the production adapter adopted OTP parsing with duplicate rejection, exact
-native integers and deferred decimal tokens. Built-in codecs decode the native
-tree directly; custom callbacks convert their Value subtree. Admission is byte
-limited. JavaScript still retained its exact parser with byte-only admission and
-a runtime-capacity error boundary. The later JavaScript hybrid capture below
-supersedes that implementation choice.
-
-A fresh comparison against the frozen optimized-parser worktree used three
-separate VM timing and memory trials per workload. Source hashes stayed unchanged.
-The integrated adapter includes copies of escaping strings and object keys to
-avoid retaining unrelated input bytes. [Raw measurements](https://github.com/lostbean/json_blueprint/blob/db21f3b41e77dda2a3fe56b99e60ca33054f5b64/experiment/adoption-results.json)
-include toolchain versions, source and input hashes, all samples and memory snapshots.
-
-Erlang small records improved from 2.07 to 1.25 µs and 50-record responses from
-99.13 to 55.88 µs. The 262,143-integer fixture improved from 235.95 to 41.34 ms;
-peak RSS decreased from 178.94 to 127.88 MiB (about 29%). Small-document peak RSS
-was essentially unchanged. Decimal-to-Float arrays improved 12.91×; exact Number
-arrays improved 1.24×. These are different projection workloads.
-
-JavaScript small records changed from 10.54 to 11.28 µs, responses from 383.21
-to 387.25 µs, and 10,000 integers from 10.20 to 10.02 ms. This does not establish
-a broad JavaScript gain. RSS includes the complete runtime and is not retained
-JSON allocation. Timings and memory observations never gate a change.
-
-The [adoption report](https://github.com/lostbean/json_blueprint/blob/db21f3b41e77dda2a3fe56b99e60ca33054f5b64/docs/NATIVE-DECODING-ADOPTION.md) records the complete comparison,
-accepted behavior changes, consumer consequences and release checks. The
-[independent oracle](ORACLE.md) remains separate from these performance observations.
-
-## JavaScript native hybrid adoption, 2026-10-25
-
-This capture supersedes the earlier JavaScript byte-only-parser measurements
-for the native hybrid path. It compares baseline commit `2c6df61` with the
-final native-only source (portable fallback removed), identified by full source and harness hashes in the
-[raw results](benchmarks/javascript-hybrid-2026-10-25/results-native-only.json).
-
-Node 24.21.0, Gleam 1.19.2, macOS arm64. Six fresh timing VMs per
-candidate/workload, rotating candidate order; five timed batches per VM. Separate
-fresh processes measure peak RSS and forced-GC retained heap. All 17 fixture
-parity checks pass, 43 rows complete, and source/support hashes are unchanged.
-There is no CPU affinity/frequency control. These application-shaped fixtures
-are not an observed production traffic distribution.
-
-| Workload | Previous parser (µs) | Native-only hybrid (µs) | Speedup | Peak RSS MiB: previous → hybrid |
-| --- | ---: | ---: | ---: | ---: |
-| Small record | 10.78 | 5.71 | 1.89× | 53.04 → 52.89 |
-| 50-record response | 392.33 | 162.45 | 2.42× | 54.06 → 53.01 |
-| 51 optional-field records | 107.50 | 69.42 | 1.55× | 53.15 → 53.09 |
-| 10,000 integers | 10,365.17 | 4,376.79 | 2.37× | 63.31 → 56.64 |
-| 262,143 integers | 319,978.23 | 162,570.42 | 1.97× | 263.22 → 103.41 |
-| 1,000 decimals → Float | 5,235.10 | 602.41 | 8.69× | 58.88 → 53.44 |
-| 1,000 decimals → exact Number | 4,289.06 | 2,800.63 | 1.53× | 58.82 → 56.22 |
-| Unicode strings | 1,058.46 | 124.00 | 8.54× | 55.41 → 53.26 |
-| 50 text-heavy records | 6,411.73 | 1,102.98 | 5.81× | 56.32 → 54.23 |
-| Whole Value: 262,143 integers | 271,636.77 | 292,551.33 | 0.93× | 243.77 → 258.89 |
-| Custom callback: response | 382.40 | 287.50 | 1.33× | 53.91 → 53.13 |
-
-The large typed array lowers peak RSS about 61%, while retained heap after GC
-stays around 16.4 MiB in both variants. The gain is transient allocation, not a
-smaller returned list. Small-record process RSS is dominated by Node. The large
-whole-Value array is about 8% slower and uses about 6% more peak RSS in this
-capture; do not generalize direct typed-decoding gains to whole-Value consumers.
-
-The native-only hybrid small-record/response results (5.71/162.45 µs) remain
-close to the earlier prototype (5.52/157.47 µs) and the first adoption capture
-with fallback retained (5.72/164.07 µs). Dense typed peak RSS is 103.41 MiB versus
-103.46/104.86 MiB in those earlier captures. These are separate captures, not a
-controlled causal comparison of the cleanup. Removing the fallback simplifies
-maintenance without claiming another performance gain. The final runtime has
-188 fewer source lines than baseline, including its new 233-line JS adapter.
-The [previous adoption capture](benchmarks/javascript-hybrid-2026-10-25/results.json)
-is retained with its own source hashes for provenance.
-
-Reproduce with `nix develop --command python3 experiment/js-hybrid-benchmark.py
---work /tmp/blueprint-js-hybrid-fresh --output /tmp/blueprint-js-hybrid-fresh.json`
-(on one shell line). The harness snapshots the baseline commit and current
-source, checks native feature selection, and refuses stale snapshots or existing
-output. Plain native rows lack strict guarantees and are only a cost reference.
-
-[ADR 0015](adr/0015-adopt-javascript-native-hybrid.md) owns the decision;
-[the migration guide](MIGRATION.md) describes diagnostic changes and
-[browser validation](BROWSER-SUPPORT.md) records executed engines.
-
-## Broader release-readiness comparison, 2026-10-25
-
-Runtime source is commit `5525c90`. The only code changes in this capture are
-additional correctness laws and schema benchmark operations. [General results](benchmarks/release-readiness-2026-10-25/general-results.json)
-retain each process mean and post-capture source hashes. Three fresh processes
-per backend each warm up 200 times and measure 1,000 samples per operation;
-the table is the median of those three means, in microseconds. Order is fixed,
-there is no CPU affinity/frequency control, and these are local observations.
-
-The same representable Order record is used for the following complete-text
-conversions. Vanilla is a handwritten `gleam/json` encoder/typed decoder.
-Its native parser does not retain strict duplicate/number evidence. Generated
-strict decoding uses the custom-codec Value path; generated direct encoding
-uses specialized checked JSON construction. These are not equivalent policies
-for arbitrary hostile or unrepresentable input.
-
-| Operation | Erlang/OTP 29, µs | Node 24.21, µs |
-| --- | ---: | ---: |
-| Reused runtime codec: strict decode | 2.799 | 10.677 |
-| Generated strict decode | 3.207 | 20.237 |
-| Generated standard-JSON decode | 3.383 | 13.394 |
-| Vanilla typed decode | 2.476 | 6.950 |
-| Reused runtime codec: encode | 3.206 | 9.359 |
-| Generated direct encode | 1.477 | 7.914 |
-| Vanilla encode | 1.035 | 1.621 |
-| Runtime schema discovery | 0.521 | 5.187 |
-| Generated schema accessor | 0.018 | 0.098 |
-| Runtime schema JSON rendering | 13.288 | 16.329 |
-| Generated schema JSON rendering | 13.282 | 12.611 |
-
-Strict runtime decoding costs about 1.13× the vanilla baseline on Erlang and
-1.54× on Node for this fixture. Runtime encoding costs about 3.10×/5.77×;
-specialized generated encoding improves that to about 1.43×/4.88×. Generated
-strict decoding is slower than the reused runtime codec, particularly on JS,
-because its custom wrapper materializes Values. Generation is not a blanket
-optimization. Constructing a typed-definition codec per call costs approximately
-36/71 µs before conversion; retain codecs and schema documents when reusable.
-
-A separate three-process [schema-consumer capture](benchmarks/release-readiness-2026-10-25/schema-results.json)
-uses the existing adaptive benchmark and its own
-[source fingerprints](benchmarks/release-readiness-2026-10-25/schema-inputs.sha256.json)
-and [environment](benchmarks/release-readiness-2026-10-25/schema-environment.json).
-For 100 items, schema-generated versus handwritten encode-text is 417/411 µs
-on Erlang and 1,282/1,257 µs on JS; decode-text is 212/218 and 868/868 µs.
-This generator emits ordinary codec combinators, with broadly similar cost.
-Generating the Gleam source itself takes approximately 0.140 ms on Erlang and
-0.202 ms on JS; these figures exclude file I/O and Gleam compilation.
-
-Validation of the already-built 100-item Value takes approximately 51 µs on
-Erlang and 382 µs on JS through the runtime-contract adapter. It does not build
-native records or parse JSON, so it must not be compared as equivalent work to
-typed text decoding. Plain native JSON has no schema-validation equivalent.
-The tiny three-field validation fixture in the general harness is 0.272/2.476 µs;
-that is a different workload. All schema claims remain within the finite
-Draft 2020-12 profile documented in [ORACLE.md](ORACLE.md).
-
-Reproduce the general capture with `sh scripts/benchmark.sh` in three fresh
-Nix-shell runs, and the schema capture with
-`python3 scripts/schema_generation_benchmark.py --output /tmp/fresh-schema-capture`
-in the Nix shell. On macOS, clear `DEVELOPER_DIR` and `SDKROOT` if system Git
-cannot resolve its executable in the benchmark subprocess.
-
-## Generated specialization adoption, 2026-10-26
-
-The [adoption capture](benchmarks/generated-specialization-2026-10-26/REPORT.md)
-compares the final direct emitter with the previous generated implementation,
-ordinary runtime codecs and vanilla JSON decoding on both targets. On the
-50-record fixture, generated decoding changed from 238 to 176 µs on Erlang and
-801 to 396 µs on JavaScript. For 5,000 records, whole-process peak RSS changed
-from 92.88 to 88.92 MiB and 87.80 to 80.12 MiB respectively. Small-record encoding
-through the generated Codec also benefits from specialization. The report
-retains methods, ranges, source hashes, prototype comparisons and limitations;
-native parsing alone does not provide equivalent guarantees.
-
-## Historical experiment archive
-
-Older parser experiments and native adoption reports are preserved in the
-[checksummed archive](benchmarks/history/README.md). Commands above that refer to
-`experiment/` describe the original capture workspace: extract the archive into a
-disposable directory and restore its recorded source revisions before reuse.
-They are not commands against the current checkout. Immutable links retain the
-original reports and raw evidence without treating abandoned prototypes as code
-to maintain.

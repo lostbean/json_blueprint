@@ -31,3 +31,18 @@
   memory observations from correctness guarantees. This decision extends the
   typed generator in [ADR 0008](0008-development-time-source-generation.md)
   without replacing its schema-driven generator.
+
+## Experiment conclusion and retention, 2026-10-26
+
+The adopted emitter retained the prototype's gains without source-token rewriting.
+A local three-VM comparison of 50-record decoding measured 238 to 176 µs on
+Erlang and 801 to 396 µs on JavaScript. For 5,000 records, whole-process peak RSS
+changed from 92.88 to 88.92 MiB and 87.80 to 80.12 MiB respectively. RSS includes
+runtime, modules, input and result; these observations are not performance
+contracts or isolated allocation measurements. The compared native-only paths
+have weaker admission guarantees.
+
+Keep this design conclusion, runtime parity tests and maintained benchmarks
+against vanilla codecs. Remove the disposable runner, captured results and
+adoption report from the checkout. Source generation adds specialized output,
+so its complexity is justified by conversion savings rather than smaller modules.

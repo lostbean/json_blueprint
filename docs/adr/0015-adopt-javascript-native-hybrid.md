@@ -7,11 +7,11 @@
 - **Compatibility.** The owner selected modern runtimes and removal of the portable parser fallback on 2026-10-25. Require reviver source-text support and return explicit UnsupportedRuntime when unavailable. Feature introduction versions are Chrome 114, Firefox 135, Safari 18.4 and Node 21; executed engine versions and limits are recorded in `docs/BROWSER-SUPPORT.md`. The legacy API is unchanged.
 - **Rationale.** The prototype materially reduced ordinary typed-decoding time and transient allocation. Native grammar ownership avoids maintaining another JSON grammar; a narrow scanner retains evidence native parsing otherwise discards.
 - **Consequences.** Native syntax and raw Unicode diagnostics have unavailable locations. Malformed escaped surrogates report NativeSyntax. Multiply-invalid error precedence and integer-like object member order change. JavaScript retains its numeric representation limits. Native parsing allocates a complete tree before duplicate rejection; public Value parsing and custom callbacks still allocate Value nodes. The byte bound is not a heap quota.
-- **Evidence.** The JavaScript hybrid capture and independent review in `experiment/js-hybrid-report.md` distinguish typed-codec gains from whole-Value behavior. Timings are observations, not release guarantees. Browser execution and final adoption measurements are recorded separately from the prototype.
+- **Experiment conclusion.** Native parsing plus a narrow evidence-preserving scan reduced normal typed-decoding time and memory compared with the portable parser. Maintaining a portable fallback added a second implementation and diagnostic surface; the owner chose a capability requirement instead. Native parsing still constructs its complete tree before duplicate rejection. Browser evidence is maintained in [BROWSER-SUPPORT.md](../BROWSER-SUPPORT.md).
 
-## Evidence consolidation, 2026-10-26
+## Evidence retention decision, 2026-10-26
 
-The original `experiment/` paths above are historical. Their bytes and source
-revision are retained in the [checksummed archive](../benchmarks/history/README.md).
-Current behavior and validation are documented in the design, migration guide
-and release-readiness assessment. This relocation does not change the decision.
+Retain the design conclusions here and current comparisons in the maintained
+benchmark harnesses. Remove disposable prototypes, archived sources, raw
+captures and experiment reports from the checkout. Git history retains prior
+records; they are not part of the maintained implementation or release package.

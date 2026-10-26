@@ -6,11 +6,11 @@
 - **Supersedes.** The independent admission bounds in ADR 0003. Explicit standalone `number.parse` limits and the checked native projections in ADR 0002 remain available. The frozen legacy API and release version remain unchanged.
 - **Rationale.** Native parsing and avoiding the intermediate Value tree reduced runtime and peak memory in the local prototypes. Retaining global structural admission required another scan and recovered much of the overhead. The owner selected byte-only admission on 2026-10-25; consumers such as llm_wire may inspect decoded structure.
 - **Consequences.** A byte bound is not a memory or recursion quota. Erlang object source order and detailed old parser locations are not retained. Complete syntax admission precedes typed callbacks; duplicate names reject before typed decoding. JavaScript exponents remain constrained by its exact native integer representation. Custom callbacks and Value parsing still allocate Value nodes.
-- **Evidence.** `experiment/MITIGATION.md` and the dated benchmark artifacts record the prototypes. Production integration must be evaluated separately; prototype timings are not a release performance guarantee.
+- **Experiment conclusion.** OTP callbacks retained duplicate rejection and exact numeric evidence while recovering most native parsing gains. Global structural limits needed additional traversal and allocation, so the owner chose byte-only admission. Public Value conversion and custom callbacks still incur materialization costs. Prototype timings were workload-specific observations, not release guarantees.
 
-## Evidence consolidation, 2026-10-26
+## Evidence retention decision, 2026-10-26
 
-The original `experiment/` paths above are historical. Their bytes and source
-revision are retained in the [checksummed archive](../benchmarks/history/README.md).
-Current behavior and validation are documented in the design, migration guide
-and release-readiness assessment. This relocation does not change the decision.
+Retain the design conclusions here and current comparisons in the maintained
+benchmark harnesses. Remove disposable prototypes, archived sources, raw
+captures and experiment reports from the checkout. Git history retains prior
+records; they are not part of the maintained implementation or release package.
