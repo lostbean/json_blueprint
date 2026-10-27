@@ -4,10 +4,9 @@
 [![json_blueprint on Hex](https://img.shields.io/hexpm/v/json_blueprint?label=Hex%3A%20json_blueprint)](https://hex.pm/packages/json_blueprint)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
 
-Usage of the codec API as real code: each example compiles and runs against the
-library in this checkout on Erlang and JavaScript, so it cannot drift from it. The
-[README](../README.md) illustrates the record and union examples; documentation
-consistency is maintained through review.
+Each codec example compiles and runs against this checkout on Erlang and
+JavaScript. The [README](../README.md) illustrates the record and union examples;
+documentation consistency is reviewed manually.
 
 ```sh
 nix develop --command sh -c 'cd examples && gleam run'              # print each result

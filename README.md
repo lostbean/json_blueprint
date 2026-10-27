@@ -242,10 +242,10 @@ Generate reviewable Gleam source through two development-time paths:
 Your build task writes, formats, and compiles the returned source. Both paths use
 JSON Blueprint at runtime.
 
-The generators are included in `json_blueprint` under
-`json/blueprint/codegen` and `json/blueprint/codegen/schema`. The same dependency
-supplies the runtime and generators; no separate `json_blueprint_codegen`
-package is needed. Choose a dependency from [Installation](#installation).
+`json_blueprint` includes the runtime and both generators,
+`json/blueprint/codegen` and `json/blueprint/codegen/schema`; no separate
+`json_blueprint_codegen` package is needed. Choose a dependency from
+[Installation](#installation).
 
 <!-- prettier-ignore-start -->
 
