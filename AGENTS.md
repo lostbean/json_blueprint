@@ -2,7 +2,7 @@
 
 - JSON Blueprint owns schema-aware values, codecs, schema projection and finite runtime contracts. Protocol admission, business policy and execution belong to consumers.
 - Read the design (`docs/design/`), glossary, coverage and the relevant ADRs before changing behavior. Keep unbuilt intent in the pending ledgers and out of the present-tense design.
-- Preserve the frozen root/schema 1.x surface. Source generators belong to this package and run through explicit build tasks. Version 2.0.0 is selected for release preparation (ADR 0013); further version changes require an explicit release decision.
+- Preserve the frozen root/schema 1.x surface. Source generators belong to this package and run through explicit build tasks. Version 2.0.0 is the published baseline (ADR 0013); further version changes require an explicit release decision.
 - Strict Value parsing and standard JSON/native paths have different precision, duplicate-key and resource guarantees.
 
 ## Commands

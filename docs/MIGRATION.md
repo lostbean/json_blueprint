@@ -5,14 +5,13 @@ typed codecs, exact JSON values, finite runtime contracts, and source generators
 Upgrading the package can retain your legacy wire format. Moving an application
 to codecs requires a separate review of its accepted and emitted JSON.
 
-This guide compares published 1.7.1 with the 2.0.0 checkout. It does not claim
+This guide compares published 1.7.1 with published 2.0.0. It does not claim
 complete equivalence for every legacy schema, error path, or numeric boundary.
 
 ## Update the dependency
 
-Until 2.0.0 is published to Hex, use a Git or local path dependency on this
-checkout. Keep the resolved Git commit in `manifest.toml`. After publication,
-update the application with:
+Update the application to JSON Blueprint 2 from Hex and retain the resolved
+version in `manifest.toml`:
 
 ```sh
 gleam add json_blueprint@2

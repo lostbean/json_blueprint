@@ -1,6 +1,6 @@
 # JSON Blueprint 2.0.0 release-readiness review
 
-## Current assessment — 2026-10-26
+## Pre-publication assessment — 2026-10-26
 
 The specialized generated-code adoption is locally validated and has no known
 unresolved correctness blocker in the reviewed paths. This is a release
