@@ -1,5 +1,9 @@
 # Schema-driven order consumer
 
+[![CI](https://github.com/lostbean/json_blueprint/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/lostbean/json_blueprint/actions/workflows/test.yml)
+[![json_blueprint on Hex](https://img.shields.io/hexpm/v/json_blueprint?label=Hex%3A%20json_blueprint)](https://hex.pm/packages/json_blueprint)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 A separate consumer package that loads `schema/order.json` through `contract.parse`, generates the `commerce/order` module with `json/blueprint/codegen/schema.compile`, and composes the generated codec into an application-owned envelope. Generation runs in the separate `generate/` task, while generation and production both depend on `json_blueprint`.
 
 ## Run

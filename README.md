@@ -1,10 +1,12 @@
 # JSON Blueprint
 
+[![CI](https://github.com/lostbean/json_blueprint/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/lostbean/json_blueprint/actions/workflows/test.yml)
+[![json_blueprint on Hex](https://img.shields.io/hexpm/v/json_blueprint?label=Hex%3A%20json_blueprint)](https://hex.pm/packages/json_blueprint)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
+
 Define a JSON codec in Gleam to encode native values, decode JSON strictly, and
 publish a Draft 2020-12 schema from the same definition.
-
-[![Package Version](https://img.shields.io/hexpm/v/json_blueprint)](https://hex.pm/packages/json_blueprint)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/json_blueprint/)
 
 JSON Blueprint 2.0 includes typed codecs, exact JSON values, runtime schema
 contracts, and build-time source generators in one package. The legacy decoder
