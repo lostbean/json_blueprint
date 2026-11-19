@@ -27,7 +27,7 @@ targets.
 | `gleam_json_bridge`       | the same codec through `gleam/json`                              |
 | `larger_inputs`           | raising parser limits                                            |
 | `runtime_schema`          | loading and validating against a schema that arrives at runtime  |
-| `schema_inspection`       | reading a schema with `codec.view`                               |
+| `schema_inspection`       | reading a schema with `codec.view` and mapping its enum labels   |
 
 The frozen 1.x API and the move to 2.0 are compiled tests under `test/`:
 [`legacy/`](test/legacy/) holds the 1.x union, enum, tuple, optional, recursive and

@@ -88,8 +88,8 @@ pub fn from_codec(codec: Codec(a)) -> Result(Contract, codec.SchemaError) {
 }
 
 /// The contract of a schema, such as one that a tool declaration holds.
-/// Every `Schema` comes from a codec or a contract and is already checked,
-/// so this cannot fail.
+/// Every `Schema` comes from a codec, a contract or a checked mapping of one
+/// and is already checked, so this cannot fail.
 pub fn from_schema(schema: Schema) -> Contract {
   Contract(normalize(codec.to_tree(schema)))
 }

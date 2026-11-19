@@ -44,7 +44,8 @@ authorization, protocol policy, and effects in custom callbacks.
 - Runtime `Contract`s load schemas, validate `Value`s, and decode validated
   values only with a codec whose schema matches.
 - Opaque schemas can be rendered as JSON or inspected with `codec.view` for
-  consumer-side translation.
+  consumer-side translation. `codec.map_enum_labels` and
+  `codec.map_descriptions` derive a schema with other labels or descriptions.
 - Included source generators produce specialized functions for an existing
   native type, or native records and a codec from a supported schema.
 
