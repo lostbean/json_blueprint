@@ -73,7 +73,7 @@
       #relates(cardinality: "1 : 0..n")[Arrays own ordered Values. Objects own ordered name/Value pairs; the raw Object constructor permits repeated names.]
     ]
     #entity(id: "schema", title: "Schema", description: [Checked finite structure with optional descriptions.], kind: "value-object", owner: "Typed codecs", domain: "JSON contracts", lifecycle: "immutable", tint: "teal")[
-      #attribute(name: "Checked structure", type: "Opaque Tree", provenance: "derived")[Codec discovery or document loading derives structure after checking definition invariants. The public projection never exposes a constructor for unchecked structure.]
+      #attribute(name: "Checked structure", type: "Opaque Tree", provenance: "derived")[Codec discovery or document loading derives structure after checking definition invariants. A label or description mapping derives another Schema of the same structure and rechecks it. The public projection never exposes a constructor for unchecked structure.]
       #relates(cardinality: "1 : 0..n")[Property and variant records retain opaque child Schemas with exact name/requiredness and tag/payload associations.]
     ]
     #entity(id: "codec", title: "Codec(a)", description: [Compiled native conversion and discoverable schema capability.], kind: "value-object", owner: "Typed codecs", domain: "JSON contracts", lifecycle: "immutable", tint: "teal")[
@@ -272,6 +272,7 @@
         [#term("term-schema-view") has fixed alternatives throughout 2.x: StringSchema, StringEnumSchema, IntSchema, IntegerRangeSchema, NumberSchema, NumberRangeSchema, BoolSchema, PairSchema, ListSchema, NullableSchema, ObjectSchema, UnionSchema, AnySchema, and OtherSchema.],
         [Descriptions are optional annotations read by codec.description; view looks through them. The latest description at one node replaces the earlier one. Child descriptions remain local to their nodes.],
         [A future minor-release kind reaches OtherSchema with its rendered schema object. A dedicated projection alternative requires a major release. PropertySchema and VariantSchema may gain fields; consumers read them by label. No current finite kind produces OtherSchema. #adr(5) records the evolution contract.],
+        [map_enum_labels returns the schema with every string-enum label at any depth passed through a caller function. Structure, label order, bounds, property names, union tags and descriptions are unchanged, so the result equals the schema that string_enum of the mapped labels describes in the same places. Two labels of one enumeration mapped to one string return DuplicateEnumLabel with the repeated mapped label; separate enumerations may share a label, and the empty string remains a label. map_descriptions returns the schema with every description passed through a caller function; it is total and the result is a #term("term-contract-match") of its input. Both leave the source codec unchanged, so a codec whose labels were mapped no longer matches a contract of the mapped schema. #adr(17) records the scope.],
       )
     ]
     #subsection(title: "Document loading profile")[

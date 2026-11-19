@@ -113,6 +113,13 @@
 ////   }
 //// }
 //// ```
+////
+//// A schema whose enum labels or descriptions are runtime data can be
+//// published under other strings: `map_enum_labels` replaces the labels of
+//// every string enumeration and fails when two labels of one enumeration
+//// would become the same, and `map_descriptions` replaces every description.
+//// Both return another checked `Schema` of the same structure and leave the
+//// codec as it is.
 
 import gleam/dict.{type Dict}
 import gleam/dynamic/decode
@@ -134,6 +141,8 @@ import json/blueprint/value.{type Value}
 /// The JSON Schema of a codec, within the finite Draft 2020-12 profile that
 /// codecs describe. Get one with `schema`, render it with `schema_value` or
 /// `schema_document`, and read its structure with `view` and `description`.
+/// `map_enum_labels` and `map_descriptions` derive another schema of the same
+/// structure.
 ///
 /// It is opaque so that the schema model can grow without breaking callers;
 /// see `SchemaView` for the evolution policy. Two schemas are `==` when they
@@ -255,6 +264,92 @@ pub fn description(schema: Schema) -> Option(String) {
   case schema.tree {
     tree.DescribedSchema(description, _) -> Some(description)
     _ -> None
+  }
+}
+
+/// `schema` with every label of every string enumeration in it, at any depth,
+/// replaced by `mapping(label)`. Nothing else changes: the structure, the
+/// order of labels, bounds, property names, union tags and descriptions stay
+/// as they are, so the result is what `string_enum` of the mapped labels
+/// would describe in the same places.
+///
+/// Use it to publish a schema whose labels are runtime data under other
+/// labels, such as stable stand-ins for generated identifiers. Only the
+/// schema is mapped. The codec it came from still reads and writes its own
+/// labels, and `contract.decode` refuses that codec for a value validated
+/// against the mapped schema, so map the documents the same way.
+///
+/// Labels of one enumeration must stay distinct: when `mapping` gives two of
+/// them the same string, the result is `Error(DuplicateEnumLabel(label))`
+/// with the repeated mapped label. Enumerations are checked separately, so
+/// two enumerations may share a label. The empty string is a valid label.
+/// `mapping` is called once for each label of each enumeration.
+pub fn map_enum_labels(
+  schema: Schema,
+  with mapping: fn(String) -> String,
+) -> Result(Schema, DefinitionError) {
+  let mapped = rewrite(schema.tree, mapping, fn(description) { description })
+  use Nil <- result.map(validate_tree(mapped))
+  Schema(mapped)
+}
+
+/// `schema` with every description in it, at any depth, replaced by
+/// `mapping(description)`. Descriptions are annotations, so the result
+/// accepts the same documents and `contract.same_schema` holds between the
+/// two. A node without a description gains none.
+pub fn map_descriptions(
+  schema: Schema,
+  with mapping: fn(String) -> String,
+) -> Schema {
+  Schema(rewrite(schema.tree, fn(label) { label }, mapping))
+}
+
+fn rewrite(
+  node: Tree,
+  label: fn(String) -> String,
+  describe: fn(String) -> String,
+) -> Tree {
+  case node {
+    tree.DescribedSchema(description, inner) ->
+      tree.DescribedSchema(
+        describe(description),
+        rewrite(inner, label, describe),
+      )
+    tree.StringEnumSchema(labels) ->
+      tree.StringEnumSchema(list.map(labels, label))
+    tree.StringSchema
+    | tree.IntSchema
+    | tree.NumberSchema
+    | tree.BoolSchema
+    | tree.IntegerRangeSchema(_, _)
+    | tree.NumberRangeSchema(_, _)
+    | tree.AnySchema -> node
+    tree.PairSchema(left, right) ->
+      tree.PairSchema(
+        rewrite(left, label, describe),
+        rewrite(right, label, describe),
+      )
+    tree.ListSchema(items) -> tree.ListSchema(rewrite(items, label, describe))
+    tree.NullableSchema(inner) ->
+      tree.NullableSchema(rewrite(inner, label, describe))
+    tree.ObjectSchema(properties) ->
+      tree.ObjectSchema(
+        list.map(properties, fn(property) {
+          tree.PropertySchema(
+            ..property,
+            schema: rewrite(property.schema, label, describe),
+          )
+        }),
+      )
+    tree.UnionSchema(variants) ->
+      tree.UnionSchema(
+        list.map(variants, fn(variant) {
+          tree.VariantSchema(
+            ..variant,
+            payload: option.map(variant.payload, rewrite(_, label, describe)),
+          )
+        }),
+      )
   }
 }
 
