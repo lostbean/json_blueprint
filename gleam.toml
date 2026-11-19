@@ -1,5 +1,5 @@
 name = "json_blueprint"
-version = "2.1.0"
+version = "2.1.1"
 internal_modules = ["json/blueprint/internal", "json/blueprint/internal/*", "json/blueprint/codegen/internal", "json/blueprint/codegen/internal/*"]
 
 description = "Simplify JSON encoding/decoding while automatically generating JSON schemas for your data types."
