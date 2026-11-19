@@ -15,6 +15,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `scripts/parser_benchmark.py` | Current strict Value parsing versus native parsing, on both targets; fresh-process timing and peak RSS |
 | `scripts/contract_encoding_benchmark.py` | Contract validation and encoding costs |
 | `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
+| `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -161,6 +162,91 @@ measures different work. µs per operation, 100 items:
 - No live service, upstream oracle, full conformance or concurrency test is claimed.
   The interrupted first capture is excluded; the final capture starts after the
   implementation was frozen.
+
+### Codec copy cost, 2026-11-19
+
+A BEAM process copy (a spawn argument, a message, a supervisor child
+specification) does not preserve sharing, so a codec costs its flat size to send.
+The record, union, `pair`, `nullable`, `map`, `try_map` and `describe` callbacks
+each retained the whole child codec; they now retain only the child operations
+they call, as `list` already did. The baseline is commit
+`867c549` with the same tests, fixtures and harness. Bytes on a 64-bit BEAM,
+flat size / `term_to_binary` size, from `copy_cost_profile_runner`:
+
+| Codec (`test/copy_cost_fixtures.gleam`) | Before | After |
+| --- | ---: | ---: |
+| Profile, 12 optional fields | 26,752 / 23,814 | 2,920 / 4,001 |
+| Entry: profile first, two more fields | 699,312 / 626,737 | 4,408 / 8,106 |
+| Agent input: record of a list of entries | 13,995,296 / 12,558,007 | 5,944 / 12,398 |
+| Record of list of profile, depth 1 | 562,656 / 512,429 | 4,456 / 8,270 |
+| depth 2 | 11,262,176 / 10,271,685 | 5,992 / 12,538 |
+| depth 3 | 225,252,576 / 205,456,805 | 7,528 / 16,806 |
+| depth 4 | 4,505,060,576 / 4,109,159,205 | 9,064 / 21,074 |
+| Record of profile, depth 1 | 699,312 / 626,602 | 4,408 / 8,073 |
+| depth 2 | 18,185,872 / 16,299,090 | 6,184 / 13,175 |
+| depth 3 | 472,836,432 / 423,783,778 | 8,248 / 19,309 |
+| depth 4 | 12,293,750,992 / 11,018,385,666 | 10,600 / 26,475 |
+| Union of profile, depth 1 / 2 / 3 (flat) | 570,384 / 11,986,704 / 251,729,424 | 3,048 / 4,528 / 6,008 |
+| `nullable` of profile, depth 1 / 2 / 3 (flat) | 107,192 / 428,952 / 1,715,992 | 1,640 / 1,736 / 1,832 |
+| `pair` of Int and profile, depth 1 / 2 / 3 (flat) | 134,832 / 675,232 / 3,377,232 | 1,824 / 2,080 / 2,336 |
+
+- A record layer multiplied the copied size by 20 to 26, a union by 21, a pair by
+  5 and a nullable by 4. Every layer now adds a fixed number of words, except
+  that a record whose first field is a required record adds 36 words more per
+  enclosing record: decoding and the schema continue from the first field's
+  placeholder, one thunk per layer.
+- Fields after the first live in the continuation and are never part of the
+  copied codec, so record width does not change the size. A codec bound outside
+  a record and used by a later field is captured by the continuation, and is
+  still copied once per callback that holds the continuation.
+- The size in the heap that builds the codec was already small and moved little:
+  2,240 to 1,832 bytes for the agent input.
+
+Run time, µs per operation, ten entries per operation. The harness rows are the
+median of five fresh VMs per side, all baseline VMs first, with the range of the
+VM means. Environment: Apple M2 Max, Darwin 27.2.0 on arm64, Gleam 1.19.2,
+Erlang/OTP 29 (ERTS 17.1.1), Node 24.21.0, no isolation.
+
+| `scripts/benchmark.sh` row | Erlang before → after | Node before → after |
+| --- | ---: | ---: |
+| `record_input_codec_construction` | 0.30 [0.29–0.33] → 0.31 [0.30–0.33] | 3.94 [3.84–4.24] → 3.82 [3.75–4.07] |
+| `record_input_schema_discovery` | 2.76 [2.70–2.95] → 2.80 [2.76–3.08] | 27.53 [26.54–28.03] → 25.92 [25.10–27.51] |
+| `record_input_reused_encode` | 35.83 [35.54–35.96] → 37.02 [36.42–37.94] | 202.77 [201.58–213.59] → 186.98 [184.51–195.47] |
+| `record_input_reused_decode` | 39.07 [38.79–39.22] → 38.48 [36.96–40.95] | 212.92 [209.32–227.70] → 207.11 [206.14–211.30] |
+| `record_input_reused_complete_text_encode` | 94.73 [92.77–97.75] → 104.68 [100.74–106.31] | 227.78 [223.49–234.19] → 207.72 [205.46–218.22] |
+| `record_input_reused_complete_text_decode` | 72.72 [72.20–73.04] → 73.64 [70.20–73.79] | 255.10 [253.49–258.24] → 250.76 [249.77–257.43] |
+| `legacy_value_runtime_reused_encode` | 0.75 [0.74–0.78] → 1.24 [1.21–1.35] | 8.47 [8.27–9.78] → 8.38 [7.95–9.18] |
+| `legacy_value_runtime_reused_decode` | 0.76 [0.74–0.80] → 0.76 [0.75–0.88] | 6.00 [5.79–6.69] → 5.86 [5.67–6.18] |
+| `order_runtime_schema_discovery` | 0.34 [0.34–0.38] → 0.46 [0.42–0.51] | 5.63 [5.53–6.05] → 5.38 [5.35–5.84] |
+| `order_vanilla_complete_text_decode` (unchanged code) | 2.54 [2.51–2.63] → 2.78 [2.78–2.96] | 7.29 [7.15–7.49] → 7.07 [6.92–7.30] |
+| `native_dynamic_object_dict_materialization` (unchanged code) | 0.53 [0.51–0.59] → 0.69 [0.67–0.81] | 1.60 [1.39–1.70] → 1.47 [1.39–1.66] |
+
+- The Erlang captures drifted between the sides: rows that run unchanged code
+  moved by up to 1.29×, and the sub-microsecond rows time about one millisecond
+  in total, where one collection decides the figure. They do not show a cost of
+  the change.
+- An isolated loop outside the harness settles the Erlang rows: 10,000 to 500,000
+  calls in a fresh process after a tenth as many warmup calls, the minimum of
+  nine processes, the median of three alternating VMs per side with `+S 1:1`.
+
+| Isolated Erlang loop | Before → after |
+| --- | ---: |
+| Agent input encode to Value | 40.31 → 39.22 |
+| Agent input decode from Value | 49.18 → 47.33 |
+| Agent input complete-text encode | 87.12 → 85.57 |
+| Agent input complete-text decode | 75.36 → 74.82 |
+| Agent input schema discovery | 3.99 → 3.95 |
+| Agent input codec construction | 0.383 → 0.382 |
+| Runtime Order encode to Value | 1.116 → 1.131 |
+| Runtime Order decode from Value | 1.060 → 1.041 |
+| Runtime Order complete-text decode | 3.461 → 3.468 |
+| Runtime Order schema discovery | 0.565 → 0.566 |
+
+- Conversion, schema discovery and construction time are unchanged within 3%.
+- A profile of the agent-input conversions shows no single cost in running the
+  continuations: rebuilding `string_enum` codecs, the visited-name dictionary
+  and the member lookup each take a tenth to a quarter of the time. None was
+  changed.
 
 ## Limits of these claims
 
