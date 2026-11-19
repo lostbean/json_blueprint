@@ -1,3 +1,4 @@
+import copy_cost_fixtures
 import generated/order_codec
 import gleam/dynamic/decode
 import gleam/int
@@ -180,7 +181,7 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
 
   list.append(
     [bench_number, bench_parser, bench_runtime, bench_codec],
-    run_order_codec_benchmarks(),
+    list.append(run_order_codec_benchmarks(), run_record_codec_benchmarks()),
   )
 }
 
@@ -575,6 +576,56 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
       list.append(complete_text_benchmarks, native_decode_diagnostics),
     ),
   )
+}
+
+// A record of a list of records whose first field is a record of twelve
+// optional fields, ten entries per operation. Field continuations run on
+// every conversion, so these rows follow the record combinators themselves.
+fn run_record_codec_benchmarks() -> List(BenchResult) {
+  let input = copy_cost_fixtures.agent_input(10)
+  let input_codec = copy_cost_fixtures.agent_input_codec()
+  let assert Ok(input_value) = codec.encode(input_codec, input)
+  let assert Ok(input_json) = codec.encode_json(input_codec, input)
+  should.equal(codec.decode(input_codec, input_value), Ok(input))
+  should.equal(codec.decode_json(input_codec, input_json), Ok(input))
+  let assert Ok(_) = codec.schema(input_codec)
+
+  [
+    run_construction_benchmark("record_input_codec_construction", fn() {
+      copy_cost_fixtures.agent_input_codec()
+    }),
+    run_construction_benchmark("record_input_schema_discovery", fn() {
+      codec.schema(input_codec)
+    }),
+    run_benchmark("record_input_reused_encode", 500, 5, 1000, fn() {
+      let assert Ok(_) = codec.encode(input_codec, input)
+      Nil
+    }),
+    run_benchmark("record_input_reused_decode", 500, 5, 1000, fn() {
+      let assert Ok(_) = codec.decode(input_codec, input_value)
+      Nil
+    }),
+    run_benchmark(
+      "record_input_reused_complete_text_encode",
+      500,
+      5,
+      1000,
+      fn() {
+        let assert Ok(_) = codec.encode_json(input_codec, input)
+        Nil
+      },
+    ),
+    run_benchmark(
+      "record_input_reused_complete_text_decode",
+      500,
+      5,
+      1000,
+      fn() {
+        let assert Ok(_) = codec.decode_json(input_codec, input_json)
+        Nil
+      },
+    ),
+  ]
 }
 
 fn run_construction_benchmark(
