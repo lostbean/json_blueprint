@@ -1117,7 +1117,8 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
 }
 
 fn digit_count(item: Int) -> Int {
-  string.length(int.to_string(int.absolute_value(item)))
+  // Digits are ASCII, so bytes count them without walking graphemes.
+  string.byte_size(int.to_string(int.absolute_value(item)))
 }
 
 fn within(item: Number, lower: Number, upper: Number) -> Bool {
