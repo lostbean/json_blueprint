@@ -77,7 +77,7 @@ AI-assisted contribution.
 Resolved without changing the generator by [ADR 0018](../../../docs/adr/0018-hold-each-codec-input-once.md): from 2.2.0 a child
 codec bound before a field chain is held once, like any captured input. The
 committed `examples/codegen` order codec, generated unchanged, copies in
-1.7 kB on 2.2.0 against 105 kB on 2.1.1, measured from a fresh build of the
+1.9 kB on 2.2.0 against 105 kB on 2.1.1, measured from a fresh build of the
 consumer, and its conversions, refusals and schema are unchanged (the gate
 regenerates the module and runs the consumer's tests against it).
 Building each child in its field is no longer needed on 2.2.0, so the

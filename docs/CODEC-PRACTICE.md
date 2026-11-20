@@ -49,7 +49,7 @@ can run out of memory on 2.1.0 or earlier.
 
 From 2.2.0 each combinator holds each of its inputs once
 ([ADR 0018](adr/0018-hold-each-codec-input-once.md)), so a codec copies at
-about its in-heap size: the agent input codec above copies in 688 B, a
+about its in-heap size: the agent input codec above copies in 736 B, a
 consumer's model-answer codec in 1.0 kB instead of 88.6 kB, and a run-time enum
 label costs its own data once instead of about 1 kB. Prefer
 `json_blueprint >= 2.2.0` for new code. Two union cases changed in 2.2.0: a
@@ -78,7 +78,7 @@ Reasons for generated codecs:
 
 - A generated codec refers to module functions and literals and captures no
   child codec. In this repository's [codegen consumer](../examples/codegen/README.md),
-  the export job codec has a flat size of 920 B when generated, against 1.3 kB
+  the export job codec has a flat size of 944 B when generated, against 1.4 kB
   built with combinators from the same definition on 2.2.0 and 19.3 kB on
   2.1.1.
 - On Erlang/OTP 29, literals are not copied between processes: a receiver of a
@@ -207,8 +207,8 @@ pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
 
 <!-- prettier-ignore-end -->
 
-Measured flat sizes on 2.1.1 (on 2.2.0 the answer codec copies in 440 B and
-168 B, and the reply codec in 440 B and 392 B):
+Measured flat sizes on 2.1.1 (on 2.2.0 the answer codec copies in 464 B and
+168 B, and the reply codec in 464 B and 416 B):
 
 | Codec | `let`-bound children | Children built in their fields |
 | --- | ---: | ---: |
@@ -405,7 +405,7 @@ Generated modules have these costs:
 
 The schema-driven generator binds each child codec with `let` before its field
 chain, the form that rule 1 forbids on 2.1.x. There its order codec copies in
-105 kB; on 2.2.0 the same generated source copies in 1.7 kB. The tracker issue
+105 kB; on 2.2.0 the same generated source copies in 1.9 kB. The tracker issue
 [`issues/codec-copy-cost/issues/01-schema-generator-captures-child-codecs.md`](../issues/codec-copy-cost/issues/01-schema-generator-captures-child-codecs.md)
 records it.
 
