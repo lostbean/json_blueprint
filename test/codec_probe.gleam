@@ -32,6 +32,14 @@ fn take() -> List(String)
 
 /// `Ok` with the result of `run`, or `Error` with the message of the panic it
 /// raised.
+@external(erlang, "codec_probe_ffi", "stash")
+@external(javascript, "./codec_probe_ffi.mjs", "stash")
+fn stash(item: a) -> Nil
+
+@external(erlang, "codec_probe_ffi", "unstash")
+@external(javascript, "./codec_probe_ffi.mjs", "unstash")
+fn unstash() -> a
+
 @external(erlang, "codec_probe_ffi", "panic_message")
 @external(javascript, "./codec_probe_ffi.mjs", "panic_message")
 fn panic_message(run: fn() -> a) -> Result(a, String)
@@ -376,6 +384,7 @@ pub fn lines() -> List(String) {
     definition_cases(),
     mapping_cases(c, good),
     leaf_cases(),
+    union_cases(),
   ])
 }
 
@@ -627,4 +636,61 @@ fn leaf_cases() -> List(String) {
 fn too_long() -> Int {
   let assert Ok(found) = int.parse("1234567890123456789012345")
   found
+}
+
+/// A union whose `match` returns what an enclosing union passed on.
+fn inner_union(
+  outer_payload: fn(Int) -> codec.Tagged(Shape),
+  outer_unit: codec.Tagged(Shape),
+) -> #(Codec(Shape), Codec(Shape)) {
+  let payload =
+    codec.union({
+      use _square <- codec.variant("inner", codec.int(), Square)
+      codec.match(fn(_) { outer_payload(7) })
+    })
+  let unit =
+    codec.union({
+      use _square <- codec.variant("inner", codec.int(), Square)
+      codec.match(fn(_) { outer_unit })
+    })
+  #(payload, unit)
+}
+
+/// Cases whose expected lines follow ADR 0018, which changes them from 2.1.1.
+fn union_cases() -> List(String) {
+  let _outer =
+    codec.union({
+      use circle <- codec.variant("outer", traced_int("outer"), Circle)
+      use empty <- codec.unit_variant("outer-empty", Empty)
+      stash(inner_union(circle, empty))
+      codec.match(fn(shape) {
+        case shape {
+          Circle(r) -> circle(r)
+          _ -> empty
+        }
+      })
+    })
+  let #(foreign_payload, foreign_unit): #(Codec(Shape), Codec(Shape)) =
+    unstash()
+  let two_taggers =
+    codec.union({
+      use circle <- codec.variant("circle", traced_int("first"), Circle)
+      use square <- codec.variant("square", traced_int("second"), Square)
+      codec.match(fn(_) {
+        let _ = circle(1)
+        log("match after first")
+        square(2)
+      })
+    })
+  [
+    case_line("adr-0018 foreign tagging function", fn() {
+      encoded(codec.encode_json(foreign_payload, Empty))
+    }),
+    case_line("adr-0018 foreign tagged value", fn() {
+      encoded(codec.encode_json(foreign_unit, Empty))
+    }),
+    case_line("adr-0018 match calls two tagging functions", fn() {
+      encoded(codec.encode_json(two_taggers, Empty))
+    }),
+  ]
 }

@@ -202,8 +202,9 @@ Wrong: the prebuilt enum codec is captured by every later continuation.
 
 <!-- snips: ../examples/test/copy_cost_test.gleam#prebuilt-enum -->
 ```gleam
-/// Avoid: the enum codec is built once before the chain, so every later
-/// continuation captures the whole codec rather than its label strings.
+/// The enum codec built once before the chain: from 2.2.0 it is copied once
+/// and not rebuilt per conversion. On 2.1.x every later continuation
+/// captured the whole codec, so avoid this form there.
 fn prebuilt_citation_codec(offered: List(String)) -> Codec(Citation) {
   let sources = codec.string_enum(list.map(offered, fn(id) { #(id, id) }))
   use claim <- codec.field("claim", codec.string(), get: fn(c: Citation) {

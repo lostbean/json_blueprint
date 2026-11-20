@@ -21,3 +21,14 @@ export function panic_message(run) {
     throw error;
   }
 }
+
+let stashed = undefined;
+
+export function stash(item) {
+  stashed = item;
+  return undefined;
+}
+
+export function unstash() {
+  return stashed;
+}

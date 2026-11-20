@@ -10,3 +10,7 @@ export function shared_size_words(_term) {
 export function external_bytes(_term) {
   return -1;
 }
+
+export function reference_words() {
+  return -1;
+}

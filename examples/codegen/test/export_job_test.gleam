@@ -46,9 +46,10 @@ pub fn generated_codec_refuses_what_the_definition_refuses_test() {
   |> should.equal(Error(error))
 }
 
-/// A generated codec is module functions and literals; the combinator codec
-/// for the same shape holds closures. Sending either to a worker copies its
-/// flat size, which only the BEAM measures.
+/// A generated codec is module functions and literals; a combinator codec
+/// holds each of its inputs once (2.2.0). Sending either to a worker copies
+/// its flat size, which only the BEAM measures: both stay small, and the
+/// generated one stays smaller.
 pub fn generated_codec_is_smaller_to_copy_than_combinators_test() {
   let generated = flat_size_bytes(export_job_codec.export_job_codec())
   let runtime =
@@ -57,7 +58,8 @@ pub fn generated_codec_is_smaller_to_copy_than_combinators_test() {
     -1 -> Nil
     _ -> {
       { generated < 2048 } |> should.be_true
-      { generated * 10 < runtime } |> should.be_true
+      { runtime < 4096 } |> should.be_true
+      { generated < runtime } |> should.be_true
     }
   }
 }

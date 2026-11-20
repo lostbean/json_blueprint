@@ -1,8 +1,10 @@
 //// Expected output of `codec_probe.lines()`, written by
 //// `codec_probe_runner`. Every line was generated on json_blueprint 2.1.1
 //// (commit 323f133) with Gleam 1.19.2, Erlang/OTP 29 and Node 24, and is
-//// the same on both targets. A line changes only in a commit that names
-//// the design or ADR change it follows; new cases are appended.
+//// the same on both targets, except the `adr-0018` cases: they follow
+//// ADR 0018 (2.2.0), which changed them from 2.1.1. A line changes only
+//// in a commit that names the design or ADR change it follows; new cases
+//// are appended.
 
 pub const lines = [
   "construct =>  | trace: ",
@@ -85,4 +87,7 @@ pub const lines = [
   "int spelling => ok 12 | trace: ",
   "enum unknown value => error $: value is not in the enum | trace: ",
   "decoder failure placeholder => error | trace: order_codec; id.decode 0; after id 0; total_of []; radius.decode 0; construct circle; success",
+  "adr-0018 foreign tagging function => panic json_blueprint: the union with tags \"inner\" was given a value tagged by a tagging function or tagged value from another codec.union; in `match`, use only what this union's `variant` and `unit_variant` pass on | trace: ",
+  "adr-0018 foreign tagged value => panic json_blueprint: the union with tags \"inner\" was given a value tagged by a tagging function or tagged value from another codec.union; in `match`, use only what this union's `variant` and `unit_variant` pass on | trace: ",
+  "adr-0018 match calls two tagging functions => ok {\"tag\":\"square\",\"value\":2} | trace: match after first; second.encode 2",
 ]

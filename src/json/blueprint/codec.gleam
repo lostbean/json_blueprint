@@ -52,15 +52,13 @@
 //// plain constructor call.
 ////
 //// Sending a codec, or a value that holds one, to another BEAM process
-//// copies it without sharing. Build each child codec in the field that uses
-//// it, directly or by calling a function there. A child codec, or any large
-//// value, bound with `let` before the `use` chain or passed in as a
-//// parameter, and used by a later field, is captured by the continuation and
-//// copied once per callback that holds it. For a codec whose shape is fixed at build time and that other
-//// processes hold, the generator in `json/blueprint/codegen` emits module
-//// functions and literals instead.
-//// The codec practice guide, `docs/CODEC-PRACTICE.md` in the repository,
-//// gives the measurements and a copy-size test.
+//// copies it without sharing. Each combinator holds each of its inputs once,
+//// so the copy costs about the codec's own size: a child codec or a large
+//// value captured by a later field is copied once, and a run-time enum label
+//// costs its own data once. Before 2.2.0 a continuation was copied once per
+//// callback that held it; the codec practice guide,
+//// `docs/CODEC-PRACTICE.md` in the repository, gives the rules for code that
+//// must still run on 2.1.x.
 ////
 //// Objects are closed: an unknown field fails to decode. `optional_field`
 //// omits the field for `None`; wrap the inner codec in `nullable` to also
@@ -136,6 +134,7 @@
 //// codec as it is.
 
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/json
@@ -477,18 +476,22 @@ pub fn encode_failure(message: String) -> EncodeError {
 
 /// Encodes `a` to JSON, decodes JSON to `a`, and describes the JSON.
 ///
-/// Sending a codec to another process copies every callback's environment
-/// without preserving sharing. Each callback a combinator builds therefore
-/// retains only the child operations it calls, never a whole child codec,
-/// `Fields` or `Union`: the copied size then adds up over nesting layers
-/// instead of multiplying at each one.
-///
-/// A record's continuation is a callback too. A child codec bound with `let`
-/// before a `use … <- field` chain and used by a later field is captured by
-/// that continuation and copied once per callback that holds it; build each
-/// child codec in the field that uses it.
+/// A codec holds each of its inputs once, so sending it to another process
+/// copies about its own size. It builds its operations each time it is used.
 pub opaque type Codec(a) {
-  Codec(
+  // One thunk per combinator: it captures the combinator's arguments once and
+  // builds the operations when the codec is used, so no captured value is
+  // held by several stored closures.
+  Codec(ops: fn() -> Ops(a))
+}
+
+fn ops(codec: Codec(a)) -> Ops(a) {
+  codec.ops()
+}
+
+/// The operations of a codec, built on demand and never stored in a codec.
+type Ops(a) {
+  Ops(
     text_encode: Option(fn(a) -> Result(String, EncodeError)),
     encode: fn(a) -> Result(Value, EncodeError),
     decode: fn(Value) -> Result(a, DecodeError),
@@ -525,7 +528,7 @@ type Property {
 
 /// The schema, after panicking on a definition mistake.
 fn defined(codec: Codec(a)) -> Option(Tree) {
-  case codec.definition() {
+  case ops(codec).definition() {
     Ok(schema) -> schema
     Error(error) -> definition_panic(error)
   }
@@ -550,7 +553,7 @@ fn definition_panic(error: DefinitionError) -> b {
 /// from runtime data, such as enum labels or bounds loaded at runtime; the
 /// other functions panic on the same mistake.
 pub fn check(codec: Codec(a)) -> Result(Codec(a), DefinitionError) {
-  case codec.definition() {
+  case ops(codec).definition() {
     Ok(_) -> Ok(codec)
     Error(error) -> Error(error)
   }
@@ -560,19 +563,20 @@ pub fn check(codec: Codec(a)) -> Result(Codec(a), DefinitionError) {
 
 /// Encode to a `Value`.
 pub fn encode(codec: Codec(a), item: a) -> Result(Value, EncodeError) {
-  codec.encode(item)
+  ops(codec).encode(item)
 }
 
 /// Decode a `Value`.
 pub fn decode(codec: Codec(a), raw: Value) -> Result(a, DecodeError) {
-  codec.decode(raw)
+  ops(codec).decode(raw)
 }
 
 /// Encode to compact JSON text.
 pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
-  case codec.text_encode {
+  let found = ops(codec)
+  case found.text_encode {
     Some(encode) -> encode(item)
-    None -> encode(codec, item) |> result.map(value.to_string)
+    None -> found.encode(item) |> result.map(value.to_string)
   }
 }
 
@@ -594,7 +598,7 @@ pub fn decode_json_with_limits(
     value.parse_native(text, limits)
     |> result.map_error(fn(error) { DecodeError([], InvalidJson(error)) }),
   )
-  codec.native_decode(raw)
+  ops(codec).native_decode(raw)
 }
 
 /// Encode to `gleam/json`, for libraries that take `json.Json`. Numbers are
@@ -646,10 +650,11 @@ fn value_to_json(
 pub fn decoder(codec: Codec(a)) -> decode.Decoder(a) {
   value.decoder()
   |> decode.then(fn(raw) {
-    case codec.decode(raw) {
+    let found = ops(codec)
+    case found.decode(raw) {
       Ok(item) -> decode.success(item)
       Error(error) ->
-        decode.failure(codec.placeholder(), describe_decode_error(error))
+        decode.failure(found.placeholder(), describe_decode_error(error))
     }
   })
 }
@@ -679,7 +684,7 @@ pub fn decoder(codec: Codec(a)) -> decode.Decoder(a) {
 /// }
 /// ```
 pub fn placeholder(codec: Codec(a)) -> a {
-  codec.placeholder()
+  ops(codec).placeholder()
 }
 
 /// The codec's schema.
@@ -705,15 +710,17 @@ fn leaf(
   schema: Tree,
   placeholder: a,
 ) -> Codec(a) {
-  Codec(
-    None,
-    encode,
-    decode,
-    native_decode,
-    fn() { Ok(Some(schema)) },
-    fn() { placeholder },
-    None,
-  )
+  Codec(fn() {
+    Ops(
+      None,
+      encode,
+      decode,
+      native_decode,
+      fn() { Ok(Some(schema)) },
+      fn() { placeholder },
+      None,
+    )
+  })
 }
 
 fn fail(reason: Reason) -> Result(a, DecodeError) {
@@ -930,60 +937,62 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
   let lower = number.from_int(minimum) |> result.unwrap(zero())
   let upper = number.from_int(maximum) |> result.unwrap(zero())
   let digits = int.max(digit_count(minimum), digit_count(maximum))
-  Codec(
-    text_encode: None,
-    encode: fn(item) {
-      ensure(defect)
-      case item >= minimum && item <= maximum {
-        True -> encode_int(item)
-        False -> refuse(IntegerOutsideRange(minimum, maximum))
-      }
-    },
-    decode: fn(raw) {
-      ensure(defect)
-      case raw {
-        value.Number(item) ->
-          case number.is_integer(item) {
-            False -> fail(ExpectedInt)
-            True ->
-              case within(item, lower, upper) {
-                False -> fail(IntegerOutsideRange(minimum, maximum))
-                True ->
-                  number.to_int(item, digits)
-                  |> result.replace_error(DecodeError([], ExpectedInt))
-              }
-          }
-        _ -> fail(ExpectedInt)
-      }
-    },
-    native_decode: fn(raw) {
-      ensure(defect)
-      use item <- result.try(
-        native.number(raw)
-        |> result.map_error(fn(error) {
-          native_numeric_failure(error, ExpectedInt)
-        }),
-      )
-      case number.is_integer(item) {
-        False -> fail(ExpectedInt)
-        True ->
-          case within(item, lower, upper) {
-            False -> fail(IntegerOutsideRange(minimum, maximum))
-            True ->
-              number.to_int(item, digits)
-              |> result.replace_error(DecodeError([], ExpectedInt))
-          }
-      }
-    },
-    definition: fn() {
-      case defect {
-        Some(error) -> Error(error)
-        None -> Ok(Some(tree.IntegerRangeSchema(minimum, maximum)))
-      }
-    },
-    placeholder: fn() { minimum },
-    fields: None,
-  )
+  Codec(fn() {
+    Ops(
+      text_encode: None,
+      encode: fn(item) {
+        ensure(defect)
+        case item >= minimum && item <= maximum {
+          True -> encode_int(item)
+          False -> refuse(IntegerOutsideRange(minimum, maximum))
+        }
+      },
+      decode: fn(raw) {
+        ensure(defect)
+        case raw {
+          value.Number(item) ->
+            case number.is_integer(item) {
+              False -> fail(ExpectedInt)
+              True ->
+                case within(item, lower, upper) {
+                  False -> fail(IntegerOutsideRange(minimum, maximum))
+                  True ->
+                    number.to_int(item, digits)
+                    |> result.replace_error(DecodeError([], ExpectedInt))
+                }
+            }
+          _ -> fail(ExpectedInt)
+        }
+      },
+      native_decode: fn(raw) {
+        ensure(defect)
+        use item <- result.try(
+          native.number(raw)
+          |> result.map_error(fn(error) {
+            native_numeric_failure(error, ExpectedInt)
+          }),
+        )
+        case number.is_integer(item) {
+          False -> fail(ExpectedInt)
+          True ->
+            case within(item, lower, upper) {
+              False -> fail(IntegerOutsideRange(minimum, maximum))
+              True ->
+                number.to_int(item, digits)
+                |> result.replace_error(DecodeError([], ExpectedInt))
+            }
+        }
+      },
+      definition: fn() {
+        case defect {
+          Some(error) -> Error(error)
+          None -> Ok(Some(tree.IntegerRangeSchema(minimum, maximum)))
+        }
+      },
+      placeholder: fn() { minimum },
+      fields: None,
+    )
+  })
 }
 
 fn digit_count(item: Int) -> Int {
@@ -1002,43 +1011,45 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
     order.Gt -> Some(ReversedNumberBounds(minimum, maximum))
     _ -> None
   }
-  Codec(
-    text_encode: None,
-    encode: fn(item) {
-      ensure(defect)
-      case within(item, minimum, maximum) {
-        True -> Ok(value.Number(item))
-        False -> refuse(NumberOutsideRange(minimum, maximum))
-      }
-    },
-    decode: fn(raw) {
-      ensure(defect)
-      case raw {
-        value.Number(item) ->
-          case within(item, minimum, maximum) {
-            True -> Ok(item)
-            False -> fail(NumberOutsideRange(minimum, maximum))
-          }
-        _ -> fail(ExpectedNumber)
-      }
-    },
-    native_decode: fn(raw) {
-      ensure(defect)
-      use item <- result.try(native_number(raw))
-      case within(item, minimum, maximum) {
-        True -> Ok(item)
-        False -> fail(NumberOutsideRange(minimum, maximum))
-      }
-    },
-    definition: fn() {
-      case defect {
-        Some(error) -> Error(error)
-        None -> Ok(Some(tree.NumberRangeSchema(minimum, maximum)))
-      }
-    },
-    placeholder: fn() { minimum },
-    fields: None,
-  )
+  Codec(fn() {
+    Ops(
+      text_encode: None,
+      encode: fn(item) {
+        ensure(defect)
+        case within(item, minimum, maximum) {
+          True -> Ok(value.Number(item))
+          False -> refuse(NumberOutsideRange(minimum, maximum))
+        }
+      },
+      decode: fn(raw) {
+        ensure(defect)
+        case raw {
+          value.Number(item) ->
+            case within(item, minimum, maximum) {
+              True -> Ok(item)
+              False -> fail(NumberOutsideRange(minimum, maximum))
+            }
+          _ -> fail(ExpectedNumber)
+        }
+      },
+      native_decode: fn(raw) {
+        ensure(defect)
+        use item <- result.try(native_number(raw))
+        case within(item, minimum, maximum) {
+          True -> Ok(item)
+          False -> fail(NumberOutsideRange(minimum, maximum))
+        }
+      },
+      definition: fn() {
+        case defect {
+          Some(error) -> Error(error)
+          None -> Ok(Some(tree.NumberRangeSchema(minimum, maximum)))
+        }
+      },
+      placeholder: fn() { minimum },
+      fields: None,
+    )
+  })
 }
 
 /// A string from a fixed set of labels, each mapped to a value, such as
@@ -1050,50 +1061,58 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
     [] -> Some(EmptyEnum)
     _ -> enum_defect(variants, set.new(), set.new())
   }
-  let labels = list.map(variants, fn(variant) { variant.0 })
-  Codec(
-    text_encode: None,
-    encode: fn(item) {
-      ensure(defect)
-      case list.find(variants, fn(variant) { variant.1 == item }) {
-        Ok(#(label, _)) -> Ok(value.String(label))
-        Error(Nil) -> refuse(UnknownEnumValue)
-      }
-    },
-    decode: fn(raw) {
-      ensure(defect)
-      case raw {
-        value.String(label) ->
-          case list.key_find(variants, label) {
-            Ok(item) -> Ok(item)
-            Error(Nil) -> fail(UnknownEnumLabel)
-          }
-        _ -> fail(ExpectedString)
-      }
-    },
-    native_decode: fn(raw) {
-      ensure(defect)
-      use label <- result.try(
-        native.string(raw)
-        |> result.replace_error(DecodeError([], ExpectedString)),
-      )
-      list.key_find(variants, label)
-      |> result.replace_error(DecodeError([], UnknownEnumLabel))
-    },
-    definition: fn() {
-      case defect {
-        Some(error) -> Error(error)
-        None -> Ok(Some(tree.StringEnumSchema(labels)))
-      }
-    },
-    placeholder: fn() {
-      case variants {
-        [#(_, first), ..] -> first
-        [] -> definition_panic(EmptyEnum)
-      }
-    },
-    fields: None,
-  )
+  Codec(fn() {
+    Ops(
+      text_encode: None,
+      encode: fn(item) {
+        ensure(defect)
+        case list.find(variants, fn(variant) { variant.1 == item }) {
+          Ok(#(label, _)) -> Ok(value.String(label))
+          Error(Nil) -> refuse(UnknownEnumValue)
+        }
+      },
+      decode: fn(raw) {
+        ensure(defect)
+        case raw {
+          value.String(label) ->
+            case list.key_find(variants, label) {
+              Ok(item) -> Ok(item)
+              Error(Nil) -> fail(UnknownEnumLabel)
+            }
+          _ -> fail(ExpectedString)
+        }
+      },
+      native_decode: fn(raw) {
+        ensure(defect)
+        use label <- result.try(
+          native.string(raw)
+          |> result.replace_error(DecodeError([], ExpectedString)),
+        )
+        list.key_find(variants, label)
+        |> result.replace_error(DecodeError([], UnknownEnumLabel))
+      },
+      definition: fn() {
+        case defect {
+          Some(error) -> Error(error)
+          None ->
+            Ok(
+              Some(
+                tree.StringEnumSchema(
+                  list.map(variants, fn(variant) { variant.0 }),
+                ),
+              ),
+            )
+        }
+      },
+      placeholder: fn() {
+        case variants {
+          [#(_, first), ..] -> first
+          [] -> definition_panic(EmptyEnum)
+        }
+      },
+      fields: None,
+    )
+  })
 }
 
 /// Sets keep this linear in the number of labels, which may come from
@@ -1118,57 +1137,63 @@ fn enum_defect(
 /// Add a JSON Schema description without changing encoding or decoding. A
 /// later description at the same node replaces an earlier one.
 pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
-  let definition = codec.definition
-  Codec(
-    ..codec,
-    definition: fn() {
-      use found <- result.map(definition())
-      option.map(found, fn(found) {
-        case found {
-          tree.DescribedSchema(_, inner) ->
-            tree.DescribedSchema(description, inner)
-          other -> tree.DescribedSchema(description, other)
-        }
-      })
-    },
-    fields: None,
-  )
+  Codec(fn() {
+    let inner = ops(codec)
+    let definition = inner.definition
+    Ops(
+      ..inner,
+      definition: fn() {
+        use found <- result.map(definition())
+        option.map(found, fn(found) {
+          case found {
+            tree.DescribedSchema(_, inner) ->
+              tree.DescribedSchema(description, inner)
+            other -> tree.DescribedSchema(description, other)
+          }
+        })
+      },
+      fields: None,
+    )
+  })
 }
 
 // --- collections -------------------------------------------------------------
 
 /// A JSON array of items.
 pub fn list(of item: Codec(a)) -> Codec(List(a)) {
-  let encode_item = item.encode
-  let decode_item = item.decode
-  let decode_native_item = item.native_decode
-  let item_definition = item.definition
-  Codec(
-    text_encode: None,
-    encode: fn(items) {
-      list.index_map(items, fn(entry, index) { #(index, entry) })
-      |> list.try_map(fn(pair) {
-        encode_item(pair.1) |> at_encode(Index(pair.0))
-      })
-      |> result.map(value.Array)
-    },
-    decode: fn(raw) {
-      case raw {
-        value.Array(items) -> decode_items(decode_item, items, 0, [])
-        _ -> fail(ExpectedArray)
-      }
-    },
-    native_decode: fn(raw) {
-      native.array_decode(
-        raw,
-        fn(raw, index) { decode_native_item(raw) |> at_decode(Index(index)) },
-        DecodeError([], ExpectedArray),
-      )
-    },
-    definition: fn() { item_definition() |> map_schema(tree.ListSchema) },
-    placeholder: fn() { [] },
-    fields: None,
-  )
+  Codec(fn() {
+    let item_ops = ops(item)
+    let encode_item = item_ops.encode
+    let decode_item = item_ops.decode
+    let decode_native_item = item_ops.native_decode
+    let item_definition = item_ops.definition
+    Ops(
+      text_encode: None,
+      encode: fn(items) {
+        list.index_map(items, fn(entry, index) { #(index, entry) })
+        |> list.try_map(fn(pair) {
+          encode_item(pair.1) |> at_encode(Index(pair.0))
+        })
+        |> result.map(value.Array)
+      },
+      decode: fn(raw) {
+        case raw {
+          value.Array(items) -> decode_items(decode_item, items, 0, [])
+          _ -> fail(ExpectedArray)
+        }
+      },
+      native_decode: fn(raw) {
+        native.array_decode(
+          raw,
+          fn(raw, index) { decode_native_item(raw) |> at_decode(Index(index)) },
+          DecodeError([], ExpectedArray),
+        )
+      },
+      definition: fn() { item_definition() |> map_schema(tree.ListSchema) },
+      placeholder: fn() { [] },
+      fields: None,
+    )
+  })
 }
 
 fn decode_items(
@@ -1190,98 +1215,107 @@ fn decode_items(
 
 /// A two-item JSON array.
 pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
-  let encode_left = left.encode
-  let encode_right = right.encode
-  let decode_left = left.decode
-  let decode_right = right.decode
-  let decode_native_left = left.native_decode
-  let decode_native_right = right.native_decode
-  let left_definition = left.definition
-  let right_definition = right.definition
-  let left_placeholder = left.placeholder
-  let right_placeholder = right.placeholder
-  Codec(
-    text_encode: None,
-    encode: fn(items: #(a, b)) {
-      use first <- result.try(encode_left(items.0) |> at_encode(Index(0)))
-      use second <- result.try(encode_right(items.1) |> at_encode(Index(1)))
-      Ok(value.Array([first, second]))
-    },
-    decode: fn(raw) {
-      case raw {
-        value.Array([first, second]) -> {
-          use first <- result.try(decode_left(first) |> at_decode(Index(0)))
-          use second <- result.try(decode_right(second) |> at_decode(Index(1)))
-          Ok(#(first, second))
+  Codec(fn() {
+    let left_ops = ops(left)
+    let right_ops = ops(right)
+    let encode_left = left_ops.encode
+    let encode_right = right_ops.encode
+    let decode_left = left_ops.decode
+    let decode_right = right_ops.decode
+    let decode_native_left = left_ops.native_decode
+    let decode_native_right = right_ops.native_decode
+    let left_definition = left_ops.definition
+    let right_definition = right_ops.definition
+    let left_placeholder = left_ops.placeholder
+    let right_placeholder = right_ops.placeholder
+    Ops(
+      text_encode: None,
+      encode: fn(items: #(a, b)) {
+        use first <- result.try(encode_left(items.0) |> at_encode(Index(0)))
+        use second <- result.try(encode_right(items.1) |> at_encode(Index(1)))
+        Ok(value.Array([first, second]))
+      },
+      decode: fn(raw) {
+        case raw {
+          value.Array([first, second]) -> {
+            use first <- result.try(decode_left(first) |> at_decode(Index(0)))
+            use second <- result.try(
+              decode_right(second) |> at_decode(Index(1)),
+            )
+            Ok(#(first, second))
+          }
+          value.Array(items) -> fail(WrongLength(2, list.length(items)))
+          _ -> fail(ExpectedArray)
         }
-        value.Array(items) -> fail(WrongLength(2, list.length(items)))
-        _ -> fail(ExpectedArray)
-      }
-    },
-    native_decode: fn(raw) {
-      case native.array_items(raw) {
-        Ok([first, second]) -> {
-          use first <- result.try(
-            decode_native_left(first) |> at_decode(Index(0)),
-          )
-          use second <- result.try(
-            decode_native_right(second) |> at_decode(Index(1)),
-          )
-          Ok(#(first, second))
+      },
+      native_decode: fn(raw) {
+        case native.array_items(raw) {
+          Ok([first, second]) -> {
+            use first <- result.try(
+              decode_native_left(first) |> at_decode(Index(0)),
+            )
+            use second <- result.try(
+              decode_native_right(second) |> at_decode(Index(1)),
+            )
+            Ok(#(first, second))
+          }
+          Ok(items) -> fail(WrongLength(2, list.length(items)))
+          Error(Nil) -> fail(ExpectedArray)
         }
-        Ok(items) -> fail(WrongLength(2, list.length(items)))
-        Error(Nil) -> fail(ExpectedArray)
-      }
-    },
-    definition: fn() {
-      use first <- result.try(left_definition())
-      use second <- result.map(right_definition())
-      case first, second {
-        Some(first), Some(second) -> Some(tree.PairSchema(first, second))
-        _, _ -> None
-      }
-    },
-    placeholder: fn() { #(left_placeholder(), right_placeholder()) },
-    fields: None,
-  )
+      },
+      definition: fn() {
+        use first <- result.try(left_definition())
+        use second <- result.map(right_definition())
+        case first, second {
+          Some(first), Some(second) -> Some(tree.PairSchema(first, second))
+          _, _ -> None
+        }
+      },
+      placeholder: fn() { #(left_placeholder(), right_placeholder()) },
+      fields: None,
+    )
+  })
 }
 
 /// `null` or the inner codec's JSON, as an `Option`. `Some(x)` whose inner
 /// encoding is itself `null` fails with `NullInsideNullable`, because it
 /// would decode as `None`.
 pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
-  let encode_inner = inner.encode
-  let decode_inner = inner.decode
-  let decode_native_inner = inner.native_decode
-  let inner_definition = inner.definition
-  Codec(
-    text_encode: None,
-    encode: fn(item) {
-      case item {
-        None -> Ok(value.Null)
-        Some(item) ->
-          case encode_inner(item) {
-            Ok(value.Null) -> refuse(NullInsideNullable)
-            other -> other
-          }
-      }
-    },
-    decode: fn(raw) {
-      case raw {
-        value.Null -> Ok(None)
-        _ -> decode_inner(raw) |> result.map(Some)
-      }
-    },
-    native_decode: fn(raw) {
-      case native.is_null(raw) {
-        True -> Ok(None)
-        False -> decode_native_inner(raw) |> result.map(Some)
-      }
-    },
-    definition: fn() { inner_definition() |> map_schema(tree.NullableSchema) },
-    placeholder: fn() { None },
-    fields: None,
-  )
+  Codec(fn() {
+    let inner_ops = ops(inner)
+    let encode_inner = inner_ops.encode
+    let decode_inner = inner_ops.decode
+    let decode_native_inner = inner_ops.native_decode
+    let inner_definition = inner_ops.definition
+    Ops(
+      text_encode: None,
+      encode: fn(item) {
+        case item {
+          None -> Ok(value.Null)
+          Some(item) ->
+            case encode_inner(item) {
+              Ok(value.Null) -> refuse(NullInsideNullable)
+              other -> other
+            }
+        }
+      },
+      decode: fn(raw) {
+        case raw {
+          value.Null -> Ok(None)
+          _ -> decode_inner(raw) |> result.map(Some)
+        }
+      },
+      native_decode: fn(raw) {
+        case native.is_null(raw) {
+          True -> Ok(None)
+          False -> decode_native_inner(raw) |> result.map(Some)
+        }
+      },
+      definition: fn() { inner_definition() |> map_schema(tree.NullableSchema) },
+      placeholder: fn() { None },
+      fields: None,
+    )
+  })
 }
 
 fn map_schema(
@@ -1331,66 +1365,69 @@ pub fn field(
   then next: fn(a) -> Codec(r),
   get get: fn(r) -> a,
 ) -> Codec(r) {
-  let encode_item = codec.encode
-  let decode_item = codec.decode
-  let decode_native_item = codec.native_decode
-  let item_definition = codec.definition
-  let item_placeholder = codec.placeholder
-  let fields =
-    Fields(
-      encode: fn(record, seen) {
-        let seen = visit_name(name, seen)
-        let item = get(record)
-        use encoded <- result.try(encode_item(item) |> at_encode(Field(name)))
-        use others <- result.map(record_fields(name, next(item)).encode(
-          record,
-          seen,
-        ))
-        [#(name, encoded), ..others]
-      },
-      decode: fn(members, seen) {
-        let seen = visit_name(name, seen)
-        case list.key_find(members, name) {
-          Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
-          Ok(raw) -> {
-            use item <- result.try(decode_item(raw) |> at_decode(Field(name)))
-            use #(record, used) <- result.map(record_fields(name, next(item)).decode(
-              members,
-              seen,
-            ))
-            #(record, used + 1)
+  Codec(fn() {
+    let codec_ops = ops(codec)
+    let encode_item = codec_ops.encode
+    let decode_item = codec_ops.decode
+    let decode_native_item = codec_ops.native_decode
+    let item_definition = codec_ops.definition
+    let item_placeholder = codec_ops.placeholder
+    let fields =
+      Fields(
+        encode: fn(record, seen) {
+          let seen = visit_name(name, seen)
+          let item = get(record)
+          use encoded <- result.try(encode_item(item) |> at_encode(Field(name)))
+          use others <- result.map(record_fields(name, next(item)).encode(
+            record,
+            seen,
+          ))
+          [#(name, encoded), ..others]
+        },
+        decode: fn(members, seen) {
+          let seen = visit_name(name, seen)
+          case list.key_find(members, name) {
+            Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
+            Ok(raw) -> {
+              use item <- result.try(decode_item(raw) |> at_decode(Field(name)))
+              use #(record, used) <- result.map(record_fields(name, next(item)).decode(
+                members,
+                seen,
+              ))
+              #(record, used + 1)
+            }
           }
-        }
-      },
-      native_decode: fn(members, seen) {
-        let seen = visit_name(name, seen)
-        case native.field(members, name) {
-          Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
-          Ok(raw) -> {
-            use item <- result.try(
-              decode_native_item(raw) |> at_decode(Field(name)),
-            )
-            use #(record, used) <- result.map(record_fields(name, next(item)).native_decode(
-              members,
-              seen,
-            ))
-            #(record, used + 1)
+        },
+        native_decode: fn(members, seen) {
+          let seen = visit_name(name, seen)
+          case native.field(members, name) {
+            Error(Nil) -> Error(DecodeError([Field(name)], MissingField))
+            Ok(raw) -> {
+              use item <- result.try(
+                decode_native_item(raw) |> at_decode(Field(name)),
+              )
+              use #(record, used) <- result.map(record_fields(name, next(item)).native_decode(
+                members,
+                seen,
+              ))
+              #(record, used + 1)
+            }
           }
-        }
-      },
-      names: fn() {
-        prepend_name(
-          name,
-          record_fields(name, next(item_placeholder())).names(),
-        )
-      },
-      properties: fn() {
-        use found <- result.try(item_definition())
-        let next_codec = next(item_placeholder())
-        property(name, True, found, next_codec)
-      },
-    )
-  record(fields, fn() { next(item_placeholder()).placeholder() })
+        },
+        names: fn() {
+          prepend_name(
+            name,
+            record_fields(name, next(item_placeholder())).names(),
+          )
+        },
+        properties: fn() {
+          use found <- result.try(item_definition())
+          let next_codec = next(item_placeholder())
+          property(name, True, found, next_codec)
+        },
+      )
+    record(fields, fn() { ops(next(item_placeholder())).placeholder() })
+  })
 }
 
 /// An optional field of a record: absent decodes as `None`, and `None`
@@ -1410,83 +1447,88 @@ pub fn optional_field(
   then next: fn(Option(a)) -> Codec(r),
   get get: fn(r) -> Option(a),
 ) -> Codec(r) {
-  let encode_item = codec.encode
-  let decode_item = codec.decode
-  let decode_native_item = codec.native_decode
-  let item_definition = codec.definition
-  let fields =
-    Fields(
-      encode: fn(record, seen) {
-        let seen = visit_name(name, seen)
-        case get(record) {
-          None -> record_fields(name, next(None)).encode(record, seen)
-          Some(item) as found -> {
-            use encoded <- result.try(
-              encode_item(item) |> at_encode(Field(name)),
-            )
-            use others <- result.map(record_fields(name, next(found)).encode(
-              record,
-              seen,
-            ))
-            [#(name, encoded), ..others]
+  Codec(fn() {
+    let codec_ops = ops(codec)
+    let encode_item = codec_ops.encode
+    let decode_item = codec_ops.decode
+    let decode_native_item = codec_ops.native_decode
+    let item_definition = codec_ops.definition
+    let fields =
+      Fields(
+        encode: fn(record, seen) {
+          let seen = visit_name(name, seen)
+          case get(record) {
+            None -> record_fields(name, next(None)).encode(record, seen)
+            Some(item) as found -> {
+              use encoded <- result.try(
+                encode_item(item) |> at_encode(Field(name)),
+              )
+              use others <- result.map(record_fields(name, next(found)).encode(
+                record,
+                seen,
+              ))
+              [#(name, encoded), ..others]
+            }
           }
-        }
-      },
-      decode: fn(members, seen) {
-        let seen = visit_name(name, seen)
-        case list.key_find(members, name) {
-          Error(Nil) -> record_fields(name, next(None)).decode(members, seen)
-          Ok(raw) -> {
-            use item <- result.try(decode_item(raw) |> at_decode(Field(name)))
-            use #(record, used) <- result.map(record_fields(
-              name,
-              next(Some(item)),
-            ).decode(members, seen))
-            #(record, used + 1)
+        },
+        decode: fn(members, seen) {
+          let seen = visit_name(name, seen)
+          case list.key_find(members, name) {
+            Error(Nil) -> record_fields(name, next(None)).decode(members, seen)
+            Ok(raw) -> {
+              use item <- result.try(decode_item(raw) |> at_decode(Field(name)))
+              use #(record, used) <- result.map(record_fields(
+                name,
+                next(Some(item)),
+              ).decode(members, seen))
+              #(record, used + 1)
+            }
           }
-        }
-      },
-      native_decode: fn(members, seen) {
-        let seen = visit_name(name, seen)
-        case native.field(members, name) {
-          Error(Nil) ->
-            record_fields(name, next(None)).native_decode(members, seen)
-          Ok(raw) -> {
-            use item <- result.try(
-              decode_native_item(raw) |> at_decode(Field(name)),
-            )
-            use #(record, used) <- result.map(record_fields(
-              name,
-              next(Some(item)),
-            ).native_decode(members, seen))
-            #(record, used + 1)
+        },
+        native_decode: fn(members, seen) {
+          let seen = visit_name(name, seen)
+          case native.field(members, name) {
+            Error(Nil) ->
+              record_fields(name, next(None)).native_decode(members, seen)
+            Ok(raw) -> {
+              use item <- result.try(
+                decode_native_item(raw) |> at_decode(Field(name)),
+              )
+              use #(record, used) <- result.map(record_fields(
+                name,
+                next(Some(item)),
+              ).native_decode(members, seen))
+              #(record, used + 1)
+            }
           }
-        }
-      },
-      names: fn() {
-        prepend_name(name, record_fields(name, next(None)).names())
-      },
-      properties: fn() {
-        use found <- result.try(item_definition())
-        property(name, False, found, next(None))
-      },
-    )
-  record(fields, fn() { next(None).placeholder() })
+        },
+        names: fn() {
+          prepend_name(name, record_fields(name, next(None)).names())
+        },
+        properties: fn() {
+          use found <- result.try(item_definition())
+          property(name, False, found, next(None))
+        },
+      )
+    record(fields, fn() { ops(next(None)).placeholder() })
+  })
 }
 
 /// The end of a record: the value built from the decoded fields. Alone,
 /// `success(x)` is the empty object `{}`, which decodes as `x`.
 pub fn success(value: r) -> Codec(r) {
-  record(
-    Fields(
-      encode: fn(_, _) { Ok([]) },
-      decode: fn(_, _) { Ok(#(value, 0)) },
-      native_decode: fn(_, _) { Ok(#(value, 0)) },
-      names: fn() { [] },
-      properties: fn() { Ok([]) },
-    ),
-    fn() { value },
-  )
+  Codec(fn() {
+    record(
+      Fields(
+        encode: fn(_, _) { Ok([]) },
+        decode: fn(_, _) { Ok(#(value, 0)) },
+        native_decode: fn(_, _) { Ok(#(value, 0)) },
+        names: fn() { [] },
+        properties: fn() { Ok([]) },
+      ),
+      fn() { value },
+    )
+  })
 }
 
 fn property(
@@ -1495,7 +1537,7 @@ fn property(
   found: Option(Tree),
   next_codec: Codec(r),
 ) -> Result(List(Property), DefinitionError) {
-  case next_codec.fields {
+  case ops(next_codec).fields {
     None -> Error(NotARecord(name))
     Some(fields) -> {
       use others <- result.try(fields.properties())
@@ -1524,13 +1566,13 @@ fn prepend_name(name: String, others: List(String)) -> List(String) {
 }
 
 fn record_fields(after: String, codec: Codec(r)) -> Fields(r) {
-  case codec.fields {
+  case ops(codec).fields {
     Some(fields) -> fields
     None -> definition_panic(NotARecord(after))
   }
 }
 
-fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
+fn record(fields: Fields(r), placeholder: fn() -> r) -> Ops(r) {
   let Fields(
     encode: encode_fields,
     decode: decode_fields,
@@ -1538,7 +1580,7 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Codec(r) {
     names:,
     properties:,
   ) = fields
-  Codec(
+  Ops(
     text_encode: None,
     encode: fn(item) {
       encode_fields(item, dict.new()) |> result.map(value.Object)
@@ -1625,31 +1667,56 @@ fn check_native_members(
 
 // --- unions ------------------------------------------------------------------
 
-/// The variants of a union under construction; see `union`. Each operation
-/// keeps its own list of cases, so a callback of the finished codec retains
-/// only the payload operations it calls.
+/// The variants of a union under construction; see `union`.
 pub opaque type Union(t) {
   Union(
-    decoders: List(Case(fn(Value) -> Result(t, DecodeError))),
-    native_decoders: List(Case(fn(native.Raw) -> Result(t, DecodeError))),
-    definitions: List(Case(fn() -> Result(Option(Tree), DefinitionError))),
-    // The placeholder of the first variant.
-    placeholder: Option(fn() -> t),
-    encode: fn(t) -> Tagged(t),
+    // In declaration order.
+    variants: List(Variant(t)),
+    select: fn(t) -> Tagged(t),
     defect: Option(DefinitionError),
   )
 }
 
-/// One operation of a variant.
-type Case(run) {
-  Case(tag: String, has_payload: Bool, run: run)
+/// A case of a union. One closure holds the payload codec once and builds
+/// the variant's operations when the union is used.
+type Variant(t) {
+  Variant(
+    tag: String,
+    token: Identity,
+    has_payload: Bool,
+    ops: fn() -> VariantOps(t),
+  )
+}
+
+type VariantOps(t) {
+  VariantOps(
+    // The payload of a value this variant tagged; see `encode_union`.
+    encode: fn(Dynamic) -> Result(Value, EncodeError),
+    decode: fn(Value) -> Result(t, DecodeError),
+    native_decode: fn(native.Raw) -> Result(t, DecodeError),
+    definition: fn() -> Result(Option(Tree), DefinitionError),
+    placeholder: fn() -> t,
+  )
 }
 
 /// A value of a union with its tag, made by the function that `variant` or
 /// `unit_variant` passes on.
 pub opaque type Tagged(t) {
-  Tagged(tag: String, payload: Option(Result(Value, EncodeError)))
+  Tagged(token: Identity, payload: Option(Dynamic))
 }
+
+/// A variant's identity: an Erlang reference or a JavaScript symbol, unique
+/// across runtimes and nodes, that ties a tagged value to the variant that
+/// tagged it.
+type Identity
+
+@external(erlang, "erlang", "make_ref")
+@external(javascript, "../../json_blueprint_ffi.mjs", "identity")
+fn new_identity() -> Identity
+
+@external(erlang, "gleam_dynamic", "identity")
+@external(javascript, "../../gleam_dynamic.mjs", "identity")
+fn coerce(item: a) -> b
 
 /// A codec for a sum type. Each case is a `variant` with a payload or a
 /// `unit_variant` without one, and `match` maps each value to its case:
@@ -1672,54 +1739,49 @@ pub opaque type Tagged(t) {
 /// The JSON is `{"tag": "circle", "value": 2}`; a unit variant has no
 /// `"value"`. Gleam checks the `case` for exhaustiveness. A repeated tag or a
 /// union with no variants is a definition mistake.
+///
+/// `match` must return only what this union's own `variant` and
+/// `unit_variant` pass on. A value tagged by another union's tagging function
+/// or tagged value, such as one captured from an enclosing union, panics when
+/// it is encoded, and `check` cannot see it. The payload is encoded after
+/// `match` returns, for the value `match` returned.
 pub fn union(variants: Union(t)) -> Codec(t) {
-  let Union(
-    decoders:,
-    native_decoders:,
-    definitions:,
-    placeholder:,
-    encode: tag_item,
-    defect:,
-  ) = variants
-  let defect = case defect, placeholder {
+  let Union(variants:, select:, defect:) = variants
+  let defect = case defect, variants {
     Some(_), _ -> defect
-    None, None -> Some(EmptyUnion)
-    None, Some(_) -> None
+    None, [] -> Some(EmptyUnion)
+    None, _ -> None
   }
-  Codec(
-    text_encode: None,
-    encode: fn(item) {
-      ensure(defect)
-      let Tagged(tag, payload) = tag_item(item)
-      let tag_member = #("tag", value.String(tag))
-      case payload {
-        None -> Ok(value.Object([tag_member]))
-        Some(Ok(encoded)) -> Ok(value.Object([tag_member, #("value", encoded)]))
-        Some(Error(error)) -> Error(error) |> at_encode(Field("value"))
-      }
-    },
-    decode: fn(raw) {
-      ensure(defect)
-      decode_union(decoders, raw)
-    },
-    native_decode: fn(raw) {
-      ensure(defect)
-      decode_native_union(native_decoders, raw)
-    },
-    definition: fn() {
-      case defect {
-        Some(error) -> Error(error)
-        None -> union_schema(definitions, [])
-      }
-    },
-    placeholder: fn() {
-      case placeholder {
-        Some(first) -> first()
-        None -> definition_panic(EmptyUnion)
-      }
-    },
-    fields: None,
-  )
+  Codec(fn() {
+    Ops(
+      text_encode: None,
+      encode: fn(item) {
+        ensure(defect)
+        encode_union(variants, select(item))
+      },
+      decode: fn(raw) {
+        ensure(defect)
+        decode_union(variants, raw)
+      },
+      native_decode: fn(raw) {
+        ensure(defect)
+        decode_native_union(variants, raw)
+      },
+      definition: fn() {
+        case defect {
+          Some(error) -> Error(error)
+          None -> union_schema(variants, [])
+        }
+      },
+      placeholder: fn() {
+        case variants {
+          [first, ..] -> first.ops().placeholder()
+          [] -> definition_panic(EmptyUnion)
+        }
+      },
+      fields: None,
+    )
+  })
 }
 
 /// A case of a union whose JSON carries a payload. `next` receives the
@@ -1730,19 +1792,25 @@ pub fn variant(
   construct construct: fn(p) -> t,
   then next: fn(fn(p) -> Tagged(t)) -> Union(t),
 ) -> Union(t) {
-  let encode_payload = payload.encode
-  let decode_payload = payload.decode
-  let decode_native_payload = payload.native_decode
-  let payload_placeholder = payload.placeholder
-  let rest = next(fn(item) { Tagged(tag, Some(encode_payload(item))) })
+  // The tagging function holds only the token, never the payload codec,
+  // which the variant holds once.
+  let token = new_identity()
+  let rest = next(fn(item) { Tagged(token, Some(coerce(item))) })
   add_variant(
     rest,
-    tag,
-    True,
-    fn(raw) { decode_payload(raw) |> result.map(construct) },
-    fn(raw) { decode_native_payload(raw) |> result.map(construct) },
-    payload.definition,
-    fn() { construct(payload_placeholder()) },
+    Variant(tag, token, True, fn() {
+      let payload_ops = ops(payload)
+      VariantOps(
+        // `encode_union` checked the token, so the value is a `p`.
+        encode: fn(item) { payload_ops.encode(coerce(item)) },
+        decode: fn(raw) { payload_ops.decode(raw) |> result.map(construct) },
+        native_decode: fn(raw) {
+          payload_ops.native_decode(raw) |> result.map(construct)
+        },
+        definition: payload_ops.definition,
+        placeholder: fn() { construct(payload_ops.placeholder()) },
+      )
+    }),
   )
 }
 
@@ -1753,59 +1821,89 @@ pub fn unit_variant(
   value item: t,
   then next: fn(Tagged(t)) -> Union(t),
 ) -> Union(t) {
-  let rest = next(Tagged(tag, None))
+  let token = new_identity()
+  let rest = next(Tagged(token, None))
   add_variant(
     rest,
-    tag,
-    False,
-    fn(_) { Ok(item) },
-    fn(_) { Ok(item) },
-    fn() { Ok(None) },
-    fn() { item },
+    Variant(tag, token, False, fn() {
+      VariantOps(
+        encode: fn(_) { Ok(value.Null) },
+        decode: fn(_) { Ok(item) },
+        native_decode: fn(_) { Ok(item) },
+        definition: fn() { Ok(None) },
+        placeholder: fn() { item },
+      )
+    }),
   )
 }
 
-/// The end of a union: the function that maps each value to its case.
+/// The end of a union: the function that maps each value to its case,
+/// using the tagging functions and tagged values this union passed on.
 pub fn match(encode: fn(t) -> Tagged(t)) -> Union(t) {
-  Union([], [], [], None, encode, None)
+  Union([], encode, None)
 }
 
-fn add_variant(
-  rest: Union(t),
-  tag: String,
-  has_payload: Bool,
-  decode: fn(Value) -> Result(t, DecodeError),
-  native_decode: fn(native.Raw) -> Result(t, DecodeError),
-  definition: fn() -> Result(Option(Tree), DefinitionError),
-  placeholder: fn() -> t,
-) -> Union(t) {
-  let repeated = list.any(rest.decoders, fn(other) { other.tag == tag })
+fn add_variant(rest: Union(t), variant: Variant(t)) -> Union(t) {
+  let tag = variant.tag
+  let repeated = list.any(rest.variants, fn(other) { other.tag == tag })
   let defect = case rest.defect, repeated {
     Some(_), _ -> rest.defect
     None, True -> Some(DuplicateTag(tag))
     None, False -> None
   }
-  Union(
-    decoders: [Case(tag, has_payload, decode), ..rest.decoders],
-    native_decoders: [
-      Case(tag, has_payload, native_decode),
-      ..rest.native_decoders
-    ],
-    definitions: [Case(tag, has_payload, definition), ..rest.definitions],
-    placeholder: Some(placeholder),
-    encode: rest.encode,
-    defect:,
-  )
+  Union([variant, ..rest.variants], rest.select, defect)
+}
+
+fn find_variant(
+  variants: List(Variant(t)),
+  tag: String,
+) -> Result(Variant(t), Nil) {
+  list.find(variants, fn(variant) { variant.tag == tag })
+}
+
+fn encode_union(
+  variants: List(Variant(t)),
+  tagged: Tagged(t),
+) -> Result(Value, EncodeError) {
+  let Tagged(token, payload) = tagged
+  case list.find(variants, fn(variant) { variant.token == token }), payload {
+    Ok(Variant(tag:, has_payload: False, ..)), None ->
+      Ok(value.Object([#("tag", value.String(tag))]))
+    Ok(Variant(tag:, has_payload: True, ops:, ..)), Some(item) ->
+      case ops().encode(item) {
+        Ok(encoded) ->
+          Ok(
+            value.Object([
+              #("tag", value.String(tag)),
+              #("value", encoded),
+            ]),
+          )
+        Error(error) -> Error(error) |> at_encode(Field("value"))
+      }
+    _, _ -> foreign_tag_panic(variants)
+  }
+}
+
+/// A tagging function or tagged value belongs to the union whose `variant`
+/// or `unit_variant` passed it on.
+fn foreign_tag_panic(variants: List(Variant(t))) -> b {
+  panic as {
+    "json_blueprint: the union with tags "
+    <> string.join(list.map(variants, fn(variant) { quote(variant.tag) }), ", ")
+    <> " was given a value tagged by a tagging function or tagged value from "
+    <> "another codec.union; in `match`, use only what this union's "
+    <> "`variant` and `unit_variant` pass on"
+  }
 }
 
 fn union_schema(
-  variants: List(Case(fn() -> Result(Option(Tree), DefinitionError))),
+  variants: List(Variant(t)),
   done: List(tree.VariantSchema),
 ) -> Result(Option(Tree), DefinitionError) {
   case variants {
     [] -> Ok(Some(tree.UnionSchema(list.reverse(done))))
     [variant, ..rest] -> {
-      use found <- result.try(variant.run())
+      use found <- result.try(variant.ops().definition())
       case variant.has_payload, found {
         False, _ ->
           union_schema(rest, [tree.VariantSchema(variant.tag, None), ..done])
@@ -1823,7 +1921,7 @@ fn union_schema(
 }
 
 fn decode_union(
-  variants: List(Case(fn(Value) -> Result(t, DecodeError))),
+  variants: List(Variant(t)),
   raw: Value,
 ) -> Result(t, DecodeError) {
   case raw {
@@ -1832,17 +1930,18 @@ fn decode_union(
       case list.key_find(members, "tag") {
         Error(Nil) -> Error(DecodeError([Field("tag")], MissingField))
         Ok(value.String(tag)) ->
-          case list.find(variants, fn(variant) { variant.tag == tag }) {
+          case find_variant(variants, tag) {
             Error(Nil) -> Error(DecodeError([Field("tag")], UnknownTag))
             Ok(variant) ->
               case variant.has_payload, list.key_find(members, "value") {
                 True, Ok(payload) ->
-                  variant.run(payload) |> at_decode(Field("value"))
+                  variant.ops().decode(payload)
+                  |> at_decode(Field("value"))
                 True, Error(Nil) ->
                   Error(DecodeError([Field("value")], MissingField))
                 False, Ok(_) ->
                   Error(DecodeError([Field("value")], UnknownField))
-                False, Error(Nil) -> variant.run(value.Null)
+                False, Error(Nil) -> variant.ops().decode(value.Null)
               }
           }
         Ok(_) -> Error(DecodeError([Field("tag")], ExpectedString))
@@ -1852,10 +1951,8 @@ fn decode_union(
   }
 }
 
-// --- mapping -----------------------------------------------------------------
-
 fn decode_native_union(
-  variants: List(Case(fn(native.Raw) -> Result(t, DecodeError))),
+  variants: List(Variant(t)),
   raw: native.Raw,
 ) -> Result(t, DecodeError) {
   use names <- result.try(
@@ -1871,16 +1968,20 @@ fn decode_native_union(
     |> result.replace_error(DecodeError([Field("tag")], ExpectedString)),
   )
   use variant <- result.try(
-    list.find(variants, fn(variant) { variant.tag == tag })
+    find_variant(variants, tag)
     |> result.replace_error(DecodeError([Field("tag")], UnknownTag)),
   )
   case variant.has_payload, native.field(raw, "value") {
-    True, Ok(payload) -> variant.run(payload) |> at_decode(Field("value"))
+    True, Ok(payload) ->
+      variant.ops().native_decode(payload)
+      |> at_decode(Field("value"))
     True, Error(Nil) -> Error(DecodeError([Field("value")], MissingField))
     False, Ok(_) -> Error(DecodeError([Field("value")], UnknownField))
-    False, Error(Nil) -> variant.run(raw)
+    False, Error(Nil) -> variant.ops().native_decode(raw)
   }
 }
+
+// --- mapping -----------------------------------------------------------------
 
 /// Convert a codec to another type with total conversions in both
 /// directions, such as `map(codec.string(), decode: Email, encode: fn(e) {
@@ -1890,19 +1991,22 @@ pub fn map(
   decode from: fn(a) -> b,
   encode to: fn(b) -> a,
 ) -> Codec(b) {
-  let encode_inner = codec.encode
-  let decode_inner = codec.decode
-  let decode_native_inner = codec.native_decode
-  let inner_placeholder = codec.placeholder
-  Codec(
-    text_encode: None,
-    encode: fn(item) { encode_inner(to(item)) },
-    decode: fn(raw) { decode_inner(raw) |> result.map(from) },
-    native_decode: fn(raw) { decode_native_inner(raw) |> result.map(from) },
-    definition: codec.definition,
-    placeholder: fn() { from(inner_placeholder()) },
-    fields: None,
-  )
+  Codec(fn() {
+    let codec_ops = ops(codec)
+    let encode_inner = codec_ops.encode
+    let decode_inner = codec_ops.decode
+    let decode_native_inner = codec_ops.native_decode
+    let inner_placeholder = codec_ops.placeholder
+    Ops(
+      text_encode: None,
+      encode: fn(item) { encode_inner(to(item)) },
+      decode: fn(raw) { decode_inner(raw) |> result.map(from) },
+      native_decode: fn(raw) { decode_native_inner(raw) |> result.map(from) },
+      definition: codec_ops.definition,
+      placeholder: fn() { from(inner_placeholder()) },
+      fields: None,
+    )
+  })
 }
 
 /// Like `map`, with conversions that may fail with a message. A failure is
@@ -1932,31 +2036,34 @@ pub fn try_map(
   encode to: fn(b) -> Result(a, String),
   placeholder placeholder: b,
 ) -> Codec(b) {
-  let encode_inner = codec.encode
-  let decode_inner = codec.decode
-  let decode_native_inner = codec.native_decode
-  Codec(
-    text_encode: None,
-    encode: fn(item) {
-      case to(item) {
-        Ok(inner) -> encode_inner(inner)
-        Error(message) -> refuse(Custom(message))
-      }
-    },
-    decode: fn(raw) {
-      use inner <- result.try(decode_inner(raw))
-      from(inner)
-      |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
-    },
-    native_decode: fn(raw) {
-      use inner <- result.try(decode_native_inner(raw))
-      from(inner)
-      |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
-    },
-    definition: codec.definition,
-    placeholder: fn() { placeholder },
-    fields: None,
-  )
+  Codec(fn() {
+    let codec_ops = ops(codec)
+    let encode_inner = codec_ops.encode
+    let decode_inner = codec_ops.decode
+    let decode_native_inner = codec_ops.native_decode
+    Ops(
+      text_encode: None,
+      encode: fn(item) {
+        case to(item) {
+          Ok(inner) -> encode_inner(inner)
+          Error(message) -> refuse(Custom(message))
+        }
+      },
+      decode: fn(raw) {
+        use inner <- result.try(decode_inner(raw))
+        from(inner)
+        |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
+      },
+      native_decode: fn(raw) {
+        use inner <- result.try(decode_native_inner(raw))
+        from(inner)
+        |> result.map_error(fn(message) { DecodeError([], Custom(message)) })
+      },
+      definition: codec_ops.definition,
+      placeholder: fn() { placeholder },
+      fields: None,
+    )
+  })
 }
 
 /// A codec from your own functions over `Value`. `schema` is its schema, or
@@ -1973,24 +2080,26 @@ pub fn custom(
   schema schema: Option(Schema),
   placeholder placeholder: a,
 ) -> Codec(a) {
-  Codec(
-    text_encode: None,
-    encode:,
-    decode:,
-    native_decode: fn(raw) {
-      use raw <- result.try(native_value(raw))
-      decode(raw)
-    },
-    definition: fn() {
-      case schema {
-        None -> Ok(None)
-        Some(found) ->
-          validate_tree(found.tree) |> result.replace(Some(found.tree))
-      }
-    },
-    placeholder: fn() { placeholder },
-    fields: None,
-  )
+  Codec(fn() {
+    Ops(
+      text_encode: None,
+      encode:,
+      decode:,
+      native_decode: fn(raw) {
+        use raw <- result.try(native_value(raw))
+        decode(raw)
+      },
+      definition: fn() {
+        case schema {
+          None -> Ok(None)
+          Some(found) ->
+            validate_tree(found.tree) |> result.replace(Some(found.tree))
+        }
+      },
+      placeholder: fn() { placeholder },
+      fields: None,
+    )
+  })
 }
 
 /// The first definition mistake in a schema tree. Every `Schema` that this
@@ -2300,13 +2409,15 @@ pub fn generated(
   schema schema: Schema,
   placeholder placeholder: fn() -> a,
 ) -> Codec(a) {
-  Codec(
-    text_encode: Some(text_encode),
-    encode:,
-    decode:,
-    native_decode: strict_decode,
-    definition: fn() { Ok(Some(schema.tree)) },
-    placeholder:,
-    fields: None,
-  )
+  Codec(fn() {
+    Ops(
+      text_encode: Some(text_encode),
+      encode:,
+      decode:,
+      native_decode: strict_decode,
+      definition: fn() { Ok(Some(schema.tree)) },
+      placeholder:,
+      fields: None,
+    )
+  })
 }
