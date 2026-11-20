@@ -332,7 +332,7 @@ Where flat exceeds in-heap in the candidate, the fixture shares a value between
 layers, or a union variant's reference is held by the variant and its tagging
 function; `test/codec_input_once_test.gleam` asserts both bounds per combinator.
 The schema-generated order codec of `examples/codegen`, unchanged, copies in
-2,504 bytes against 105,112.
+1,672 bytes against 105,112 (1,592 in-heap).
 
 Consumer shapes, from a harness that builds the consumers' codecs against each
 source and compares their encoded payloads and schema text (byte-identical).
@@ -359,7 +359,7 @@ the chain:
 | In field: construct | 0.74 [0.74–0.79] | 0.45 [0.45–0.47] | 0.60 |
 | In field: encode / decode | 321.7 / 304.1 | 316.1 / 297.4 | 0.98 / 0.98 |
 | Prebuilt: encode / decode | 107.5 / 94.6 | 94.7 / 82.3 | 0.88 / 0.87 |
-| Prebuilt: schema | 32.2 [32.2–33.8] | 35.1 [35.1–38.4] | 1.09 |
+| Prebuilt: schema | 32.2 [32.2–33.8] | 35.0 [35.0–38.4] | 1.09 |
 | Generated: encode / decode / schema | 37.7 / 68.5 / 19.1 | 37.9 / 67.1 / 19.1 | 1.01 / 0.98 / 1.00 |
 | Union list, 100 records: encode / decode | 458.5 / 319.0 | 478.7 / 314.7 | 1.04 / 0.99 |
 
@@ -383,9 +383,9 @@ build):
 
 | Slice | Kept | Effect |
 | --- | --- | --- |
-| Constant operations for input-free leaves | yes | Erlang prebuilt schema 1.18 → 1.09; fewer words; the application's expansion input codec 1.40 → 1.02 |
-| Digits counted by bytes | yes | Node encode 0.89 (in field) and 0.84 (prebuilt); union encode 0.61 |
-| Field names tracked in a short list | yes | Erlang prebuilt encode 1.06 → 0.81 and decode 1.00 → 0.91 per entry |
+| Constant operations for input-free leaves | yes | Erlang prebuilt schema 1.18 → 1.09; fewer words; the application's expansion input codec, at 1.40 on the representation alone, is 1.02 with all kept slices |
+| Digits counted by bytes | yes | Node, ten entries: encode 0.91 (in field) and 0.84 (prebuilt); union encode 0.61 |
+| Field names tracked in a short list | yes | Erlang prebuilt, per entry: encode 1.06 → 0.81 and decode 1.04 → 0.94 |
 | Short enums scanned for repeats | yes | Node construction 0.87 → 0.25, encode 0.89 → 0.73 |
 | Direct JSON text for `encode_json` | no | Erlang encode 0.98 → 1.06, union encode 1.00 → 1.22; decode slower on both targets |
 

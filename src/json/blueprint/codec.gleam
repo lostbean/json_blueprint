@@ -701,7 +701,8 @@ pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
 // --- primitives --------------------------------------------------------------
 
 /// A codec with no inputs: its operations are a module constant of named
-/// functions, so using it allocates nothing and copying it costs nothing.
+/// functions, so using it allocates nothing, and the codec is a few words
+/// that refer to a module literal, which a process copy does not copy.
 fn leaf(operations: fn() -> Ops(a)) -> Codec(a) {
   Codec(operations)
 }
@@ -1908,8 +1909,9 @@ fn coerce(item: a) -> b
 /// `match` must return only what this union's own `variant` and
 /// `unit_variant` pass on. A value tagged by another union's tagging function
 /// or tagged value, such as one captured from an enclosing union, panics when
-/// it is encoded, and `check` cannot see it. The payload is encoded after
-/// `match` returns, for the value `match` returned.
+/// it is encoded, and `check` cannot see it. A payload is encoded when the
+/// union encodes the value `match` returned, not when a tagging function is
+/// called, in `match` or elsewhere in the union block.
 pub fn union(variants: Union(t)) -> Codec(t) {
   let Union(variants:, select:, defect:) = variants
   let defect = case defect, variants {
