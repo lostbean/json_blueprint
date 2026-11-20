@@ -193,8 +193,9 @@ pub fn captured_reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   codec.success(Reply(id:, answer:))
 }
 
-/// The first field keeps only the operations its callbacks call, so no
-/// continuation captures the parameter. This changes the order of the encoded members and of the
+/// On 2.1.x the first field keeps only the operations its callbacks call, so
+/// no continuation captures the parameter; from 2.2.0 either order copies the
+/// parameter once. This changes the order of the encoded members and of the
 /// schema's properties; decoding accepts members in any order.
 pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
