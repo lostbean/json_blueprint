@@ -84,6 +84,32 @@ pub fn captured_answer_codec() -> Codec(Answer) {
 
 // snips-end: let-bound
 
+/// A reply that carries a caller's answer, whose codec arrives as a parameter.
+pub type Reply(a) {
+  Reply(id: String, answer: a)
+}
+
+// snips-start: parameter
+/// Avoid when the codec is sent: the `answer` parameter is used by a later
+/// field, so every continuation after the first field captures it, as a
+/// `let`-bound child codec would be.
+pub fn captured_reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
+  use id <- codec.field("id", codec.string(), get: fn(r) { r.id })
+  use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
+  codec.success(Reply(id:, answer:))
+}
+
+/// The first field keeps only the operations its callbacks call, so no
+/// continuation captures the parameter. This changes the order of the encoded members and of the
+/// schema's properties; decoding accepts members in any order.
+pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
+  use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
+  use id <- codec.field("id", codec.string(), get: fn(r) { r.id })
+  codec.success(Reply(id:, answer:))
+}
+
+// snips-end: parameter
+
 /// Runs the example and returns what it shows.
 pub fn demonstrate() -> String {
   let contact =
@@ -103,5 +129,11 @@ pub fn demonstrate() -> String {
   assert codec.decode_json(captured_answer_codec(), text) == Ok(answer)
   assert codec.schema_json(answer_codec())
     == codec.schema_json(captured_answer_codec())
+  // Both reply codecs decode the same JSON, whatever the member order.
+  let reply = Reply("r-1", contact)
+  let assert Ok(reply_text) =
+    codec.encode_json(captured_reply_codec(contact_codec()), reply)
+  assert codec.decode_json(reply_codec(contact_codec()), reply_text)
+    == Ok(reply)
   "encoded: " <> text
 }

@@ -54,9 +54,9 @@
 //// Sending a codec, or a value that holds one, to another BEAM process
 //// copies it without sharing. Build each child codec in the field that uses
 //// it, directly or by calling a function there. A child codec, or any large
-//// value, bound with `let` before the `use` chain and used by a later field
-//// is captured by the continuation and copied once per callback that holds
-//// it. For a codec whose shape is fixed at build time and that other
+//// value, bound with `let` before the `use` chain or passed in as a
+//// parameter, and used by a later field, is captured by the continuation and
+//// copied once per callback that holds it. For a codec whose shape is fixed at build time and that other
 //// processes hold, the generator in `json/blueprint/codegen` emits module
 //// functions and literals instead.
 //// The codec practice guide, `docs/CODEC-PRACTICE.md` in the repository,

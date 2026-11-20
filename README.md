@@ -96,11 +96,13 @@ size when it is sent to another BEAM process.
   child codec, so it stays small to send. Sending decoded data costs the same
   with either kind of codec.
 - Write it with combinators when the shape depends on run-time values, needs
-  tagged unions or recursion, uses `custom`, `value` or arbitrary `try_map`, or
-  is used once.
+  tagged unions, shared definitions or recursion, uses `custom`, `value` or
+  arbitrary `try_map`, or is used once. For a fixed shape that is neither hot
+  nor held by other processes, default to combinators.
 - In a combinator codec, build each child codec in the field that uses it.
-  A child codec bound with `let` before a `use … <- codec.field` chain is
-  copied once per callback when the codec is sent to another process.
+  A child codec bound with `let` before a `use … <- codec.field` chain, or
+  passed in as a parameter and used by a later field, is copied once per
+  callback when the codec is sent to another process.
 
 The [codec practice guide](https://github.com/lostbean/json_blueprint/blob/main/docs/CODEC-PRACTICE.md) gives the measurements, the rules for
 combinator codecs with examples, a copy-size test, and the generator's current

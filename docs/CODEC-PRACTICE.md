@@ -141,12 +141,48 @@ pub fn answer_codec() -> Codec(Answer) {
 
 <!-- prettier-ignore-end -->
 
+A codec passed in as a function parameter and used by a later field is
+captured in the same way, because the continuation refers to the parameter.
+Use such a codec in the first field when the wire order allows: the first
+field keeps only the operations its callbacks call, so no continuation
+captures the codec. Reordering
+changes the order of the encoded members and of the schema's properties, while
+decoding accepts members in any order. When the order is fixed, for instance by
+a stored format, the record continuation limit below owns the cost.
+
+<!-- prettier-ignore-start -->
+
+<!-- snips: ../examples/src/examples/child_codecs.gleam#parameter -->
+```gleam
+/// Avoid when the codec is sent: the `answer` parameter is used by a later
+/// field, so every continuation after the first field captures it, as a
+/// `let`-bound child codec would be.
+pub fn captured_reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
+  use id <- codec.field("id", codec.string(), get: fn(r) { r.id })
+  use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
+  codec.success(Reply(id:, answer:))
+}
+
+/// The first field keeps only the operations its callbacks call, so no
+/// continuation captures the parameter. This changes the order of the encoded members and of the
+/// schema's properties; decoding accepts members in any order.
+pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
+  use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
+  use id <- codec.field("id", codec.string(), get: fn(r) { r.id })
+  codec.success(Reply(id:, answer:))
+}
+
+```
+
+<!-- prettier-ignore-end -->
+
 Measured flat sizes:
 
 | Codec | `let`-bound children | Children built in their fields |
 | --- | ---: | ---: |
 | [`child_codecs`](../examples/src/examples/child_codecs.gleam) answer codec | 19.7 kB | 1.6 kB |
 | Codegen consumer submission envelope (`order_app.submission_codec`) | 1.26 MB | 1.7 kB |
+| [`child_codecs`](../examples/src/examples/child_codecs.gleam) reply codec, contact codec as a parameter | 19.7 kB (later field) | 3.0 kB (first field) |
 | A consumer's model-answer codec ([observation](BENCHMARKS.md#generated-and-combinator-codecs-in-a-consumer-2026-11-19)) | 88.6 kB | 1.9 kB |
 
 Both forms convert the same JSON and describe the same schema. A child built

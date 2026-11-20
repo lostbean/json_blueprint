@@ -34,6 +34,14 @@ pub fn a_let_bound_child_codec_is_copied_once_per_callback_test() {
   { captured > built * 10 } |> should.be_true
 }
 
+pub fn a_codec_parameter_used_by_a_later_field_is_copied_per_callback_test() {
+  let contact = child_codecs.contact_codec()
+  use first <- copy_size(child_codecs.reply_codec(contact))
+  use later <- copy_size(child_codecs.captured_reply_codec(contact))
+  { first < 4096 } |> should.be_true
+  { later > first * 5 } |> should.be_true
+}
+
 pub fn a_runtime_enum_built_in_its_field_copies_less_than_a_prebuilt_one_test() {
   let offered = ["doc-1", "doc-2", "doc-3", "doc-4", "doc-5"]
   use in_field <- copy_size(runtime_enum.citation_codec(offered))
