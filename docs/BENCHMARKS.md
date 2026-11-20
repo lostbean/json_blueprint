@@ -413,7 +413,13 @@ encode 0.83 and decode 0.81; on Node 0.20, 0.60, 0.82, 0.63 and 0.84.
 
 All three use `codegen.runtime`, whose record codec is built through
 `codec.deferred` on every use; on the other target each is at most 1.10
-(Erlang 1.10 and 1.01, Node 1.10). Erlang `legacy_value_runtime_inline_encode`
+(Erlang 1.10 and 1.01, Node 1.10). Timed alone on an idle machine (minimum of
+nine batches, three fresh VMs per build), schema discovery of the order codec
+costs 1.42 → 1.74 µs on Erlang and 3.6 → 4.6 µs on Node, and a decode
+3.8 → 4.5 µs on Node; rendering the discovered schema is unchanged (Erlang
+document 1.55 / 1.57 µs, text 15.7 / 15.4 µs). The extra is the rebuild of the
+record's field chain, which holding the definition once without a cache
+requires; the owner accepted these rows for 2.2.0 on 2026-11-20. Erlang `legacy_value_runtime_inline_encode`
 (1.10) sits beside `vanilla_parsed_dynamic_typed_decode` (1.10), which uses no
 codec.
 
