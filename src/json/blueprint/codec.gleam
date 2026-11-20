@@ -2562,6 +2562,16 @@ fn variant_schema_value(variant: tree.VariantSchema) -> Value {
   }
 }
 
+/// A codec that `build` makes each time it is used. The one stored closure
+/// holds what `build` captures once, so library code that would otherwise
+/// capture an input in several closures, such as `contract.value_codec`,
+/// keeps the copy promise of ADR 0018. `build` must make the same codec on
+/// every call and run no caller callback.
+@internal
+pub fn deferred(build: fn() -> Codec(a)) -> Codec(a) {
+  Codec(fn() { ops(build()) })
+}
+
 /// Register compiler-checked generated operations and their checked schema.
 /// Generated modules share the strict parser and decode its retained evidence
 /// directly. The placeholder stays lazy, as it is for ordinary codecs.

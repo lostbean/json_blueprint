@@ -49,3 +49,13 @@ pub fn the_first_mistake_wins_for_few_and_many_labels_test() {
     |> should.equal(Error(codec.DuplicateEnumValue("twice")))
   })
 }
+
+/// An entry that repeats both an earlier label and an earlier value reports
+/// the label, for few labels and for many.
+pub fn a_label_is_reported_before_a_value_test() {
+  [3, 30]
+  |> list.each(fn(count) {
+    first_mistake(list.append(labels(count), [#("l2", 2)]))
+    |> should.equal(Error(codec.DuplicateEnumLabel("l2")))
+  })
+}

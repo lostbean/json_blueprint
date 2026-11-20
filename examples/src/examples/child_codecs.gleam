@@ -1,7 +1,7 @@
 //// Building child codecs where they are used.
 ////
-//// `use … <- codec.field` turns the rest of a record into a continuation, and
-//// a record codec keeps that continuation in several callbacks. A value bound
+//// `use … <- codec.field` turns the rest of a record into a continuation; on
+//// 2.1.x a record codec kept that continuation in several callbacks. A value bound
 //// with `let` before the chain and used by a later field is captured by the
 //// continuation. Inside one process that capture is shared, but a process copy
 //// (a message, a spawn argument, a child specification) does not preserve
@@ -102,8 +102,9 @@ pub fn captured_reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   codec.success(Reply(id:, answer:))
 }
 
-/// The first field keeps only the operations its callbacks call, so no
-/// continuation captures the parameter. This changes the order of the encoded members and of the
+/// On 2.1.x the first field keeps only the operations its callbacks call, so
+/// no continuation captures the parameter; from 2.2.0 either order copies the
+/// parameter once. This changes the order of the encoded members and of the
 /// schema's properties; decoding accepts members in any order.
 pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   use answer <- codec.field("answer", answer, get: fn(r) { r.answer })

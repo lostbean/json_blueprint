@@ -30,8 +30,6 @@ fn log(entry: String) -> Nil
 @external(javascript, "./codec_probe_ffi.mjs", "take")
 fn take() -> List(String)
 
-/// `Ok` with the result of `run`, or `Error` with the message of the panic it
-/// raised.
 @external(erlang, "codec_probe_ffi", "stash")
 @external(javascript, "./codec_probe_ffi.mjs", "stash")
 fn stash(item: a) -> Nil
@@ -40,6 +38,8 @@ fn stash(item: a) -> Nil
 @external(javascript, "./codec_probe_ffi.mjs", "unstash")
 fn unstash() -> a
 
+/// `Ok` with the result of `run`, or `Error` with the message of the panic it
+/// raised.
 @external(erlang, "codec_probe_ffi", "panic_message")
 @external(javascript, "./codec_probe_ffi.mjs", "panic_message")
 fn panic_message(run: fn() -> a) -> Result(a, String)
@@ -321,7 +321,12 @@ fn parsed(text: String) -> value.Value {
 
 /// Every case, in a fixed order.
 pub fn lines() -> List(String) {
-  let built = case_line("construct", fn() { "" })
+  let built =
+    case_line("construct", fn() {
+      let _ = codec.list(codec.describe(order_codec(), "orders"))
+      let _ = shape_codec()
+      ""
+    })
   let c = order_codec()
   let good = Order(1, [2, 3], 5, Some("hi"), Circle(4), B, #(0.5, exact("2")))
   list.flatten([
@@ -385,6 +390,8 @@ pub fn lines() -> List(String) {
     mapping_cases(c, good),
     leaf_cases(),
     union_cases(),
+    composite_cases(),
+    union_cases_later(),
   ])
 }
 
@@ -691,6 +698,219 @@ fn union_cases() -> List(String) {
     }),
     case_line("adr-0018 match calls two tagging functions", fn() {
       encoded(codec.encode_json(two_taggers, Empty))
+    }),
+  ]
+}
+
+type Box {
+  Box(order: Order, n: Int)
+}
+
+/// Composite codecs: operations rebuilt per use and per element.
+fn composite_cases() -> List(String) {
+  let lc = codec.list(order_codec())
+  let good = Order(1, [2, 3], 5, Some("hi"), Circle(4), B, #(0.5, exact("2")))
+  let two = "[" <> good_text <> "," <> good_text <> "]"
+  let boxu =
+    codec.union({
+      use boxed <- codec.variant("box", order_codec(), fn(o) { Box(o, 0) })
+      use n <- codec.variant("n", traced_int("n"), fn(n) { Box(good, n) })
+      codec.match(fn(b: Box) {
+        log("box match")
+        case b.n {
+          0 -> boxed(b.order)
+          k -> n(k)
+        }
+      })
+    })
+  let nested = {
+    use o <- codec.field("o", order_codec(), get: fn(b: Box) {
+      log("get o")
+      b.order
+    })
+    use n <- codec.field("n", codec.nullable(traced_int("nn")), get: fn(b: Box) {
+      log("get n")
+      Some(b.n)
+    })
+    log("nested success")
+    codec.success(Box(o, option.unwrap(n, 0)))
+  }
+  [
+    case_line("composite list encode", fn() {
+      encoded(codec.encode_json(lc, [good, good]))
+    }),
+    case_line("composite list decode", fn() {
+      decoded(codec.decode_json(lc, two), fn(l) {
+        int.to_string(list.length(l))
+      })
+    }),
+    case_line("composite list decode value", fn() {
+      decoded(codec.decode(lc, parsed(two)), fn(l) {
+        int.to_string(list.length(l))
+      })
+    }),
+    case_line("composite list schema", fn() {
+      codec.schema_json(lc) |> result.unwrap("unknown")
+    }),
+    case_line("composite list check", fn() { defined(codec.check(lc)) }),
+    case_line("composite list decoder", fn() {
+      case json.parse(two, codec.decoder(lc)) {
+        Ok(l) -> "ok " <> int.to_string(list.length(l))
+        Error(_) -> "error"
+      }
+    }),
+    case_line("composite list decoder bad", fn() {
+      case json.parse("[1]", codec.decoder(lc)) {
+        Ok(_) -> "ok"
+        Error(_) -> "error"
+      }
+    }),
+    case_line("composite union record encode", fn() {
+      encoded(codec.encode_json(boxu, Box(good, 0)))
+    }),
+    case_line("composite union int encode", fn() {
+      encoded(codec.encode_json(boxu, Box(good, 3)))
+    }),
+    case_line("composite union record decode", fn() {
+      decoded(
+        codec.decode_json(
+          boxu,
+          "{\"tag\":\"box\",\"value\":" <> good_text <> "}",
+        ),
+        fn(b: Box) { show_order(b.order) },
+      )
+    }),
+    case_line("composite union placeholder", fn() {
+      show_order(codec.placeholder(boxu).order)
+    }),
+    case_line("composite union schema", fn() {
+      codec.schema_json(boxu) |> result.unwrap("unknown")
+    }),
+    case_line("composite nested encode", fn() {
+      encoded(codec.encode_json(nested, Box(good, 2)))
+    }),
+    case_line("composite nested decode", fn() {
+      decoded(
+        codec.decode_json(nested, "{\"o\":" <> good_text <> ",\"n\":null}"),
+        fn(b: Box) { show_order(b.order) <> int.to_string(b.n) },
+      )
+    }),
+    case_line("composite nested decode bad", fn() {
+      decoded(
+        codec.decode_json(nested, "{\"o\":" <> good_text <> ",\"n\":\"q\"}"),
+        fn(b: Box) { show_order(b.order) },
+      )
+    }),
+    case_line("composite nested placeholder", fn() {
+      show_order(codec.placeholder(nested).order)
+    }),
+    case_line("composite pair nullable", fn() {
+      let p = codec.pair(codec.nullable(order_codec()), traced_int("pr"))
+      encoded(codec.encode_json(p, #(None, 1)))
+      <> " / "
+      <> encoded(codec.encode_json(p, #(Some(good), 2)))
+    }),
+    case_line("composite check nested list bounds", fn() {
+      defined(codec.check(codec.list(codec.integer_between(3, 1))))
+    }),
+    case_line("composite check pair mistakes", fn() {
+      defined(
+        codec.check(codec.pair(
+          codec.string_enum([#("a", 1), #("a", 2)]),
+          codec.integer_between(3, 1),
+        )),
+      )
+    }),
+    case_line("composite check union payload mistake", fn() {
+      defined(
+        codec.check(
+          codec.union({
+            use a <- codec.variant("a", codec.integer_between(3, 1), Circle)
+            use b <- codec.variant("a", codec.int(), Square)
+            codec.match(fn(s) {
+              case s {
+                Circle(r) -> a(r)
+                _ -> b(1)
+              }
+            })
+          }),
+        ),
+      )
+    }),
+    case_line("composite encode nested list bounds", fn() {
+      encoded(codec.encode_json(codec.list(codec.integer_between(3, 1)), []))
+    }),
+    case_line("composite decode nested list bounds", fn() {
+      decoded(
+        codec.decode_json(codec.list(codec.integer_between(3, 1)), "[]"),
+        fn(_) { "" },
+      )
+    }),
+    case_line("composite map record", fn() {
+      let m =
+        codec.map(
+          order_codec(),
+          decode: fn(o) {
+            log("m.decode")
+            o.id
+          },
+          encode: fn(i) {
+            log("m.encode")
+            Order(..good, id: i)
+          },
+        )
+      encoded(codec.encode_json(m, 9))
+      <> " / "
+      <> decoded(codec.decode_json(m, good_text), int.to_string)
+    }),
+    case_line("composite describe record schema", fn() {
+      codec.schema_json(codec.describe(order_codec(), "d"))
+      |> result.unwrap("unknown")
+    }),
+    case_line("composite describe record check", fn() {
+      defined(codec.check(codec.describe(order_codec(), "d")))
+    }),
+  ]
+}
+
+/// More cases that follow ADR 0018.
+fn union_cases_later() -> List(String) {
+  let built_tag =
+    codec.union({
+      use circle <- codec.variant("circle", traced_int("built"), Circle)
+      let zero = circle(0)
+      log("union body done")
+      codec.match(fn(_) { zero })
+    })
+  let _outer =
+    codec.union({
+      use circle <- codec.variant("outer", codec.int(), Circle)
+      stash(
+        codec.union({
+          use _square <- codec.variant("inner-a", codec.int(), Square)
+          use _empty <- codec.unit_variant("inner-b", Empty)
+          codec.match(fn(_) { circle(1) })
+        }),
+      )
+      codec.match(fn(shape) {
+        case shape {
+          Circle(r) -> circle(r)
+          _ -> circle(0)
+        }
+      })
+    })
+  let foreign: Codec(Shape) = unstash()
+  [
+    case_line("adr-0018 tagging function called in the union body", fn() {
+      encoded(codec.encode_json(built_tag, Empty))
+      <> " / "
+      <> encoded(codec.encode_json(built_tag, Empty))
+    }),
+    case_line("adr-0018 check of a union given a foreign tag", fn() {
+      defined(codec.check(foreign))
+    }),
+    case_line("adr-0018 foreign tag names every tag", fn() {
+      encoded(codec.encode_json(foreign, Empty))
     }),
   ]
 }

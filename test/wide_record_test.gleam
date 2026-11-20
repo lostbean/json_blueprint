@@ -6,6 +6,7 @@ import gleam/list
 import gleam/string
 import gleeunit/should
 import json/blueprint/codec.{type Codec}
+import json/blueprint/value
 
 @external(erlang, "codec_test_ffi", "panic_message")
 @external(javascript, "./codec_test_ffi.mjs", "panic_message")
@@ -56,6 +57,9 @@ pub fn a_late_repeated_field_panics_on_decode_test() {
     )
     <> "}"
   let assert Ok(message) = panic_message(fn() { codec.decode_json(wide, text) })
+  string.contains(message, "field \"f3\" appears twice") |> should.be_true
+  let assert Ok(raw) = value.parse(text, value.default_limits())
+  let assert Ok(message) = panic_message(fn() { codec.decode(wide, raw) })
   string.contains(message, "field \"f3\" appears twice") |> should.be_true
 }
 

@@ -2,14 +2,19 @@
 //// from inputs that share nothing, a codec copies at its in-heap size, apart
 //// from one reference per union variant, held by the variant and by its
 //// tagging function. `copy_cost_coverage_check.py` fails when a public
-//// function returning `Codec` or `Union` has no `*_holds_its_inputs_once_test`
-//// here. Flat size is a BEAM measure; JavaScript skips these tests.
+//// function of the package returning `Codec` or `Union` has no
+//// `*_holds_its_inputs_once_test` here (prefixed by its module outside
+//// `codec`). A combinator that takes a child codec gets one with captured
+//// state, so a child held twice shows. Flat size is a BEAM measure; on
+//// JavaScript these checks pass without measuring.
 
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleeunit/should
 import json/blueprint/codec.{type Codec}
+import json/blueprint/codegen
+import json/blueprint/contract
 import json/blueprint/number
 import json/blueprint/value.{type Value}
 
@@ -20,6 +25,14 @@ fn flat_size_words(term: a) -> Int
 @external(erlang, "copy_cost_ffi", "shared_size_words")
 @external(javascript, "./copy_cost_ffi.mjs", "shared_size_words")
 fn shared_size_words(term: a) -> Int
+
+@external(erlang, "copy_cost_ffi", "round_trip")
+@external(javascript, "./copy_cost_ffi.mjs", "round_trip")
+fn round_trip(term: a) -> a
+
+@external(erlang, "copy_cost_ffi", "through_process")
+@external(javascript, "./copy_cost_ffi.mjs", "through_process")
+fn through_process(term: a) -> a
 
 @external(erlang, "copy_cost_ffi", "reference_words")
 @external(javascript, "./copy_cost_ffi.mjs", "reference_words")
@@ -75,16 +88,22 @@ pub fn string_enum_holds_its_inputs_once_test() {
   held_once(codec.string_enum([#("north", 1), #("south", 2), #("east", 3)]), 0)
 }
 
+/// A child codec with captured state: a copy of a combinator that held it
+/// twice would show the labels twice.
+fn stateful() -> Codec(Int) {
+  codec.string_enum([#("one", 1), #("two", 2), #("three", 3)])
+}
+
 pub fn describe_holds_its_inputs_once_test() {
-  held_once(codec.describe(codec.int(), "a count"), 0)
+  held_once(codec.describe(stateful(), "a count"), 0)
 }
 
 pub fn list_holds_its_inputs_once_test() {
-  held_once(codec.list(codec.string_enum([#("up", True)])), 0)
+  held_once(codec.list(stateful()), 0)
 }
 
 pub fn pair_holds_its_inputs_once_test() {
-  held_once(codec.pair(codec.int(), codec.string_enum([#("left", 0)])), 0)
+  held_once(codec.pair(stateful(), codec.string_enum([#("left", 0)])), 0)
 }
 
 pub fn nullable_holds_its_inputs_once_test() {
@@ -98,7 +117,7 @@ type Point {
 pub fn field_holds_its_inputs_once_test() {
   held_once(
     {
-      use x <- codec.field("x", codec.int(), get: fn(p: Point) { p.x })
+      use x <- codec.field("x", stateful(), get: fn(p: Point) { p.x })
       codec.success(Point(x:, label: None))
     },
     0,
@@ -108,7 +127,7 @@ pub fn field_holds_its_inputs_once_test() {
 pub fn optional_field_holds_its_inputs_once_test() {
   held_once(
     {
-      use label <- codec.optional_field("label", codec.string(), get: fn(p) {
+      use label <- codec.optional_field("label", labels_codec(), get: fn(p) {
         p.label
       })
       codec.success(Point(x: 0, label:))
@@ -129,7 +148,7 @@ type Shape {
 
 fn shape_codec() -> Codec(Shape) {
   codec.union({
-    use circle <- codec.variant("circle", codec.int(), Circle)
+    use circle <- codec.variant("circle", stateful(), Circle)
     use square <- codec.variant("square", codec.integer_between(0, 9), Square)
     use empty <- codec.unit_variant("empty", Empty)
     codec.match(fn(shape) {
@@ -151,7 +170,7 @@ pub fn union_holds_its_inputs_once_test() {
 pub fn variant_holds_its_inputs_once_test() {
   held_once(
     codec.union({
-      use circle <- codec.variant("circle", codec.int(), Circle)
+      use circle <- codec.variant("circle", stateful(), Circle)
       codec.match(fn(_) { circle(1) })
     }),
     reference_words(),
@@ -174,7 +193,7 @@ pub fn match_holds_its_inputs_once_test() {
 
 pub fn map_holds_its_inputs_once_test() {
   held_once(
-    codec.map(codec.int(), decode: fn(x) { Circle(x) }, encode: fn(shape) {
+    codec.map(stateful(), decode: fn(x) { Circle(x) }, encode: fn(shape) {
       case shape {
         Circle(r) -> r
         _ -> 0
@@ -186,7 +205,7 @@ pub fn map_holds_its_inputs_once_test() {
 
 pub fn try_map_holds_its_inputs_once_test() {
   held_once(
-    codec.try_map(codec.int(), decode: Ok, encode: Ok, placeholder: 41),
+    codec.try_map(stateful(), decode: Ok, encode: Ok, placeholder: 41),
     0,
   )
 }
@@ -222,10 +241,9 @@ type Holder(a) {
   Holder(id: Int, body: a)
 }
 
-fn holder(body: Codec(a), placeholder: a) -> Codec(Holder(a)) {
+fn holder(body: Codec(a)) -> Codec(Holder(a)) {
   use id <- codec.field("id", codec.int(), get: fn(h: Holder(a)) { h.id })
   use body <- codec.field("body", body, get: fn(h) { h.body })
-  let _ = placeholder
   codec.success(Holder(id:, body:))
 }
 
@@ -235,8 +253,8 @@ pub fn a_codec_used_by_a_later_field_is_copied_once_test() {
     -1 -> Nil
     _ -> {
       let body = shape_codec()
-      let held = holder(body, Empty)
-      let around_int = holder(codec.int(), 0)
+      let held = holder(body)
+      let around_int = holder(codec.int())
       {
         flat_size_words(held)
         <= flat_size_words(body) + flat_size_words(around_int)
@@ -264,7 +282,63 @@ pub fn a_runtime_label_costs_its_own_data_test() {
         flat_size_words(codec.string_enum(more))
         - flat_size_words(codec.string_enum(fewer))
       step |> should.equal(flat_size_words(added) + 2)
-      list.length(more) |> should.equal(21)
     }
   }
+}
+
+fn labels_codec() -> Codec(String) {
+  codec.string_enum([#("origin", "origin"), #("target", "target")])
+}
+
+pub fn contract_value_codec_holds_its_inputs_once_test() {
+  let assert Ok(shapes) = contract.from_codec(shape_codec())
+  held_once(contract.value_codec(shapes), 0)
+}
+
+/// A generated definition's runtime codec, eight fields nested in `combine`.
+/// The fields use bounded integers: input-free leaves such as `codegen.int()`
+/// are one module literal, which `erts_debug:flat_size` counts per reference
+/// although a copy does not copy it.
+pub fn codegen_runtime_holds_its_inputs_once_test() {
+  let properties =
+    codegen.combine(
+      codegen.combine(
+        codegen.combine(
+          codegen.required("a", codegen.integer_between(0, 10)),
+          codegen.required("b", codegen.integer_between(0, 20)),
+        ),
+        codegen.combine(
+          codegen.required("c", codegen.integer_between(0, 30)),
+          codegen.required("d", codegen.integer_between(0, 40)),
+        ),
+      ),
+      codegen.combine(
+        codegen.combine(
+          codegen.required("e", codegen.integer_between(0, 50)),
+          codegen.required("f", codegen.integer_between(0, 60)),
+        ),
+        codegen.combine(
+          codegen.required("g", codegen.integer_between(0, 70)),
+          codegen.required("h", codegen.integer_between(0, 80)),
+        ),
+      ),
+    )
+  held_once(codegen.runtime(codegen.object(properties)), 0)
+}
+
+/// A union codec converts the same after another process received it and
+/// after an external-format round trip: variant identities survive copies.
+pub fn a_copied_union_codec_converts_the_same_test() {
+  let shapes = codec.list(shape_codec())
+  let values = [Circle(2), Square(3), Empty]
+  let assert Ok(text) = codec.encode_json(shapes, values)
+  [
+    through_process(shapes),
+    round_trip(shapes),
+    round_trip(through_process(shapes)),
+  ]
+  |> list.each(fn(copied) {
+    codec.encode_json(copied, values) |> should.equal(Ok(text))
+    codec.decode_json(copied, text) |> should.equal(Ok(values))
+  })
 }

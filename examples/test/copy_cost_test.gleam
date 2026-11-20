@@ -34,7 +34,8 @@ pub fn a_let_bound_child_codec_is_copied_once_test() {
   use built <- copy_size(child_codecs.answer_codec())
   use captured <- copy_size(child_codecs.captured_answer_codec())
   use contact <- copy_size(child_codecs.contact_codec())
-  { captured < built + contact * 2 } |> should.be_true
+  // Holding the contact codec twice would add a whole second copy of it.
+  { captured < built + contact + contact / 2 } |> should.be_true
 }
 
 pub fn a_codec_parameter_used_by_a_later_field_is_copied_once_test() {
@@ -50,8 +51,12 @@ pub fn a_prebuilt_runtime_enum_is_copied_once_test() {
   let offered = ["doc-1", "doc-2", "doc-3", "doc-4", "doc-5"]
   use in_field <- copy_size(runtime_enum.citation_codec(offered))
   use prebuilt <- copy_size(prebuilt_citation_codec(offered))
+  use sources <- copy_size(
+    codec.string_enum(list.map(offered, fn(id) { #(id, id) })),
+  )
   { in_field < 16_384 } |> should.be_true
-  { prebuilt < in_field * 2 } |> should.be_true
+  // Holding the enum codec twice would add a whole second copy of it.
+  { prebuilt < in_field + sources } |> should.be_true
 }
 
 // snips-start: prebuilt-enum
