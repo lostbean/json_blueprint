@@ -1,6 +1,6 @@
 # Codecs stay cheap to send between processes
 
-Status: ready-for-human
+Status: done
 Category: enhancement
 
 AI-assisted contribution.

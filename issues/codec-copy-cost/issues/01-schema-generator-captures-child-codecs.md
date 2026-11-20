@@ -1,6 +1,6 @@
 # Schema-generated record codecs copy each child codec once per callback
 
-Status: needs-triage
+Status: done
 Category: bug
 
 AI-assisted contribution.
@@ -69,3 +69,15 @@ None.
 
 - If a generated child codec must be built once for a reason the generation
   design states, such as placeholder discovery or construction cost.
+
+## Comments
+
+AI-assisted contribution.
+
+Resolved without changing the generator by [ADR 0018](../../../docs/adr/0018-hold-each-codec-input-once.md): from 2.2.0 a child
+codec bound before a field chain is held once, like any captured input. The
+committed `examples/codegen` order codec, generated unchanged, copies in
+2.5 kB on 2.2.0 against 105 kB on 2.1.1, and the consumer's conversions,
+refusals and schema are unchanged (the gate regenerates and compares it).
+Building each child in its field is no longer needed on 2.2.0, so the
+emitted form stays.

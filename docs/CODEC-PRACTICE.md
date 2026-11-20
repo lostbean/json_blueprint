@@ -3,6 +3,18 @@
 This guide says when to generate a codec, when to write one with combinators,
 and how to write combinator codecs that stay cheap to send between BEAM
 processes. It is for application authors and for agents that write codecs.
+
+The copy rules depend on the lowest json_blueprint version your package
+declares, because that is the oldest version a build may resolve:
+
+| Declared minimum | Copy rules |
+| --- | --- |
+| 2.2.0 or later | Each combinator holds its inputs once. [Rules 1–3](#write-combinator-codecs-that-copy-cheaply) are no longer needed and code that follows them needs no change. Keep [rule 4](#4-test-the-copy-size). |
+| 2.1.1 to 2.1.x | Follow rules 1–4. |
+| 2.1.0 or earlier | Raise the minimum: copies multiply per nesting layer. |
+
+An application decides by its lock file as well: with a minimum of 2.2.0 in
+`gleam.toml`, a build cannot resolve an older version.
 Every Gleam, Erlang and JavaScript block below is synchronised from a compiled
 example that the repository's gate runs on Erlang and JavaScript.
 
@@ -35,6 +47,16 @@ required record adds 36 words (288 bytes) more per enclosing record. An
 application that sends codecs, or values that hold codecs, to other processes
 can run out of memory on 2.1.0 or earlier.
 
+From 2.2.0 each combinator holds each of its inputs once
+([ADR 0018](adr/0018-hold-each-codec-input-once.md)), so a codec copies at
+about its in-heap size: the agent input codec above copies in about 3 kB, a
+consumer's model-answer codec in 1.2 kB instead of 88.6 kB, and a run-time enum
+label costs its own data once instead of about 1 kB. Prefer
+`json_blueprint >= 2.2.0` for new code. Two union cases changed in 2.2.0: a
+value tagged by another union's tagging function panics when encoded, and a
+union payload is encoded after `match` returns; the documentation of
+`codec.union` describes both.
+
 ## Choose generated codecs or combinators
 
 Copy cost depends on what crosses a process boundary. Sending decoded data,
@@ -56,8 +78,9 @@ Reasons for generated codecs:
 
 - A generated codec refers to module functions and literals and captures no
   child codec. In this repository's [codegen consumer](../examples/codegen/README.md),
-  the export job codec has a flat size of 952 B when generated and 19.3 kB when
-  built with combinators from the same definition.
+  the export job codec has a flat size of 920 B when generated, against 1.9 kB
+  built with combinators from the same definition on 2.2.0 and 19.3 kB on
+  2.1.1.
 - On Erlang/OTP 29, literals are not copied between processes: a receiver of a
   4,200-byte literal grew by 0 B.
 - Generated codecs convert faster. This repository retains a 50-record decode
@@ -81,16 +104,22 @@ records the measurement policy.
 The schema-driven generator (`json/blueprint/codegen/schema`) is a third path:
 it turns a closed-object JSON Schema into native records and an ordinary
 combinator codec. Its output is combinator code, so the rules below apply to
-it.
+it on 2.1.x.
 
 ## Write combinator codecs that copy cheaply
 
-`use x <- codec.field(...)` turns the rest of the record definition into a
-continuation, a function the record codec calls with the decoded field. A
-record codec keeps that continuation in several callbacks (encoding, decoding,
-schema discovery). Every value that the continuation refers to from outside it
-is captured: inside one process the capture is shared, but a process copy
-duplicates it once per callback that holds the continuation.
+With a minimum of 2.2.0, skip rules 1–3: a record codec holds its continuation
+once, so a value the continuation captures is copied once, whichever field
+uses it. Code written to these rules stays correct and small. Do not move a
+child codec or a run-time enum out of its field while your package still
+allows 2.1.x; move it only in the change that raises the minimum to 2.2.0.
+
+On 2.1.x, `use x <- codec.field(...)` turns the rest of the record definition
+into a continuation, a function the record codec calls with the decoded field.
+A record codec keeps that continuation in several callbacks (encoding,
+decoding, schema discovery). Every value that the continuation refers to from
+outside it is captured: inside one process the capture is shared, but a
+process copy duplicates it once per callback that holds the continuation.
 
 ### 1. Build each child codec where it is used
 
@@ -105,8 +134,9 @@ Wrong: `contact` is captured by every continuation after the first field.
 
 <!-- snips: ../examples/src/examples/child_codecs.gleam#let-bound -->
 ```gleam
-/// Avoid: `contact` is bound before the chain and used by later fields, so
-/// every continuation after the first field captures it.
+/// Avoid on 2.1.x: `contact` is bound before the chain and used by later
+/// fields, so every continuation after the first field captures it. From
+/// 2.2.0 it is copied once.
 pub fn captured_answer_codec() -> Codec(Answer) {
   let contact = contact_codec()
   use summary <- codec.field("summary", codec.string(), get: fn(a) { a.summary })
@@ -154,9 +184,9 @@ a stored format, the record continuation limit below owns the cost.
 
 <!-- snips: ../examples/src/examples/child_codecs.gleam#parameter -->
 ```gleam
-/// Avoid when the codec is sent: the `answer` parameter is used by a later
-/// field, so every continuation after the first field captures it, as a
-/// `let`-bound child codec would be.
+/// Avoid on 2.1.x when the codec is sent: the `answer` parameter is used by a
+/// later field, so every continuation after the first field captures it, as a
+/// `let`-bound child codec would be. From 2.2.0 it is copied once.
 pub fn captured_reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   use id <- codec.field("id", codec.string(), get: fn(r) { r.id })
   use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
@@ -176,7 +206,8 @@ pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
 
 <!-- prettier-ignore-end -->
 
-Measured flat sizes:
+Measured flat sizes on 2.1.1 (on 2.2.0 the answer codec copies in 440 B and
+168 B, and the reply codec in 440 B and 392 B):
 
 | Codec | `let`-bound children | Children built in their fields |
 | --- | ---: | ---: |
@@ -245,22 +276,26 @@ pub fn citation_codec(offered: List(String)) -> Codec(Citation) {
 
 <!-- prettier-ignore-end -->
 
-With offered ids of the form `doc-N`, the right form copies in 7.0 kB for 5 ids
-and 54.5 kB for 50, against 27.9 kB and 239.6 kB for the prebuilt form. The
-captured labels are still copied once per callback, so capture only the strings
-the enum needs. In a
+With offered ids of the form `doc-N`, on 2.1.1 the right form copies in
+7.0 kB for 5 ids and 54.5 kB for 50, against 27.9 kB and 239.6 kB for the
+prebuilt form. The captured labels are still copied once per callback, so
+capture only the strings the enum needs. On 2.2.0 both forms copy once (616 B
+and 4.6 kB for the right form), and the prebuilt form also skips rebuilding and
+re-checking the enum on every conversion; switch to it only with a minimum of
+2.2.0. In a
 [consumer application](BENCHMARKS.md#generated-and-combinator-codecs-in-a-consumer-2026-11-19),
 enums prebuilt for 20 ids encoded 15.7 times faster and were 10.9 times bigger
 to copy; rebuilding costs microseconds per conversion.
 
 ### 3. Send inputs to other processes, not built codecs
 
-Do not hand a built codec, or a value that holds one (an agent, a tool
-definition, a server's state), to another process for each operation. Build
+On 2.1.x, do not hand a built codec, or a value that holds one (an agent, a
+tool definition, a server's state), to another process for each operation. Build
 the codec in the process that uses it, from a small builder function, and send
 the builder's inputs instead: a list of labels, an identifier, a configuration
 record. A generated codec is the exception, because its parts are literals and
-function references.
+function references. On 2.2.0 a codec copies at about its own size, so this
+rule matters only when the value holding it is large for other reasons.
 
 ### 4. Test the copy size
 
@@ -323,7 +358,12 @@ order.
 Measure the term that is actually sent: the message, the spawn argument or the
 child specification, not only the codec inside it. Set the bound from a
 measurement of the correct form, with headroom, so that a captured child codec
-fails the test. The [examples copy-cost test](../examples/test/copy_cost_test.gleam)
+fails the test. When a package raises its minimum to 2.2.0 and drops a rule 1–3
+form, give the affected value a bound that 2.1.x fails, so that resolving an
+older version fails the test rather than a production copy. A relation holds
+across releases better than a byte count: the flat size at most a small
+multiple of `erts_debug:size/1`, or a fixed step per nesting layer or label.
+The [examples copy-cost test](../examples/test/copy_cost_test.gleam)
 applies this check to the examples above.
 
 ## Generator gaps
@@ -363,16 +403,16 @@ Generated modules have these costs:
   per enum.
 
 The schema-driven generator binds each child codec with `let` before its field
-chain, the form that rule 1 forbids. Its order codec copies in 105 kB, and
-1.0 kB with the children built in their fields. The tracker issue
+chain, the form that rule 1 forbids on 2.1.x. There its order codec copies in
+105 kB; on 2.2.0 the same generated source copies in 2.5 kB. The tracker issue
 [`issues/codec-copy-cost/issues/01-schema-generator-captures-child-codecs.md`](../issues/codec-copy-cost/issues/01-schema-generator-captures-child-codecs.md)
-records the fix.
+records it.
 
-Even when every rule is followed, a record codec holds each continuation in
-about twelve callbacks, so a copied record codec costs several times its
-in-heap size. The tracker issue
+On 2.1.x, even when every rule is followed, a record codec holds each
+continuation in about twelve callbacks, so a copied record codec costs several
+times its in-heap size. 2.2.0 holds each continuation once; the tracker issue
 [`issues/record-copy-cost/issues/01-hold-a-record-continuation-once.md`](../issues/record-copy-cost/issues/01-hold-a-record-continuation-once.md)
-records that structural limit.
+records the change.
 
 ## Examples
 

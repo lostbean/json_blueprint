@@ -1,6 +1,6 @@
 # A copied record codec duplicates its continuation about twelve times
 
-Status: needs-triage
+Status: done
 Category: enhancement
 
 AI-assisted contribution.
@@ -80,3 +80,18 @@ None.
 
 - If either representation changes a public signature, record decoding order,
   or the placeholder-driven schema discovery that ADR 0004 records.
+
+## Comments
+
+AI-assisted contribution.
+
+Delivered by [ADR 0018](../../../docs/adr/0018-hold-each-codec-input-once.md) on the branch for 2.2.0: every
+combinator stores one closure that holds its inputs once, chosen over both
+candidates named above after a measured comparison (records of data were
+faster but escape the compiler). A record holding a codec in a later field
+copies in at most that codec plus the record's own size, enforced by
+`test/codec_input_once_test.gleam` for every public combinator, with a
+completeness check in the gate. Conversion results, errors, paths, schemas,
+placeholders and definition errors are unchanged apart from two union cases
+the ADR names; `test/codec_probe.gleam` pins them against 2.1.1. The
+additive-growth tests still pass. Times are in `docs/BENCHMARKS.md`.

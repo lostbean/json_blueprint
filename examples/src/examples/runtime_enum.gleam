@@ -4,10 +4,10 @@
 //// stages configured for one tenant. The typed-definition generator cannot
 //// produce them, so build them with combinators. Capture the small data, the
 //// label pairs converted once, and build `codec.string_enum` inside the field
-//// that uses it. A prebuilt enum codec bound before the `use` chain would be
-//// captured by every later continuation and copied once per callback when
-//// the codec is sent to another process. Rebuilding the enum costs
-//// microseconds per conversion.
+//// that uses it. On 2.1.x a prebuilt enum codec bound before the `use` chain
+//// would be captured by every later continuation and copied once per callback
+//// when the codec is sent to another process; from 2.2.0 it is copied once,
+//// and building it before the chain also avoids rebuilding it per conversion.
 ////
 //// Labels from data can repeat, so check the codec once where the data
 //// arrives; `codec.check` returns the problem instead of panicking later.
