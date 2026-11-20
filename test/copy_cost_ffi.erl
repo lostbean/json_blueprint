@@ -1,6 +1,10 @@
 -module(copy_cost_ffi).
--export([flat_size_words/1, shared_size_words/1, external_bytes/1,
-         reference_words/0]).
+-export([
+    flat_size_words/1,
+    shared_size_words/1,
+    external_bytes/1,
+    reference_words/0
+]).
 
 %% Words a copy to another process takes: sharing is not preserved.
 flat_size_words(Term) -> erts_debug:flat_size(Term).
