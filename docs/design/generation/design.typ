@@ -14,7 +14,6 @@
 
   #pagebreak(weak: true)
   #pending-ledger(
-    pending-entry(title: "Schema-generated records capture their child codecs", kind: "ruling", since: "2026-11-19")[The schema-driven generator binds each record's child codecs before its field chain, so every continuation captures them and a process copy duplicates them per callback. Building each child in its field makes the copy small but rebuilds the child on each conversion. The #lnk("../../../issues/codec-copy-cost/issues/01-schema-generator-captures-child-codecs.md")[tracker issue] holds the measurements.],
     pending-entry(title: "Broader runtime-schema generation is not designed", kind: "build", since: "2026-10-08", adr: [#adr(8)])[Selected naming overrides, shared named definitions, string and numeric enums, tagged and broader unions, aliases, recursive forms, and a general command-line workflow are outside generation. The build compiler creates each native type, so parsing a schema at application runtime cannot supply a typed codec. Formatter integration and upgrade fixtures remain tooling work beyond the focused consumer integration tests; committed-output freshness is reviewed manually.],
   )
 
