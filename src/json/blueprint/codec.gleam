@@ -703,24 +703,10 @@ pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
 
 // --- primitives --------------------------------------------------------------
 
-fn leaf(
-  encode: fn(a) -> Result(Value, EncodeError),
-  decode: fn(Value) -> Result(a, DecodeError),
-  native_decode: fn(native.Raw) -> Result(a, DecodeError),
-  schema: Tree,
-  placeholder: a,
-) -> Codec(a) {
-  Codec(fn() {
-    Ops(
-      None,
-      encode,
-      decode,
-      native_decode,
-      fn() { Ok(Some(schema)) },
-      fn() { placeholder },
-      None,
-    )
-  })
+/// A codec with no inputs: its operations are a module constant of named
+/// functions, so using it allocates nothing and copying it costs nothing.
+fn leaf(operations: fn() -> Ops(a)) -> Codec(a) {
+  Codec(operations)
 }
 
 fn fail(reason: Reason) -> Result(a, DecodeError) {
@@ -733,21 +719,46 @@ fn refuse(reason: Reason) -> Result(a, EncodeError) {
 
 /// A JSON string.
 pub fn string() -> Codec(String) {
-  leaf(
-    fn(item) { Ok(value.String(item)) },
-    fn(raw) {
-      case raw {
-        value.String(item) -> Ok(item)
-        _ -> fail(ExpectedString)
-      }
-    },
-    fn(raw) {
-      native.string(raw)
-      |> result.replace_error(DecodeError([], ExpectedString))
-    },
-    tree.StringSchema,
-    "",
+  leaf(string_ops)
+}
+
+fn string_ops() -> Ops(String) {
+  string_operations
+}
+
+const string_operations =
+  Ops(
+    text_encode: None,
+    encode: encode_string,
+    decode: decode_string,
+    native_decode: native_decode_string,
+    definition: string_definition,
+    placeholder: string_placeholder,
+    fields: None,
   )
+
+fn string_definition() -> Result(Option(Tree), DefinitionError) {
+  Ok(Some(tree.StringSchema))
+}
+
+fn encode_string(item: String) -> Result(Value, EncodeError) {
+  Ok(value.String(item))
+}
+
+fn decode_string(raw: Value) -> Result(String, DecodeError) {
+  case raw {
+    value.String(item) -> Ok(item)
+    _ -> fail(ExpectedString)
+  }
+}
+
+fn native_decode_string(raw: native.Raw) -> Result(String, DecodeError) {
+  native.string(raw)
+  |> result.replace_error(DecodeError([], ExpectedString))
+}
+
+fn string_placeholder() -> String {
+  ""
 }
 
 /// A JSON integer as an `Int`, with the schema `{"type": "integer"}`.
@@ -759,24 +770,43 @@ pub fn string() -> Codec(String) {
 /// integers longer than 24 digits with `ExpectedInt`; unsafe JavaScript
 /// integers fail with `UnsafeInteger`.
 pub fn int() -> Codec(Int) {
-  leaf(
-    fn(item) {
-      use encoded <- result.try(encode_int(item))
-      case digit_count(item) <= 24 {
-        True -> Ok(encoded)
-        False -> refuse(ExpectedInt)
-      }
-    },
-    decode_int,
-    fn(raw) {
-      native.int(raw)
-      |> result.map_error(fn(error) {
-        native_numeric_failure(error, ExpectedInt)
-      })
-    },
-    tree.IntSchema,
-    0,
+  leaf(int_ops)
+}
+
+fn int_ops() -> Ops(Int) {
+  int_operations
+}
+
+const int_operations =
+  Ops(
+    text_encode: None,
+    encode: encode_checked_int,
+    decode: decode_int,
+    native_decode: native_decode_int,
+    definition: int_definition,
+    placeholder: int_placeholder,
+    fields: None,
   )
+
+fn int_definition() -> Result(Option(Tree), DefinitionError) {
+  Ok(Some(tree.IntSchema))
+}
+
+fn encode_checked_int(item: Int) -> Result(Value, EncodeError) {
+  use encoded <- result.try(encode_int(item))
+  case digit_count(item) <= 24 {
+    True -> Ok(encoded)
+    False -> refuse(ExpectedInt)
+  }
+}
+
+fn native_decode_int(raw: native.Raw) -> Result(Int, DecodeError) {
+  native.int(raw)
+  |> result.map_error(fn(error) { native_numeric_failure(error, ExpectedInt) })
+}
+
+fn int_placeholder() -> Int {
+  0
 }
 
 fn encode_int(item: Int) -> Result(Value, EncodeError) {
@@ -804,54 +834,93 @@ fn decode_int(raw: Value) -> Result(Int, DecodeError) {
 /// fails with `FloatOutOfRange`. Encoding writes the shortest decimal that
 /// reads back as the same float. Use `number()` to keep numbers exact.
 pub fn float() -> Codec(Float) {
-  leaf(
-    fn(item) {
-      case number.from_float(item) {
-        Ok(parsed) -> Ok(value.Number(parsed))
-        Error(_) -> refuse(NonFiniteFloat)
-      }
-    },
-    fn(raw) {
-      case raw {
-        value.Number(item) ->
-          case number.to_float(item) {
-            Ok(float) -> Ok(float)
-            Error(_) -> fail(FloatOutOfRange)
-          }
-        _ -> fail(ExpectedNumber)
-      }
-    },
-    fn(raw) {
-      case native.float(raw) {
-        Ok(item) -> Ok(item)
-        Error(native.NotNumber) -> fail(ExpectedNumber)
-        Error(native.Unrepresentable) -> fail(FloatOutOfRange)
-        Error(native.ProjectionCapacity) ->
-          Error(native_numeric_failure(
-            native.ProjectionCapacity,
-            FloatOutOfRange,
-          ))
-      }
-    },
-    tree.NumberSchema,
-    0.0,
+  leaf(float_ops)
+}
+
+fn float_ops() -> Ops(Float) {
+  float_operations
+}
+
+const float_operations =
+  Ops(
+    text_encode: None,
+    encode: encode_float,
+    decode: decode_float,
+    native_decode: native_decode_float,
+    definition: float_definition,
+    placeholder: float_placeholder,
+    fields: None,
   )
+
+fn float_definition() -> Result(Option(Tree), DefinitionError) {
+  Ok(Some(tree.NumberSchema))
+}
+
+fn encode_float(item: Float) -> Result(Value, EncodeError) {
+  case number.from_float(item) {
+    Ok(parsed) -> Ok(value.Number(parsed))
+    Error(_) -> refuse(NonFiniteFloat)
+  }
+}
+
+fn decode_float(raw: Value) -> Result(Float, DecodeError) {
+  case raw {
+    value.Number(item) ->
+      case number.to_float(item) {
+        Ok(float) -> Ok(float)
+        Error(_) -> fail(FloatOutOfRange)
+      }
+    _ -> fail(ExpectedNumber)
+  }
+}
+
+fn native_decode_float(raw: native.Raw) -> Result(Float, DecodeError) {
+  case native.float(raw) {
+    Ok(item) -> Ok(item)
+    Error(native.NotNumber) -> fail(ExpectedNumber)
+    Error(native.Unrepresentable) -> fail(FloatOutOfRange)
+    Error(native.ProjectionCapacity) ->
+      Error(native_numeric_failure(native.ProjectionCapacity, FloatOutOfRange))
+  }
+}
+
+fn float_placeholder() -> Float {
+  0.0
 }
 
 /// A JSON number, exactly, as a `number.Number`.
 pub fn number() -> Codec(Number) {
-  leaf(
-    fn(item) { Ok(value.Number(item)) },
-    fn(raw) {
-      case raw {
-        value.Number(item) -> Ok(item)
-        _ -> fail(ExpectedNumber)
-      }
-    },
-    native_number,
-    tree.NumberSchema,
-    zero(),
+  leaf(number_ops)
+}
+
+fn number_ops() -> Ops(Number) {
+  number_operations
+}
+
+const number_operations =
+  Ops(
+    text_encode: None,
+    encode: encode_number,
+    decode: decode_number,
+    native_decode: native_number,
+    definition: number_definition,
+    placeholder: zero,
+    fields: None,
   )
+
+fn number_definition() -> Result(Option(Tree), DefinitionError) {
+  Ok(Some(tree.NumberSchema))
+}
+
+fn encode_number(item: Number) -> Result(Value, EncodeError) {
+  Ok(value.Number(item))
+}
+
+fn decode_number(raw: Value) -> Result(Number, DecodeError) {
+  case raw {
+    value.Number(item) -> Ok(item)
+    _ -> fail(ExpectedNumber)
+  }
 }
 
 fn zero() -> Number {
@@ -891,20 +960,45 @@ fn native_value(raw: native.Raw) -> Result(Value, DecodeError) {
 
 /// A JSON boolean.
 pub fn bool() -> Codec(Bool) {
-  leaf(
-    fn(item) { Ok(value.Bool(item)) },
-    fn(raw) {
-      case raw {
-        value.Bool(item) -> Ok(item)
-        _ -> fail(ExpectedBool)
-      }
-    },
-    fn(raw) {
-      native.bool(raw) |> result.replace_error(DecodeError([], ExpectedBool))
-    },
-    tree.BoolSchema,
-    False,
+  leaf(bool_ops)
+}
+
+fn bool_ops() -> Ops(Bool) {
+  bool_operations
+}
+
+const bool_operations =
+  Ops(
+    text_encode: None,
+    encode: encode_bool,
+    decode: decode_bool,
+    native_decode: native_decode_bool,
+    definition: bool_definition,
+    placeholder: bool_placeholder,
+    fields: None,
   )
+
+fn bool_definition() -> Result(Option(Tree), DefinitionError) {
+  Ok(Some(tree.BoolSchema))
+}
+
+fn encode_bool(item: Bool) -> Result(Value, EncodeError) {
+  Ok(value.Bool(item))
+}
+
+fn decode_bool(raw: Value) -> Result(Bool, DecodeError) {
+  case raw {
+    value.Bool(item) -> Ok(item)
+    _ -> fail(ExpectedBool)
+  }
+}
+
+fn native_decode_bool(raw: native.Raw) -> Result(Bool, DecodeError) {
+  native.bool(raw) |> result.replace_error(DecodeError([], ExpectedBool))
+}
+
+fn bool_placeholder() -> Bool {
+  False
 }
 
 /// Any JSON value, passed through unchanged as a `Value`: for JSON that the
@@ -917,7 +1011,34 @@ pub fn bool() -> Codec(Bool) {
 /// as `{}`. When a narrower schema for the value is known, use
 /// `contract.value_codec`, which validates the value on encoding and decoding.
 pub fn value() -> Codec(Value) {
-  leaf(Ok, Ok, native_value, tree.AnySchema, value.Null)
+  leaf(value_ops)
+}
+
+fn value_ops() -> Ops(Value) {
+  value_operations
+}
+
+const value_operations =
+  Ops(
+    text_encode: None,
+    encode: pass_value,
+    decode: pass_value,
+    native_decode: native_value,
+    definition: value_definition,
+    placeholder: value_placeholder,
+    fields: None,
+  )
+
+fn value_definition() -> Result(Option(Tree), DefinitionError) {
+  Ok(Some(tree.AnySchema))
+}
+
+fn pass_value(item: Value) -> Result(Value, a) {
+  Ok(item)
+}
+
+fn value_placeholder() -> Value {
+  value.Null
 }
 
 // --- refinements -------------------------------------------------------------
