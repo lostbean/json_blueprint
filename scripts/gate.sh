@@ -62,4 +62,5 @@ python3 test/number_check.py
 
 python3 test/parser_check.py
 
-python3 test/copy_cost_coverage_check.py
+gleam export package-interface --out "$native_output/interface.json"
+python3 test/copy_cost_coverage_check.py "$native_output/interface.json"
