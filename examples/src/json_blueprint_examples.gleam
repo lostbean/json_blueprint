@@ -3,12 +3,14 @@
 //// `gleam run` in this directory is the quickest tour; `gleam test` checks
 //// each example's assertions on both targets.
 
+import examples/child_codecs
 import examples/custom_types
 import examples/errors
 import examples/gleam_json_bridge
 import examples/larger_inputs
 import examples/optional_fields
 import examples/record
+import examples/runtime_enum
 import examples/runtime_schema
 import examples/schema_inspection
 import examples/unions
@@ -24,6 +26,8 @@ pub fn main() -> Nil {
     #("gleam_json_bridge", gleam_json_bridge.demonstrate()),
     #("larger_inputs", larger_inputs.demonstrate()),
     #("runtime_schema", runtime_schema.demonstrate()),
+    #("runtime_enum", runtime_enum.demonstrate()),
+    #("child_codecs", child_codecs.demonstrate()),
     #("schema_inspection", schema_inspection.demonstrate()),
   ]
   |> list_each

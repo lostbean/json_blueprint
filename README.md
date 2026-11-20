@@ -84,6 +84,30 @@ Before upgrading an existing application, follow the
 [2.0 migration guide](https://github.com/lostbean/json_blueprint/blob/main/docs/MIGRATION.md).
 The package upgrade and adopting codecs are separate changes.
 
+## Choosing a codec
+
+Require `json_blueprint >= 2.1.1`: earlier releases multiply a nested codec's
+size when it is sent to another BEAM process.
+
+- Generate the codec from a typed definition when its JSON shape is fixed at
+  build time and the codec is hot, long-lived, or sent to or held by other
+  processes, directly or inside a value such as an agent or a tool definition.
+  A generated codec refers to module functions and literals and captures no
+  child codec, so it stays small to send. Sending decoded data costs the same
+  with either kind of codec.
+- Write it with combinators when the shape depends on run-time values, needs
+  tagged unions, shared definitions or recursion, uses `custom`, `value` or
+  arbitrary `try_map`, or is used once. For a fixed shape that is neither hot
+  nor held by other processes, default to combinators.
+- In a combinator codec, build each child codec in the field that uses it.
+  A child codec bound with `let` before a `use … <- codec.field` chain, or
+  passed in as a parameter and used by a later field, is copied once per
+  callback when the codec is sent to another process.
+
+The [codec practice guide](https://github.com/lostbean/json_blueprint/blob/main/docs/CODEC-PRACTICE.md) gives the measurements, the rules for
+combinator codecs with examples, a copy-size test, and the generator's current
+gaps.
+
 ## Define a codec
 
 This record codec makes a field required or optional, then uses the same
@@ -107,7 +131,6 @@ pub type User {
 }
 
 pub fn user_codec() -> Codec(User) {
-  let role = codec.string_enum([#("admin", Admin), #("member", Member)])
   use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
   use age <- codec.field("age", codec.integer_between(0, 150), get: fn(u) {
     u.age
@@ -115,7 +138,11 @@ pub fn user_codec() -> Codec(User) {
   use email <- codec.optional_field("email", codec.string(), get: fn(u) {
     u.email
   })
-  use role <- codec.field("role", role, get: fn(u) { u.role })
+  use role <- codec.field(
+    "role",
+    codec.string_enum([#("admin", Admin), #("member", Member)]),
+    get: fn(u) { u.role },
+  )
   codec.success(User(name:, age:, email:, role:))
 }
 
@@ -241,7 +268,8 @@ Generate reviewable Gleam source through two development-time paths:
 - An [admitted closed-object schema](#generate-native-records-from-a-schema) generates native record types and an ordinary typed codec.
 
 Your build task writes, formats, and compiles the returned source. Both paths use
-JSON Blueprint at runtime.
+JSON Blueprint at runtime. The [codec practice guide](https://github.com/lostbean/json_blueprint/blob/main/docs/CODEC-PRACTICE.md#choose-generated-codecs-or-combinators)
+says when a generated codec is the better choice.
 
 `json_blueprint` includes the runtime and both generators,
 `json/blueprint/codegen` and `json/blueprint/codegen/schema`; no separate
@@ -325,11 +353,13 @@ From the repository root, `nix develop --command sh scripts/benchmark.sh` runs t
 - Wire names are preserved. Native names are deterministic; invalid names, name collisions, and unsupported shapes return typed failures with logical schema locations instead of partial source.
 - Enums, tagged unions, unconstrained values, shared or recursive definitions, and non-object roots are outside this generation slice. Runtime-schema admission does not imply generation support.
 - The [separate order consumer](https://github.com/lostbean/json_blueprint/blob/main/examples/codegen/README.md) demonstrates the complete workflow, including a schema file, development-only generation task, committed output, application-owned policy, recovery, both runtime targets, and freshly generated-code integration tests. Its production package depends only on JSON Blueprint and compiled source.
-- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use. [ADR 0010](https://github.com/lostbean/json_blueprint/blob/main/docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the separate construction, conversion, and build-time generation costs.
+- Generated codecs use public runtime combinators and add no second contract-validation pass. Codec accessors construct values on each call; retain a codec for repeated use in the process that uses it. Their output is combinator code, so the [codec practice guide](https://github.com/lostbean/json_blueprint/blob/main/docs/CODEC-PRACTICE.md) applies before a schema-generated codec is sent to another process. [ADR 0010](https://github.com/lostbean/json_blueprint/blob/main/docs/adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md) records the separate construction, conversion, and build-time generation costs.
 
 ## Examples and references
 
 The [examples](https://github.com/lostbean/json_blueprint/blob/main/examples/README.md) compile and run on Erlang and JavaScript.
+The [codec practice guide](https://github.com/lostbean/json_blueprint/blob/main/docs/CODEC-PRACTICE.md) says when to generate a codec and how to write
+combinator codecs that stay cheap to send between processes.
 The [design](https://github.com/lostbean/json_blueprint/blob/main/docs/design/design-layer.pdf) records behavior and ownership. The
 [benchmark report](https://github.com/lostbean/json_blueprint/blob/main/docs/BENCHMARKS.md) retains local observations without
 performance guarantees.

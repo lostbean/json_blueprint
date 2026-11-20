@@ -29,6 +29,12 @@ consumer="$output/consumer"
   cd "$consumer"
   rm -rf build/dev/erlang/schema_order_consumer build/dev/javascript/schema_order_consumer
 
+  # The typed-definition export job codec: regenerate it from its definition
+  # and require the committed module to match.
+  gleam run -m generate_export_job
+  gleam format src/jobs/export_job_codec.gleam
+  cmp src/jobs/export_job_codec.gleam "$repository/examples/codegen/src/jobs/export_job_codec.gleam"
+
   for target in erlang javascript; do
     gleam build --target="$target" --warnings-as-errors
     gleam test --target="$target"

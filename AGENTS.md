@@ -20,6 +20,7 @@
 - [`docs/ORACLE.md`](docs/ORACLE.md) pins the independent Draft 2020-12 validator (`jsonschema` 4.26.0 through `flake.lock`), the frozen 85-case manifest and the profile fixtures this package is compared against, with the limits of that claim.
 - [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) holds the benchmark method, provenance and dated local observations. Timing never gates a change, and the two documents cross-link.
 - [`examples/README.md`](examples/README.md) lists the compiled usage examples.
+- [`docs/CODEC-PRACTICE.md`](docs/CODEC-PRACTICE.md) is the consumer guide for choosing generated or combinator codecs and for keeping codecs cheap to send between processes. Keep its measurements and rules in step with the examples it cites. Other repositories link to this path and its section anchors on `main`; do not move the file or rename its headings.
 
 <!-- agent-skills:begin -->
 <!-- framework-commit: cab7c0590036edaa66d8430cc5016399a9fd2c71 origin: git@github.com:lostbean/skills.git -->
@@ -58,11 +59,11 @@ for repository formatting. Local test scripts own application compilation and be
 
 ## README snippets
 
-Keep README Gleam examples in compiled example or consumer source. Use named
+Keep Gleam examples in README and `docs/CODEC-PRACTICE.md` in compiled example or consumer source. Use named
 `snips-start` / `snips-end` regions (or include a whole example module), and retain
 Prettier ignore ranges around generated README blocks. Format the source first,
-then run `nix run .#snips -- --commands deny README.md`. CI runs
-`nix run .#snips -- --check --commands deny README.md` using the shared pinned
+then run `nix run .#snips -- --commands deny README.md docs/CODEC-PRACTICE.md`. CI runs
+`nix run .#snips -- --check --commands deny README.md docs/CODEC-PRACTICE.md` using the shared pinned
 package. Snips checks synchronization; existing example tests check behavior.
 
 ## Commit messages
