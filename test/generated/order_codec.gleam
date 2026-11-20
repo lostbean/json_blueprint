@@ -11,7 +11,7 @@ import json/blueprint/value
 import materialize_fixtures
 
 pub const generated_fingerprint: String =
-  "A0C42B67853701BF9E6EB805CB6E8C82A28A07C7"
+  "287F3347BF1D5033F794A8733E9364CE580F1600"
 
 const order_schema_value: schema_tree.Tree =
   schema_tree.ObjectSchema(
@@ -728,11 +728,13 @@ fn order_compiled_inner_properties_right_value_encode(
   item: materialize_fixtures.OrderStatus,
 ) -> Result(value.Value, codec.EncodeError) {
   case item {
-    materialize_fixtures.Pending -> Ok(value.String("pending"))
-    materialize_fixtures.Processing -> Ok(value.String("processing"))
-    materialize_fixtures.ShippedQuoted ->
+    _ if item == materialize_fixtures.Pending -> Ok(value.String("pending"))
+    _ if item == materialize_fixtures.Processing ->
+      Ok(value.String("processing"))
+    _ if item == materialize_fixtures.ShippedQuoted ->
       Ok(value.String("shipped\n\r\f\t\"quoted\""))
-    materialize_fixtures.DeliveredUnicode -> Ok(value.String("delivered 🚀 fn"))
+    _ if item == materialize_fixtures.DeliveredUnicode ->
+      Ok(value.String("delivered 🚀 fn"))
     _ -> generated.unknown_enum_value()
   }
 }
@@ -757,11 +759,12 @@ fn order_compiled_inner_properties_right_value_native_encode(
   item: materialize_fixtures.OrderStatus,
 ) -> Result(json.Json, codec.EncodeError) {
   case item {
-    materialize_fixtures.Pending -> Ok(json.string("pending"))
-    materialize_fixtures.Processing -> Ok(json.string("processing"))
-    materialize_fixtures.ShippedQuoted ->
+    _ if item == materialize_fixtures.Pending -> Ok(json.string("pending"))
+    _ if item == materialize_fixtures.Processing -> Ok(json.string("processing"))
+    _ if item == materialize_fixtures.ShippedQuoted ->
       Ok(json.string("shipped\n\r\f\t\"quoted\""))
-    materialize_fixtures.DeliveredUnicode -> Ok(json.string("delivered 🚀 fn"))
+    _ if item == materialize_fixtures.DeliveredUnicode ->
+      Ok(json.string("delivered 🚀 fn"))
     _ -> generated.unknown_enum_value()
   }
 }

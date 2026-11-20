@@ -1472,6 +1472,11 @@ fn is_digit(ch: String) -> Bool {
   }
 }
 
+// Encoder arms compare by equality, as the runtime `codec.string_enum` does,
+// instead of matching constructors. The generator cannot know whether the
+// variants name every constructor, so the closing catch-all must stay; a
+// guarded arm keeps it reachable for the compiler, and an enumeration that
+// names every constructor compiles without an unreachable-pattern warning.
 fn emit_enum_encoder_arms(
   variants: List(EnumVariant(a)),
   acc: List(String),
@@ -1481,7 +1486,7 @@ fn emit_enum_encoder_arms(
     [EnumVariant(label, _, reference), ..rest] -> {
       let expression = normalize_reference_unchecked(reference)
       emit_enum_encoder_arms(rest, [
-        "    "
+        "    _ if item == "
           <> expression
           <> " -> Ok(value.String("
           <> schema_materialize.escape_string_literal(label)
@@ -1521,7 +1526,7 @@ fn emit_native_enum_encoder_arms(
     [EnumVariant(label, _, reference), ..rest] -> {
       let expression = normalize_reference_unchecked(reference)
       emit_native_enum_encoder_arms(rest, [
-        "    "
+        "    _ if item == "
           <> expression
           <> " -> Ok(json.string("
           <> schema_materialize.escape_string_literal(label)
