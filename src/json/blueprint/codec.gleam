@@ -1178,7 +1178,11 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
 pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
   let defect = case variants {
     [] -> Some(EmptyEnum)
-    _ -> enum_defect(variants, set.new(), set.new())
+    _ ->
+      case list.length(variants) <= small_enum {
+        True -> small_enum_defect(variants, [], [])
+        False -> enum_defect(variants, set.new(), set.new())
+      }
   }
   Codec(fn() {
     Ops(
@@ -1232,6 +1236,28 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
       fields: None,
     )
   })
+}
+
+/// Up to this many labels, scanning the earlier ones is cheaper than sets.
+const small_enum = 8
+
+/// The first repeated label or value, found by scanning the earlier ones;
+/// reports the same mistake as `enum_defect`.
+fn small_enum_defect(
+  variants: List(#(String, a)),
+  labels: List(String),
+  values: List(a),
+) -> Option(DefinitionError) {
+  case variants {
+    [] -> None
+    [#(label, item), ..rest] ->
+      case list.contains(labels, label), list.contains(values, item) {
+        True, _ -> Some(DuplicateEnumLabel(label))
+        _, True -> Some(DuplicateEnumValue(label))
+        False, False ->
+          small_enum_defect(rest, [label, ..labels], [item, ..values])
+      }
+  }
 }
 
 /// Sets keep this linear in the number of labels, which may come from
