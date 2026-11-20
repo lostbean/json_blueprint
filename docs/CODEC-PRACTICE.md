@@ -270,9 +270,9 @@ Erlang, because JavaScript has no process copy.
 
 <!-- prettier-ignore-start -->
 
-<!-- snips: ../examples/test/copy_cost_ffi.erl -->
+<!-- snips: ../examples/test/examples_copy_cost_ffi.erl -->
 ```erlang
--module(copy_cost_ffi).
+-module(examples_copy_cost_ffi).
 -export([flat_size_bytes/1]).
 
 %% Bytes a copy of Term to another process takes: a message, a spawn
@@ -282,7 +282,7 @@ flat_size_bytes(Term) ->
 
 ```
 
-<!-- snips: ../examples/test/copy_cost_ffi.mjs -->
+<!-- snips: ../examples/test/examples_copy_cost_ffi.mjs -->
 ```javascript
 // JavaScript has no process copy; the copy-cost checks skip there.
 export function flat_size_bytes(_term) {
@@ -293,8 +293,8 @@ export function flat_size_bytes(_term) {
 
 <!-- snips: ../examples/test/copy_cost_test.gleam#copy-size-test -->
 ```gleam
-@external(erlang, "copy_cost_ffi", "flat_size_bytes")
-@external(javascript, "./copy_cost_ffi.mjs", "flat_size_bytes")
+@external(erlang, "examples_copy_cost_ffi", "flat_size_bytes")
+@external(javascript, "./examples_copy_cost_ffi.mjs", "flat_size_bytes")
 fn flat_size_bytes(term: a) -> Int
 
 /// Copy size is a BEAM measure; on JavaScript the check is skipped.
@@ -313,6 +313,11 @@ pub fn child_codecs_built_in_their_fields_stay_small_test() {
 ```
 
 <!-- prettier-ignore-end -->
+
+Give the FFI module a name that no other package in the build uses: a package
+that depends on another by path also builds that package's test modules, and
+two Erlang modules with one name shadow each other depending on code-path
+order.
 
 Measure the term that is actually sent: the message, the spawn argument or the
 child specification, not only the codec inside it. Set the bound from a

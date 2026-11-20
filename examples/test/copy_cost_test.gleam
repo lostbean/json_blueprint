@@ -9,8 +9,8 @@ import gleeunit/should
 import json/blueprint/codec.{type Codec}
 
 // snips-start: copy-size-test
-@external(erlang, "copy_cost_ffi", "flat_size_bytes")
-@external(javascript, "./copy_cost_ffi.mjs", "flat_size_bytes")
+@external(erlang, "examples_copy_cost_ffi", "flat_size_bytes")
+@external(javascript, "./examples_copy_cost_ffi.mjs", "flat_size_bytes")
 fn flat_size_bytes(term: a) -> Int
 
 /// Copy size is a BEAM measure; on JavaScript the check is skipped.

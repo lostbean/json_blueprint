@@ -1,4 +1,4 @@
--module(copy_cost_ffi).
+-module(examples_copy_cost_ffi).
 -export([flat_size_bytes/1]).
 
 %% Bytes a copy of Term to another process takes: a message, a spawn

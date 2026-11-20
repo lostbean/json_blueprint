@@ -8,7 +8,15 @@ cd "$(dirname "$0")/.."
 
 native_output=$(mktemp -d)
 trap 'rm -rf "$native_output"' EXIT HUP INT TERM
-find src test examples/src examples/test examples/codegen/src examples/codegen/test examples/codegen/generate/src -name '*.erl' -type f -exec erlc -Werror -o "$native_output" {} +
+erlang_sources="src test examples/src examples/test examples/codegen/src examples/codegen/test examples/codegen/generate/src"
+# A consumer builds its path dependency's test modules too, so two Erlang
+# modules with one name would shadow each other depending on code-path order.
+duplicate_modules=$(find $erlang_sources -name '*.erl' -type f -exec basename {} \; | sort | uniq -d)
+if [ -n "$duplicate_modules" ]; then
+  echo "Erlang module names must be unique across packages: $duplicate_modules" >&2
+  exit 1
+fi
+find $erlang_sources -name '*.erl' -type f -exec erlc -Werror -o "$native_output" {} +
 
 echo "== json_blueprint"
 rm -rf build/dev/erlang/json_blueprint build/dev/javascript/json_blueprint
