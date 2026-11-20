@@ -482,11 +482,42 @@ pub opaque type Codec(a) {
   // One thunk per combinator: it captures the combinator's arguments once and
   // builds the operations when the codec is used, so no captured value is
   // held by several stored closures.
-  Codec(ops: fn() -> Ops(a))
+  Codec(build: fn() -> Built(a))
+}
+
+/// What a codec's closure builds on use: its operations, or, for a record
+/// step, only the fields that the rest of the record needs, so a record does
+/// not build its whole operations at every field.
+type Built(a) {
+  Operations(Ops(a))
+  RecordStep(fields: Fields(a), placeholder: fn() -> a)
+}
+
+/// A codec whose closure builds `make`'s operations on use.
+fn operations(make: fn() -> Ops(a)) -> Codec(a) {
+  Codec(fn() { Operations(make()) })
 }
 
 fn ops(codec: Codec(a)) -> Ops(a) {
-  codec.ops()
+  case codec.build() {
+    Operations(found) -> found
+    RecordStep(fields, placeholder) -> record(fields, placeholder)
+  }
+}
+
+/// The fields of a record codec, without building its other operations.
+fn fields_of(codec: Codec(a)) -> Option(Fields(a)) {
+  case codec.build() {
+    RecordStep(fields, _) -> Some(fields)
+    Operations(found) -> found.fields
+  }
+}
+
+fn placeholder_of(codec: Codec(a)) -> a {
+  case codec.build() {
+    RecordStep(_, placeholder) -> placeholder()
+    Operations(found) -> found.placeholder()
+  }
 }
 
 /// The operations of a codec, built on demand and never stored in a codec.
@@ -681,7 +712,7 @@ pub fn decoder(codec: Codec(a)) -> decode.Decoder(a) {
 /// }
 /// ```
 pub fn placeholder(codec: Codec(a)) -> a {
-  ops(codec).placeholder()
+  placeholder_of(codec)
 }
 
 /// The codec's schema.
@@ -703,8 +734,8 @@ pub fn schema_json(codec: Codec(a)) -> Result(String, SchemaError) {
 /// A codec with no inputs: its operations are a module constant of named
 /// functions, so using it allocates nothing, and the codec is a few words
 /// that refer to a module literal, which a process copy does not copy.
-fn leaf(operations: fn() -> Ops(a)) -> Codec(a) {
-  Codec(operations)
+fn leaf(built: fn() -> Built(a)) -> Codec(a) {
+  Codec(built)
 }
 
 fn fail(reason: Reason) -> Result(a, DecodeError) {
@@ -720,9 +751,11 @@ pub fn string() -> Codec(String) {
   leaf(string_ops)
 }
 
-fn string_ops() -> Ops(String) {
-  string_operations
+fn string_ops() -> Built(String) {
+  string_built
 }
+
+const string_built = Operations(string_operations)
 
 const string_operations =
   Ops(
@@ -771,9 +804,11 @@ pub fn int() -> Codec(Int) {
   leaf(int_ops)
 }
 
-fn int_ops() -> Ops(Int) {
-  int_operations
+fn int_ops() -> Built(Int) {
+  int_built
 }
+
+const int_built = Operations(int_operations)
 
 const int_operations =
   Ops(
@@ -835,9 +870,11 @@ pub fn float() -> Codec(Float) {
   leaf(float_ops)
 }
 
-fn float_ops() -> Ops(Float) {
-  float_operations
+fn float_ops() -> Built(Float) {
+  float_built
 }
+
+const float_built = Operations(float_operations)
 
 const float_operations =
   Ops(
@@ -891,9 +928,11 @@ pub fn number() -> Codec(Number) {
   leaf(number_ops)
 }
 
-fn number_ops() -> Ops(Number) {
-  number_operations
+fn number_ops() -> Built(Number) {
+  number_built
 }
+
+const number_built = Operations(number_operations)
 
 const number_operations =
   Ops(
@@ -961,9 +1000,11 @@ pub fn bool() -> Codec(Bool) {
   leaf(bool_ops)
 }
 
-fn bool_ops() -> Ops(Bool) {
-  bool_operations
+fn bool_ops() -> Built(Bool) {
+  bool_built
 }
+
+const bool_built = Operations(bool_operations)
 
 const bool_operations =
   Ops(
@@ -1012,9 +1053,11 @@ pub fn value() -> Codec(Value) {
   leaf(value_ops)
 }
 
-fn value_ops() -> Ops(Value) {
-  value_operations
+fn value_ops() -> Built(Value) {
+  value_built
 }
+
+const value_built = Operations(value_operations)
 
 const value_operations =
   Ops(
@@ -1056,7 +1099,7 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
   let lower = number.from_int(minimum) |> result.unwrap(zero())
   let upper = number.from_int(maximum) |> result.unwrap(zero())
   let digits = int.max(digit_count(minimum), digit_count(maximum))
-  Codec(fn() {
+  operations(fn() {
     Ops(
       text_encode: None,
       encode: fn(item) {
@@ -1131,7 +1174,7 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
     order.Gt -> Some(ReversedNumberBounds(minimum, maximum))
     _ -> None
   }
-  Codec(fn() {
+  operations(fn() {
     Ops(
       text_encode: None,
       encode: fn(item) {
@@ -1185,7 +1228,7 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
         False -> enum_defect(variants, set.new(), set.new())
       }
   }
-  Codec(fn() {
+  operations(fn() {
     Ops(
       text_encode: None,
       encode: fn(item) {
@@ -1283,7 +1326,7 @@ fn enum_defect(
 /// Add a JSON Schema description without changing encoding or decoding. A
 /// later description at the same node replaces an earlier one.
 pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
-  Codec(fn() {
+  operations(fn() {
     let inner = ops(codec)
     let definition = inner.definition
     Ops(
@@ -1307,7 +1350,7 @@ pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
 
 /// A JSON array of items.
 pub fn list(of item: Codec(a)) -> Codec(List(a)) {
-  Codec(fn() {
+  operations(fn() {
     let item_ops = ops(item)
     let encode_item = item_ops.encode
     let decode_item = item_ops.decode
@@ -1361,7 +1404,7 @@ fn decode_items(
 
 /// A two-item JSON array.
 pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
-  Codec(fn() {
+  operations(fn() {
     let left_ops = ops(left)
     let right_ops = ops(right)
     let encode_left = left_ops.encode
@@ -1427,7 +1470,7 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
 /// encoding is itself `null` fails with `NullInsideNullable`, because it
 /// would decode as `None`.
 pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
-  Codec(fn() {
+  operations(fn() {
     let inner_ops = ops(inner)
     let encode_inner = inner_ops.encode
     let decode_inner = inner_ops.decode
@@ -1572,7 +1615,7 @@ pub fn field(
           property(name, True, found, next_codec)
         },
       )
-    record(fields, fn() { ops(next(item_placeholder())).placeholder() })
+    RecordStep(fields, fn() { placeholder_of(next(item_placeholder())) })
   })
 }
 
@@ -1656,7 +1699,7 @@ pub fn optional_field(
           property(name, False, found, next(None))
         },
       )
-    record(fields, fn() { ops(next(None)).placeholder() })
+    RecordStep(fields, fn() { placeholder_of(next(None)) })
   })
 }
 
@@ -1664,7 +1707,7 @@ pub fn optional_field(
 /// `success(x)` is the empty object `{}`, which decodes as `x`.
 pub fn success(value: r) -> Codec(r) {
   Codec(fn() {
-    record(
+    RecordStep(
       Fields(
         encode: fn(_, _) { Ok([]) },
         decode: fn(_, _) { Ok(#(value, 0)) },
@@ -1683,7 +1726,7 @@ fn property(
   found: Option(Tree),
   next_codec: Codec(r),
 ) -> Result(List(Property), DefinitionError) {
-  case ops(next_codec).fields {
+  case fields_of(next_codec) {
     None -> Error(NotARecord(name))
     Some(fields) -> {
       use others <- result.try(fields.properties())
@@ -1735,7 +1778,7 @@ fn prepend_name(name: String, others: List(String)) -> List(String) {
 }
 
 fn record_fields(after: String, codec: Codec(r)) -> Fields(r) {
-  case ops(codec).fields {
+  case fields_of(codec) {
     Some(fields) -> fields
     None -> definition_panic(NotARecord(after))
   }
@@ -1919,7 +1962,7 @@ pub fn union(variants: Union(t)) -> Codec(t) {
     None, [] -> Some(EmptyUnion)
     None, _ -> None
   }
-  Codec(fn() {
+  operations(fn() {
     Ops(
       text_encode: None,
       encode: fn(item) {
@@ -2158,7 +2201,7 @@ pub fn map(
   decode from: fn(a) -> b,
   encode to: fn(b) -> a,
 ) -> Codec(b) {
-  Codec(fn() {
+  operations(fn() {
     let codec_ops = ops(codec)
     let encode_inner = codec_ops.encode
     let decode_inner = codec_ops.decode
@@ -2203,7 +2246,7 @@ pub fn try_map(
   encode to: fn(b) -> Result(a, String),
   placeholder placeholder: b,
 ) -> Codec(b) {
-  Codec(fn() {
+  operations(fn() {
     let codec_ops = ops(codec)
     let encode_inner = codec_ops.encode
     let decode_inner = codec_ops.decode
@@ -2247,7 +2290,7 @@ pub fn custom(
   schema schema: Option(Schema),
   placeholder placeholder: a,
 ) -> Codec(a) {
-  Codec(fn() {
+  operations(fn() {
     Ops(
       text_encode: None,
       encode:,
@@ -2571,7 +2614,7 @@ fn variant_schema_value(variant: tree.VariantSchema) -> Value {
 /// every call and run no caller callback.
 @internal
 pub fn deferred(build: fn() -> Codec(a)) -> Codec(a) {
-  Codec(fn() { ops(build()) })
+  Codec(fn() { { build() }.build() })
 }
 
 /// Register compiler-checked generated operations and their checked schema.
@@ -2586,7 +2629,7 @@ pub fn generated(
   schema schema: Schema,
   placeholder placeholder: fn() -> a,
 ) -> Codec(a) {
-  Codec(fn() {
+  operations(fn() {
     Ops(
       text_encode: Some(text_encode),
       encode:,
