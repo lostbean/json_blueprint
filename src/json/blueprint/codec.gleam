@@ -511,12 +511,9 @@ type Fields(a) {
   Fields(
     // Thread visited declarations through conversion, without running
     // placeholder continuations again. Decode results count present members.
-    encode: fn(a, Dict(String, Nil)) ->
-      Result(List(#(String, Value)), EncodeError),
-    decode: fn(List(#(String, Value)), Dict(String, Nil)) ->
-      Result(#(a, Int), DecodeError),
-    native_decode: fn(native.Raw, Dict(String, Nil)) ->
-      Result(#(a, Int), DecodeError),
+    encode: fn(a, Seen) -> Result(List(#(String, Value)), EncodeError),
+    decode: fn(List(#(String, Value)), Seen) -> Result(#(a, Int), DecodeError),
+    native_decode: fn(native.Raw, Seen) -> Result(#(a, Int), DecodeError),
     names: fn() -> List(String),
     properties: fn() -> Result(List(Property), DefinitionError),
   )
@@ -1672,13 +1669,36 @@ fn property(
 }
 
 // Validate declarations during actual conversion, including omitted fields.
-// A dictionary avoids a quadratic scan for wide records.
-fn visit_name(name: String, seen: Dict(String, Nil)) -> Dict(String, Nil) {
-  case dict.has_key(seen, name) {
-    True -> definition_panic(DuplicateFieldName(name))
-    False -> dict.insert(seen, name, Nil)
+fn visit_name(name: String, seen: Seen) -> Seen {
+  case seen {
+    FewNames(names, count) ->
+      case list.contains(names, name) {
+        True -> definition_panic(DuplicateFieldName(name))
+        False if count < 16 -> FewNames([name, ..names], count + 1)
+        False ->
+          ManyNames(
+            list.fold([name, ..names], dict.new(), fn(found, name) {
+              dict.insert(found, name, Nil)
+            }),
+          )
+      }
+    ManyNames(names) ->
+      case dict.has_key(names, name) {
+        True -> definition_panic(DuplicateFieldName(name))
+        False -> ManyNames(dict.insert(names, name, Nil))
+      }
   }
 }
+
+/// The field names a conversion has visited: a short list, which is cheaper
+/// than a dictionary for most records, then a dictionary, so wide records
+/// stay linear.
+type Seen {
+  FewNames(names: List(String), count: Int)
+  ManyNames(names: Dict(String, Nil))
+}
+
+const no_names = FewNames([], 0)
 
 fn prepend_name(name: String, others: List(String)) -> List(String) {
   case list.contains(others, name) {
@@ -1705,12 +1725,12 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Ops(r) {
   Ops(
     text_encode: None,
     encode: fn(item) {
-      encode_fields(item, dict.new()) |> result.map(value.Object)
+      encode_fields(item, no_names) |> result.map(value.Object)
     },
     decode: fn(raw) {
       case raw {
         value.Object(members) -> {
-          use #(record, used) <- result.try(decode_fields(members, dict.new()))
+          use #(record, used) <- result.try(decode_fields(members, no_names))
           case used == list.length(members) {
             True -> Ok(record)
             // A member was not used: name it, as an unknown or repeated key.
@@ -1726,10 +1746,7 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Ops(r) {
       case native.keys(raw) {
         Error(Nil) -> fail(ExpectedObject)
         Ok(present) -> {
-          use #(record, used) <- result.try(decode_native_fields(
-            raw,
-            dict.new(),
-          ))
+          use #(record, used) <- result.try(decode_native_fields(raw, no_names))
           case used == list.length(present) {
             True -> Ok(record)
             False ->
