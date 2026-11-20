@@ -20,6 +20,7 @@
 - [`docs/ORACLE.md`](docs/ORACLE.md) pins the independent Draft 2020-12 validator (`jsonschema` 4.26.0 through `flake.lock`), the frozen 85-case manifest and the profile fixtures this package is compared against, with the limits of that claim.
 - [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) holds the benchmark method, provenance and dated local observations. Timing never gates a change, and the two documents cross-link.
 - [`examples/README.md`](examples/README.md) lists the compiled usage examples.
+- [`docs/CODEC-PRACTICE.md`](docs/CODEC-PRACTICE.md) is the consumer guide for choosing generated or combinator codecs and for keeping codecs cheap to send between processes. Keep its measurements and rules in step with the examples it cites.
 
 <!-- agent-skills:begin -->
 <!-- framework-commit: cab7c0590036edaa66d8430cc5016399a9fd2c71 origin: git@github.com:lostbean/skills.git -->

@@ -18,7 +18,6 @@
 //// }
 ////
 //// pub fn user_codec() -> Codec(User) {
-////   let role = codec.string_enum([#("admin", Admin), #("member", Member)])
 ////   use name <- codec.field("name", codec.string(), get: fn(u) { u.name })
 ////   use age <- codec.field("age", codec.integer_between(0, 150), get: fn(u) {
 ////     u.age
@@ -26,7 +25,11 @@
 ////   use email <- codec.optional_field("email", codec.string(), get: fn(u) {
 ////     u.email
 ////   })
-////   use role <- codec.field("role", role, get: fn(u) { u.role })
+////   use role <- codec.field(
+////     "role",
+////     codec.string_enum([#("admin", Admin), #("member", Member)]),
+////     get: fn(u) { u.role },
+////   )
 ////   codec.success(User(name:, age:, email:, role:))
 //// }
 ////
@@ -47,6 +50,16 @@
 //// checked first and fixes the record type. The body after each `use` runs
 //// with placeholder values when the codec describes itself, so keep it a
 //// plain constructor call.
+////
+//// Sending a codec, or a value that holds one, to another BEAM process
+//// copies it without sharing. Build each child codec in the field that uses
+//// it, directly or by calling a function there. A child codec, or any large
+//// value, bound with `let` before the `use` chain and used by a later field
+//// is captured by the continuation and copied once per callback that holds
+//// it. For a codec whose shape is fixed at build time, the generator in
+//// `json/blueprint/codegen` emits module functions and literals instead.
+//// The codec practice guide, `docs/CODEC-PRACTICE.md` in the repository,
+//// gives the measurements and a copy-size test.
 ////
 //// Objects are closed: an unknown field fails to decode. `optional_field`
 //// omits the field for `None`; wrap the inner codec in `nullable` to also
@@ -468,6 +481,11 @@ pub fn encode_failure(message: String) -> EncodeError {
 /// retains only the child operations it calls, never a whole child codec,
 /// `Fields` or `Union`: the copied size then adds up over nesting layers
 /// instead of multiplying at each one.
+///
+/// A record's continuation is a callback too. A child codec bound with `let`
+/// before a `use … <- field` chain and used by a later field is captured by
+/// that continuation and copied once per callback that holds it; build each
+/// child codec in the field that uses it.
 pub opaque type Codec(a) {
   Codec(
     text_encode: Option(fn(a) -> Result(String, EncodeError)),

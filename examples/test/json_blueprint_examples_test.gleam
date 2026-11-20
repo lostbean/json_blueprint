@@ -1,12 +1,14 @@
 //// Each usage example runs here on both targets; its own `demonstrate`
 //// carries the assertions, so API drift fails this module.
 
+import examples/child_codecs
 import examples/custom_types
 import examples/errors
 import examples/gleam_json_bridge
 import examples/larger_inputs
 import examples/optional_fields
 import examples/record
+import examples/runtime_enum
 import examples/runtime_schema
 import examples/schema_inspection
 import examples/unions
@@ -50,4 +52,12 @@ pub fn runtime_schema_test() {
 
 pub fn schema_inspection_test() {
   let _ = schema_inspection.demonstrate()
+}
+
+pub fn runtime_enum_test() {
+  let _ = runtime_enum.demonstrate()
+}
+
+pub fn child_codecs_test() {
+  let _ = child_codecs.demonstrate()
 }
