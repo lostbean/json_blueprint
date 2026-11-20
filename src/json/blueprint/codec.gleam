@@ -144,7 +144,6 @@ import gleam/order
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
-import gleam/string_tree.{type StringTree}
 import json/blueprint/internal/native
 import json/blueprint/internal/schema_tree.{type Tree} as tree
 import json/blueprint/number.{type Number}
@@ -494,9 +493,6 @@ fn ops(codec: Codec(a)) -> Ops(a) {
 type Ops(a) {
   Ops(
     text_encode: Option(fn(a) -> Result(String, EncodeError)),
-    // JSON text written directly, with the bytes and errors of rendering
-    // `encode`'s Value; `None` renders that Value. See `text_of`.
-    text: Option(fn(a) -> Result(StringTree, EncodeError)),
     encode: fn(a) -> Result(Value, EncodeError),
     decode: fn(Value) -> Result(a, DecodeError),
     native_decode: fn(native.Raw) -> Result(a, DecodeError),
@@ -516,7 +512,6 @@ type Fields(a) {
     // Thread visited declarations through conversion, without running
     // placeholder continuations again. Decode results count present members.
     encode: fn(a, Seen) -> Result(List(#(String, Value)), EncodeError),
-    text: fn(a, Seen) -> Result(List(StringTree), EncodeError),
     decode: fn(List(#(String, Value)), Seen) -> Result(#(a, Int), DecodeError),
     native_decode: fn(native.Raw, Seen) -> Result(#(a, Int), DecodeError),
     names: fn() -> List(String),
@@ -578,41 +573,8 @@ pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
   let found = ops(codec)
   case found.text_encode {
     Some(encode) -> encode(item)
-    None -> text_of(found)(item) |> result.map(string_tree.to_string)
+    None -> found.encode(item) |> result.map(value.to_string)
   }
-}
-
-/// The text encoder of `found`: its own, or rendering its encoded Value.
-/// Both write the same bytes and fail with the same errors.
-fn text_of(found: Ops(a)) -> fn(a) -> Result(StringTree, EncodeError) {
-  case found.text {
-    Some(text) -> text
-    None -> {
-      let encode = found.encode
-      fn(item) { encode(item) |> result.map(rendered) }
-    }
-  }
-}
-
-fn rendered(raw: Value) -> StringTree {
-  string_tree.from_string(value.to_string(raw))
-}
-
-fn text_member(name: String, text: StringTree) -> StringTree {
-  string_tree.prepend(text, quote(name) <> ":")
-}
-
-/// `[a,b]` or `{a,b}` from the texts of the items or members.
-fn enclosed(
-  open: String,
-  items: List(StringTree),
-  close: String,
-) -> StringTree {
-  string_tree.concat([
-    string_tree.from_string(open),
-    string_tree.join(items, ","),
-    string_tree.from_string(close),
-  ])
 }
 
 /// Parse JSON text within the default byte bound and decode it.
@@ -764,7 +726,6 @@ fn string_ops() -> Ops(String) {
 const string_operations =
   Ops(
     text_encode: None,
-    text: Some(text_string),
     encode: encode_string,
     decode: decode_string,
     native_decode: native_decode_string,
@@ -816,7 +777,6 @@ fn int_ops() -> Ops(Int) {
 const int_operations =
   Ops(
     text_encode: None,
-    text: Some(text_int),
     encode: encode_checked_int,
     decode: decode_int,
     native_decode: native_decode_int,
@@ -881,7 +841,6 @@ fn float_ops() -> Ops(Float) {
 const float_operations =
   Ops(
     text_encode: None,
-    text: None,
     encode: encode_float,
     decode: decode_float,
     native_decode: native_decode_float,
@@ -938,7 +897,6 @@ fn number_ops() -> Ops(Number) {
 const number_operations =
   Ops(
     text_encode: None,
-    text: None,
     encode: encode_number,
     decode: decode_number,
     native_decode: native_number,
@@ -1009,7 +967,6 @@ fn bool_ops() -> Ops(Bool) {
 const bool_operations =
   Ops(
     text_encode: None,
-    text: Some(text_bool),
     encode: encode_bool,
     decode: decode_bool,
     native_decode: native_decode_bool,
@@ -1061,7 +1018,6 @@ fn value_ops() -> Ops(Value) {
 const value_operations =
   Ops(
     text_encode: None,
-    text: None,
     encode: pass_value,
     decode: pass_value,
     native_decode: native_value,
@@ -1102,7 +1058,6 @@ pub fn integer_between(minimum: Int, maximum: Int) -> Codec(Int) {
   Codec(fn() {
     Ops(
       text_encode: None,
-      text: None,
       encode: fn(item) {
         ensure(defect)
         case item >= minimum && item <= maximum {
@@ -1178,7 +1133,6 @@ pub fn number_between(minimum: Number, maximum: Number) -> Codec(Number) {
   Codec(fn() {
     Ops(
       text_encode: None,
-      text: None,
       encode: fn(item) {
         ensure(defect)
         case within(item, minimum, maximum) {
@@ -1233,13 +1187,6 @@ pub fn string_enum(variants: List(#(String, a))) -> Codec(a) {
   Codec(fn() {
     Ops(
       text_encode: None,
-      text: Some(fn(item) {
-        ensure(defect)
-        case list.find(variants, fn(variant) { variant.1 == item }) {
-          Ok(#(label, _)) -> Ok(string_tree.from_string(quote(label)))
-          Error(Nil) -> refuse(UnknownEnumValue)
-        }
-      }),
       encode: fn(item) {
         ensure(defect)
         case list.find(variants, fn(variant) { variant.1 == item }) {
@@ -1361,20 +1308,12 @@ pub fn describe(codec: Codec(a), description: String) -> Codec(a) {
 pub fn list(of item: Codec(a)) -> Codec(List(a)) {
   Codec(fn() {
     let item_ops = ops(item)
-    let text_item = text_of(item_ops)
     let encode_item = item_ops.encode
     let decode_item = item_ops.decode
     let decode_native_item = item_ops.native_decode
     let item_definition = item_ops.definition
     Ops(
       text_encode: None,
-      text: Some(fn(items) {
-        list.index_map(items, fn(entry, index) { #(index, entry) })
-        |> list.try_map(fn(pair) {
-          text_item(pair.1) |> at_encode(Index(pair.0))
-        })
-        |> result.map(enclosed("[", _, "]"))
-      }),
       encode: fn(items) {
         list.index_map(items, fn(entry, index) { #(index, entry) })
         |> list.try_map(fn(pair) {
@@ -1424,8 +1363,6 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
   Codec(fn() {
     let left_ops = ops(left)
     let right_ops = ops(right)
-    let text_left = text_of(left_ops)
-    let text_right = text_of(right_ops)
     let encode_left = left_ops.encode
     let encode_right = right_ops.encode
     let decode_left = left_ops.decode
@@ -1438,11 +1375,6 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
     let right_placeholder = right_ops.placeholder
     Ops(
       text_encode: None,
-      text: Some(fn(items: #(a, b)) {
-        use first <- result.try(text_left(items.0) |> at_encode(Index(0)))
-        use second <- result.try(text_right(items.1) |> at_encode(Index(1)))
-        Ok(enclosed("[", [first, second], "]"))
-      }),
       encode: fn(items: #(a, b)) {
         use first <- result.try(encode_left(items.0) |> at_encode(Index(0)))
         use second <- result.try(encode_right(items.1) |> at_encode(Index(1)))
@@ -1496,28 +1428,12 @@ pub fn pair(left: Codec(a), right: Codec(b)) -> Codec(#(a, b)) {
 pub fn nullable(inner: Codec(a)) -> Codec(Option(a)) {
   Codec(fn() {
     let inner_ops = ops(inner)
-    let text_inner = text_of(inner_ops)
     let encode_inner = inner_ops.encode
     let decode_inner = inner_ops.decode
     let decode_native_inner = inner_ops.native_decode
     let inner_definition = inner_ops.definition
     Ops(
       text_encode: None,
-      text: Some(fn(item) {
-        case item {
-          None -> Ok(string_tree.from_string("null"))
-          Some(item) ->
-            case text_inner(item) {
-              // Only the Value null renders as `null`.
-              Ok(text) ->
-                case string_tree.to_string(text) == "null" {
-                  True -> refuse(NullInsideNullable)
-                  False -> Ok(text)
-                }
-              other -> other
-            }
-        }
-      }),
       encode: fn(item) {
         case item {
           None -> Ok(value.Null)
@@ -1597,7 +1513,6 @@ pub fn field(
   Codec(fn() {
     let codec_ops = ops(codec)
     let encode_item = codec_ops.encode
-    let text_item = text_of(codec_ops)
     let decode_item = codec_ops.decode
     let decode_native_item = codec_ops.native_decode
     let item_definition = codec_ops.definition
@@ -1613,16 +1528,6 @@ pub fn field(
             seen,
           ))
           [#(name, encoded), ..others]
-        },
-        text: fn(record, seen) {
-          let seen = visit_name(name, seen)
-          let item = get(record)
-          use text <- result.try(text_item(item) |> at_encode(Field(name)))
-          use others <- result.map(record_fields(name, next(item)).text(
-            record,
-            seen,
-          ))
-          [text_member(name, text), ..others]
         },
         decode: fn(members, seen) {
           let seen = visit_name(name, seen)
@@ -1690,7 +1595,6 @@ pub fn optional_field(
   Codec(fn() {
     let codec_ops = ops(codec)
     let encode_item = codec_ops.encode
-    let text_item = text_of(codec_ops)
     let decode_item = codec_ops.decode
     let decode_native_item = codec_ops.native_decode
     let item_definition = codec_ops.definition
@@ -1709,20 +1613,6 @@ pub fn optional_field(
                 seen,
               ))
               [#(name, encoded), ..others]
-            }
-          }
-        },
-        text: fn(record, seen) {
-          let seen = visit_name(name, seen)
-          case get(record) {
-            None -> record_fields(name, next(None)).text(record, seen)
-            Some(item) as found -> {
-              use text <- result.try(text_item(item) |> at_encode(Field(name)))
-              use others <- result.map(record_fields(name, next(found)).text(
-                record,
-                seen,
-              ))
-              [text_member(name, text), ..others]
             }
           }
         },
@@ -1776,7 +1666,6 @@ pub fn success(value: r) -> Codec(r) {
     record(
       Fields(
         encode: fn(_, _) { Ok([]) },
-        text: fn(_, _) { Ok([]) },
         decode: fn(_, _) { Ok(#(value, 0)) },
         native_decode: fn(_, _) { Ok(#(value, 0)) },
         names: fn() { [] },
@@ -1854,7 +1743,6 @@ fn record_fields(after: String, codec: Codec(r)) -> Fields(r) {
 fn record(fields: Fields(r), placeholder: fn() -> r) -> Ops(r) {
   let Fields(
     encode: encode_fields,
-    text: text_fields,
     decode: decode_fields,
     native_decode: decode_native_fields,
     names:,
@@ -1862,9 +1750,6 @@ fn record(fields: Fields(r), placeholder: fn() -> r) -> Ops(r) {
   ) = fields
   Ops(
     text_encode: None,
-    text: Some(fn(item) {
-      text_fields(item, no_names) |> result.map(enclosed("{", _, "}"))
-    }),
     encode: fn(item) {
       encode_fields(item, no_names) |> result.map(value.Object)
     },
@@ -1972,7 +1857,6 @@ type VariantOps(t) {
   VariantOps(
     // The payload of a value this variant tagged; see `encode_union`.
     encode: fn(Dynamic) -> Result(Value, EncodeError),
-    text: fn(Dynamic) -> Result(StringTree, EncodeError),
     decode: fn(Value) -> Result(t, DecodeError),
     native_decode: fn(native.Raw) -> Result(t, DecodeError),
     definition: fn() -> Result(Option(Tree), DefinitionError),
@@ -2036,10 +1920,6 @@ pub fn union(variants: Union(t)) -> Codec(t) {
   Codec(fn() {
     Ops(
       text_encode: None,
-      text: Some(fn(item) {
-        ensure(defect)
-        text_union(variants, select(item))
-      }),
       encode: fn(item) {
         ensure(defect)
         encode_union(variants, select(item))
@@ -2088,7 +1968,6 @@ pub fn variant(
       VariantOps(
         // `encode_union` checked the token, so the value is a `p`.
         encode: fn(item) { payload_ops.encode(coerce(item)) },
-        text: fn(item) { text_of(payload_ops)(coerce(item)) },
         decode: fn(raw) { payload_ops.decode(raw) |> result.map(construct) },
         native_decode: fn(raw) {
           payload_ops.native_decode(raw) |> result.map(construct)
@@ -2114,7 +1993,6 @@ pub fn unit_variant(
     Variant(tag, token, False, fn() {
       VariantOps(
         encode: fn(_) { Ok(value.Null) },
-        text: fn(_) { Ok(string_tree.from_string("null")) },
         decode: fn(_) { Ok(item) },
         native_decode: fn(_) { Ok(item) },
         definition: fn() { Ok(None) },
@@ -2169,35 +2047,6 @@ fn encode_union(
       }
     _, _ -> foreign_tag_panic(variants)
   }
-}
-
-fn text_union(
-  variants: List(Variant(t)),
-  tagged: Tagged(t),
-) -> Result(StringTree, EncodeError) {
-  let Tagged(token, payload) = tagged
-  case list.find(variants, fn(variant) { variant.token == token }), payload {
-    Ok(Variant(tag:, has_payload: False, ..)), None ->
-      Ok(enclosed("{", [text_member("tag", text_string_tree(tag))], "}"))
-    Ok(Variant(tag:, has_payload: True, ops:, ..)), Some(item) ->
-      case ops().text(item) {
-        Ok(text) ->
-          Ok(enclosed(
-            "{",
-            [
-              text_member("tag", text_string_tree(tag)),
-              text_member("value", text),
-            ],
-            "}",
-          ))
-        Error(error) -> Error(error) |> at_encode(Field("value"))
-      }
-    _, _ -> foreign_tag_panic(variants)
-  }
-}
-
-fn text_string_tree(text: String) -> StringTree {
-  string_tree.from_string(quote(text))
 }
 
 /// A tagging function or tagged value belongs to the union whose `variant`
@@ -2309,14 +2158,12 @@ pub fn map(
 ) -> Codec(b) {
   Codec(fn() {
     let codec_ops = ops(codec)
-    let text_inner = text_of(codec_ops)
     let encode_inner = codec_ops.encode
     let decode_inner = codec_ops.decode
     let decode_native_inner = codec_ops.native_decode
     let inner_placeholder = codec_ops.placeholder
     Ops(
       text_encode: None,
-      text: Some(fn(item) { text_inner(to(item)) }),
       encode: fn(item) { encode_inner(to(item)) },
       decode: fn(raw) { decode_inner(raw) |> result.map(from) },
       native_decode: fn(raw) { decode_native_inner(raw) |> result.map(from) },
@@ -2356,18 +2203,11 @@ pub fn try_map(
 ) -> Codec(b) {
   Codec(fn() {
     let codec_ops = ops(codec)
-    let text_inner = text_of(codec_ops)
     let encode_inner = codec_ops.encode
     let decode_inner = codec_ops.decode
     let decode_native_inner = codec_ops.native_decode
     Ops(
       text_encode: None,
-      text: Some(fn(item) {
-        case to(item) {
-          Ok(inner) -> text_inner(inner)
-          Error(message) -> refuse(Custom(message))
-        }
-      }),
       encode: fn(item) {
         case to(item) {
           Ok(inner) -> encode_inner(inner)
@@ -2408,7 +2248,6 @@ pub fn custom(
   Codec(fn() {
     Ops(
       text_encode: None,
-      text: None,
       encode:,
       decode:,
       native_decode: fn(raw) {
@@ -2738,7 +2577,6 @@ pub fn generated(
   Codec(fn() {
     Ops(
       text_encode: Some(text_encode),
-      text: None,
       encode:,
       decode:,
       native_decode: strict_decode,
@@ -2747,26 +2585,4 @@ pub fn generated(
       fields: None,
     )
   })
-}
-
-fn text_string(item: String) -> Result(StringTree, EncodeError) {
-  Ok(string_tree.from_string(quote(item)))
-}
-
-fn text_int(item: Int) -> Result(StringTree, EncodeError) {
-  case number.from_int(item) {
-    Error(_) -> refuse(UnsafeInteger)
-    Ok(_) ->
-      case digit_count(item) <= 24 {
-        True -> Ok(string_tree.from_string(int.to_string(item)))
-        False -> refuse(ExpectedInt)
-      }
-  }
-}
-
-fn text_bool(item: Bool) -> Result(StringTree, EncodeError) {
-  case item {
-    True -> Ok(string_tree.from_string("true"))
-    False -> Ok(string_tree.from_string("false"))
-  }
 }
