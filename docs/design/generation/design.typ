@@ -78,7 +78,7 @@
         [The #term("term-schema-driven-generator") accepts only a closed-object root. The explicit name is a validated lowercase accessor stem: order selects public Order and `order_codec()`. The module path follows the existing generator's source-path validation.],
         [Generated root and nested record types are public so consumers can construct native values. Only the root codec accessor is public; nested codec functions are private. Generated applications depend on JSON Blueprint and their compiled source; generation runs only when explicitly invoked.],
         [The generated module uses ordinary public codec constructors and record continuations. It does not emit a second Value validator or route through the typed-definition generator's specialized emitter. Caller mappings from generated records to business types remain application-owned.],
-        [Calling the root accessor constructs its codec and prebinds child codec definitions before field continuations. Exact bounds are reconstructed during that construction; retaining the returned codec reuses those child definitions and bounds across conversions. Each accessor call constructs a new codec without a global cache.],
+        [Calling the root accessor constructs its codec and prebinds child codec definitions before field continuations. Exact bounds are reconstructed during that construction; retaining the returned codec reuses those child definitions and bounds across conversions, while their operations are built on each use like any codec's. Each accessor call constructs a new codec without a global cache.],
       )
       #md-table(3, (
         [Admitted schema shape], [Native type], [Preserved behavior],
