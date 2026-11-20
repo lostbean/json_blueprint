@@ -56,6 +56,7 @@ pub fn contact_codec() -> Codec(Contact) {
   codec.success(Contact(name:, email:, phone:, company:, role:, city:))
 }
 
+// snips-start: built-in-fields
 /// Each field builds its child codec by calling `contact_codec`.
 pub fn answer_codec() -> Codec(Answer) {
   use summary <- codec.field("summary", codec.string(), get: fn(a) { a.summary })
@@ -68,6 +69,9 @@ pub fn answer_codec() -> Codec(Answer) {
   codec.success(Answer(summary:, primary:, backup:))
 }
 
+// snips-end: built-in-fields
+
+// snips-start: let-bound
 /// Avoid: `contact` is bound before the chain and used by later fields, so
 /// every continuation after the first field captures it.
 pub fn captured_answer_codec() -> Codec(Answer) {
@@ -77,6 +81,8 @@ pub fn captured_answer_codec() -> Codec(Answer) {
   use backup <- codec.optional_field("backup", contact, get: fn(a) { a.backup })
   codec.success(Answer(summary:, primary:, backup:))
 }
+
+// snips-end: let-bound
 
 /// Runs the example and returns what it shows.
 pub fn demonstrate() -> String {

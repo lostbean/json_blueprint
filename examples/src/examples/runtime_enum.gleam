@@ -21,6 +21,7 @@ pub type Citation {
   Citation(claim: String, source_ids: List(String), note: Option(String))
 }
 
+// snips-start: citation-codec
 /// The citation codec for one run, which may cite only `offered` sources.
 pub fn citation_codec(offered: List(String)) -> Codec(Citation) {
   // Small data: one label pair per offered id, converted once.
@@ -35,6 +36,8 @@ pub fn citation_codec(offered: List(String)) -> Codec(Citation) {
   use note <- codec.optional_field("note", codec.string(), get: fn(c) { c.note })
   codec.success(Citation(claim:, source_ids:, note:))
 }
+
+// snips-end: citation-codec
 
 /// The codec for `offered`, or why those ids cannot label an enum.
 pub fn checked_citation_codec(

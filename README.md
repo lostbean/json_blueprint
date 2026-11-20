@@ -90,9 +90,11 @@ Require `json_blueprint >= 2.1.1`: earlier releases multiply a nested codec's
 size when it is sent to another BEAM process.
 
 - Generate the codec from a typed definition when its JSON shape is fixed at
-  build time and the codec is hot, long-lived, or crosses processes, such as a
-  stored or queued payload or an API body. A generated codec is module
-  functions and literals, which the BEAM does not copy between processes.
+  build time and the codec is hot, long-lived, or sent to or held by other
+  processes, directly or inside a value such as an agent or a tool definition.
+  A generated codec refers to module functions and literals and captures no
+  child codec, so it stays small to send. Sending decoded data costs the same
+  with either kind of codec.
 - Write it with combinators when the shape depends on run-time values, needs
   tagged unions or recursion, uses `custom`, `value` or arbitrary `try_map`, or
   is used once.

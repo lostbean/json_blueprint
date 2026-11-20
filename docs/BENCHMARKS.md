@@ -248,6 +248,65 @@ Erlang/OTP 29 (ERTS 17.1.1), Node 24.21.0, no isolation.
   and the member lookup each take a tenth to a quarter of the time. None was
   changed.
 
+### Generated and combinator codecs in a consumer, 2026-11-19
+
+This observation comes from an application that consumes JSON Blueprint, not
+from this repository's harness. It informs the
+[codec practice guide](CODEC-PRACTICE.md) and states no performance contract.
+
+- Subject: a private Gleam application built on JSON Blueprint, at
+  commit `2ffe864`, resolving `json_blueprint` 2.1.1 from Hex. Its combinator
+  codecs for model answers and tool payloads were measured as written.
+- Generated stand-ins: the same JSON shapes compiled with the typed-definition
+  generator. Their closed sets are custom-type enums, and their source-id
+  fields are plain strings, because the generator has no run-time enum. A
+  combinator codec that enumerates 20 offered ids therefore validates more
+  than its stand-in.
+- Measures: flat size (`erts_debug:flat_size/1`, the bytes a process copy
+  takes), in-heap size (`erts_debug:size/1`), and the receiving process's
+  memory growth after a garbage collection on both sides. Growth below the
+  receiver's minimum heap reads as 0 B. Time is the mean of 5,000 calls after
+  500 warm-up calls, in one VM, without isolation.
+- Environment: Apple M2 Max, Darwin 27.2.0 on arm64, Gleam 1.19.2, Erlang/OTP 29
+  (ERTS 17.1.1). The measurement modules lived outside both repositories and
+  are not retained.
+
+| Codec | Flat size | In-heap | Encode µs | Decode µs |
+| --- | ---: | ---: | ---: | ---: |
+| Proposed item, 20 offered ids (combinators) | 25.9 kB | 2.6 kB | 106.83 | 102.70 |
+| Proposed item, any source (combinators) | 8.4 kB | 1.1 kB | 8.23 | 8.39 |
+| Proposed item (generated) | 3.3 kB | 3.3 kB | 1.80 | 5.29 |
+| Batch of items, 20 offered ids (combinators) | 59.2 kB | 3.7 kB | 610.29 | 601.37 |
+| Batch of items, any source (combinators) | 15.2 kB | 2.3 kB | 35.00 | 31.12 |
+| Batch of items (generated) | 4.1 kB | 4.1 kB | 7.00 | 19.24 |
+| Curator answer, two children bound with `let` (combinators) | 88.6 kB | 2.4 kB | 14.80 | 9.60 |
+| Curator answer, children built in their fields (combinators) | 1.9 kB | 0.7 kB | 14.51 | 12.33 |
+| Curator answer (generated) | 2.0 kB | 2.0 kB | 3.96 | 7.65 |
+| Proposed item, 20 offered ids, enums built once before the chain | 282.0 kB | 7.2 kB | 6.79 | 7.26 |
+
+- Generated codecs encoded 3.7 to 87 times and decoded 1.25 to 31 times faster
+  than the combinator codecs. The large factors come from codecs that rebuild
+  a 20-label enum on each conversion, which their stand-ins do not validate.
+  For comparable shapes, the any-source and curator rows, encoding was 3.7 to 5
+  times and decoding 1.25 to 1.6 times faster. The second range agrees with
+  the retained 238 to 176 µs Erlang decode in
+  [ADR 0016](adr/0016-specialize-generated-codecs-with-runtime-semantics.md).
+- Building the 20-id enums once before the field chain made the codec 15.7
+  times faster to encode and 10.9 times bigger to copy (282.0 kB against
+  25.9 kB).
+- Moving the curator answer's two `let`-bound child codecs into the fields
+  that use them reduced its flat size from 88.6 kB to 1.9 kB. Its times were
+  taken on a smaller sample (847 bytes of JSON against 1,197) and do not
+  compare with the other curator rows.
+- A 4,200-byte literal sent to another process grew the receiver by 0 B; on
+  this OTP release, literals are not copied between processes.
+- Values that hold codecs copied at 9 to 45 times their in-heap size: an agent
+  with 20 episodes and 20 sources, 250.8 kB against 18.6 kB; a curator agent,
+  476.7 kB against 10.7 kB; a reply drafter, 124.6 kB against 7.6 kB; a
+  registration agent, 100.8 kB against 10.8 kB. The decisions library's
+  view codec, a record whose later field holds a caller's 1.5 kB output codec,
+  copied in 22.5 kB against 1.8 kB in-heap.
+
 ## Limits of these claims
 
 - Three fresh VMs identify large differences and variation; they do not establish

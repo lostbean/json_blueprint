@@ -1,5 +1,5 @@
 //// The export job codec is generated from a typed definition because its
-//// shape is fixed at build time and every job crosses into a worker process.
+//// shape is fixed at build time and every worker process holds the codec.
 
 import export_job_definition
 import gleam/list
@@ -55,6 +55,9 @@ pub fn generated_codec_is_smaller_to_copy_than_combinators_test() {
     flat_size_bytes(codegen.runtime(export_job_definition.definition()))
   case generated {
     -1 -> Nil
-    _ -> { generated < runtime } |> should.be_true
+    _ -> {
+      { generated < 2048 } |> should.be_true
+      { generated * 10 < runtime } |> should.be_true
+    }
   }
 }
