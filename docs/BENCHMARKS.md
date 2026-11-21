@@ -385,6 +385,23 @@ rendered document is term-identical, and three paired fresh VMs timing
 | Generated: encode / decode / schema | 115.7 / 165.1 / 15.2 | 116.5 / 166.8 / 15.4 | 1.01 / 1.01 / 1.01 |
 | Union list, 100 records: encode / decode | 896.6 / 795.9 | 593.5 / 833.1 | 0.66 / 1.05 |
 
+Schema discovery alone (`codec.schema`, without rendering) of a prebuilt
+50-label `string_enum`, ns per call, minimum of seven batches of 20,000 calls
+in one fresh VM per build:
+
+| Operation | Erlang 2.1.1 | Erlang candidate | Node 2.1.1 | Node candidate |
+| --- | ---: | ---: | ---: | ---: |
+| `schema` | 770 | 1,332 | 233 | 847 |
+| `check` | 815 | 1,364 | 231 | 810 |
+| `schema_json` | 7,586 | 8,147 | 8,739 | 9,196 |
+| `encode` / `decode` one value | 1,165 / 1,260 | 1,112 / 1,325 | – | – |
+
+An enum's label list grows with its inputs, so it is derived inside the
+operation that needs it and rebuilt on each call: discovery and `check` cost
+about 0.6 µs more per 50 labels for each enum they reach. The "schema" rows of
+the fixture tables include rendering the document and hide it. Conversion of
+the enum is at parity.
+
 Words allocated per conversion (words reclaimed by garbage collection per call
 in a fresh Erlang process):
 

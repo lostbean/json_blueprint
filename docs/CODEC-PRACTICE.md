@@ -9,7 +9,7 @@ declares, because that is the oldest version a build may resolve:
 
 | Declared minimum | Copy rules |
 | --- | --- |
-| 2.2.0 or later | Each combinator holds its inputs once. [Rules 1–3](#write-combinator-codecs-that-copy-cheaply) are no longer needed and code that follows them needs no change. Keep [rule 4](#4-test-the-copy-size). |
+| 2.2.0 or later | Each combinator holds its inputs once. [Rules 1 and 3](#write-combinator-codecs-that-copy-cheaply) are no longer needed, and code that follows them needs no change. [Rule 2](#2-build-run-time-enums-inside-the-field) reverses: build a run-time enum once, before the chain, because an enum built in its field is rebuilt on every conversion. Keep [rule 4](#4-test-the-copy-size). |
 | 2.1.1 to 2.1.x | Follow rules 1–4. |
 | 2.1.0 or earlier | Raise the minimum: copies multiply per nesting layer. |
 
@@ -51,7 +51,13 @@ From 2.2.0 each combinator holds each of its inputs once
 ([ADR 0018](adr/0018-hold-each-codec-input-once.md)), so a codec copies at
 about its in-heap size: the agent input codec above copies in 736 B, a
 consumer's model-answer codec in 1.0 kB instead of 88.6 kB, and a run-time enum
-label costs its own data once instead of about 1 kB. Prefer
+label costs its own data once instead of about 1 kB. The promise covers what
+the library holds, not sharing among your own values: a copy does not preserve
+it, so a codec value used in several places is copied once per place, as any
+shared term is. A 20-label run-time enum reused on both sides of `codec.pair`
+across six layers copies in 92 kB against 1.8 kB in-heap (399 kB on 2.1.1).
+Rule 4's test, written as a ratio to the in-heap size, catches such reuse.
+Prefer
 `json_blueprint >= 2.2.0` for new code. Two union cases changed in 2.2.0: a
 value tagged by another union's tagging function panics when encoded, and a
 union payload is encoded after `match` returns; the documentation of
@@ -116,10 +122,12 @@ it on 2.1.x.
 
 ## Write combinator codecs that copy cheaply
 
-With a minimum of 2.2.0, skip rules 1–3: a record codec holds its continuation
-once, so a value the continuation captures is copied once, whichever field
-uses it. Code written to these rules stays correct and small. Do not move a
-child codec or a run-time enum out of its field while your package still
+With a minimum of 2.2.0, skip rules 1 and 3 and reverse rule 2: a record codec
+holds its continuation once, so a value the continuation captures is copied
+once, whichever field uses it. Code written to rules 1 and 3 stays correct and
+small. A run-time enum built in its field stays correct but is rebuilt and
+re-checked on every conversion, so build it once before the chain. Do not move
+a child codec or a run-time enum out of its field while your package still
 allows 2.1.x; move it only in the change that raises the minimum to 2.2.0.
 
 On 2.1.x, `use x <- codec.field(...)` turns the rest of the record definition
@@ -231,12 +239,22 @@ microseconds per conversion.
 
 ### 2. Build run-time enums inside the field
 
-When enum labels are known only at run time, capture the small data (the label
-pairs, converted once) and call `codec.string_enum` inside the field that uses
-it. Check the codec once where the labels arrive, because labels from data can
-repeat: `codec.check` returns the problem instead of a later panic.
+With a minimum of 2.2.0 this rule reverses: build the enum once, before the
+chain (the first form below), and check it where the labels arrive. Both forms
+then copy the same, but the enum built in its field is rebuilt and re-checked
+on every conversion and for every list element: in the
+[benchmark fixture](BENCHMARKS.md#codec-inputs-held-once-2026-11-20), ten
+entries with a 30-label enum encode in 315 µs that way against 98 µs prebuilt
+on Erlang.
 
-Wrong: the prebuilt enum codec is captured by every later continuation.
+On 2.1.x, when enum labels are known only at run time, capture the small data
+(the label pairs, converted once) and call `codec.string_enum` inside the field
+that uses it. On every version, check the codec once where the labels arrive,
+because labels from data can repeat: `codec.check` returns the problem instead
+of a later panic.
+
+On 2.1.x, wrong; from 2.2.0, the form to use: the prebuilt enum codec is
+captured by every later continuation on 2.1.x.
 
 <!-- prettier-ignore-start -->
 
@@ -260,7 +278,8 @@ fn prebuilt_citation_codec(offered: List(String)) -> Codec(Citation) {
 
 <!-- prettier-ignore-end -->
 
-Right: the continuation captures only the label pairs.
+On 2.1.x, right; from 2.2.0, rebuilt on every conversion: the continuation
+captures only the label pairs.
 
 <!-- prettier-ignore-start -->
 

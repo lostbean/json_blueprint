@@ -2,12 +2,14 @@
 ////
 //// Some enums come from data: the source ids offered to one model call, the
 //// stages configured for one tenant. The typed-definition generator cannot
-//// produce them, so build them with combinators. Capture the small data, the
-//// label pairs converted once, and build `codec.string_enum` inside the field
-//// that uses it. On 2.1.x a prebuilt enum codec bound before the `use` chain
-//// would be captured by every later continuation and copied once per callback
-//// when the codec is sent to another process; from 2.2.0 it is copied once,
-//// and building it before the chain also avoids rebuilding it per conversion.
+//// produce them, so build them with combinators. This module shows the 2.1.x
+//// form: capture the small data, the label pairs converted once, and build
+//// `codec.string_enum` inside the field that uses it, because a prebuilt enum
+//// codec bound before the `use` chain would be captured by every later
+//// continuation and copied once per callback when the codec is sent to
+//// another process. With a minimum of 2.2.0, build the enum once before the
+//// chain instead: it is copied once, and the form here rebuilds and re-checks
+//// it on every conversion.
 ////
 //// Labels from data can repeat, so check the codec once where the data
 //// arrives; `codec.check` returns the problem instead of panicking later.

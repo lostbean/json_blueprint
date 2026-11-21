@@ -87,7 +87,8 @@ The package upgrade and adopting codecs are separate changes.
 ## Choosing a codec
 
 Prefer `json_blueprint >= 2.2.0`: from 2.2.0 a codec holds each of its inputs
-once, so sending it to another BEAM process copies about its own size. Never
+once, so sending it to another BEAM process copies about its own size (a codec
+value you use in several places is still copied once per place). Never
 go below 2.1.1: earlier releases multiply a nested codec's size when it is
 sent.
 
