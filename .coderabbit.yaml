@@ -1,0 +1,374 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Review policy for json_blueprint, derived by the coderabbit-config skill.
+# Each instruction names the skill it comes from; `policy` is the review policy
+# of coderabbit-config itself, and `repository` marks a rule beyond the catalog.
+#
+# Catalogs read:
+#   dash-skills        879841a61c3f83cd809edca9229c4a6bb7f909f8
+#   gleam-agent-tools  6a9ea2f647e787a32d3c7fa88d9c58c5b81ae9d7
+#
+# Governing skills: coderabbit-config (policy), gleam, gleam-lib, gleam-ffi,
+# json-blueprint, testing, python, design, tracker, gate, git.
+#
+# Governing dependency versions: json_blueprint 2.2.0 (this package,
+# gleam.toml). Locked in manifest.toml: gleam_stdlib 1.0.5, gleam_json 3.1.0,
+# gleam_crypto 1.6.0, gleeunit 1.11.0.
+language: en-US
+tone_instructions: >-
+  Literal and concise. Report only defects you can evidence from the diff, its
+  callers, the design, or a cited rule. One finding per cause. An empty review
+  is valid.
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_instructions: |
+    Lead with the problem the change solves, then the response in one short
+    paragraph, then the public API or wire-contract effect, if any. Do not
+    narrate the diff file by file.
+  review_status: true
+  commit_status: true
+  fail_commit_status: true
+  collapse_walkthrough: true
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  poem: false
+  in_progress_fortune: false
+  enable_prompt_for_ai_agents: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - main
+
+  # Generated, rendered and recorded output. Generated codecs are rebuilt and
+  # compiled by scripts/gate.sh; review their generator instead.
+  path_filters:
+    - "!flake.lock"
+    - "!docs/design/design-layer.pdf"
+    - "!docs/benchmarks/**"
+    - "!test/generated/**"
+    - "!examples/codegen/src/commerce/order.gleam"
+    - "!examples/codegen/src/jobs/export_job_codec.gleam"
+    - "!examples/codegen/src/projection/numbers.gleam"
+
+  path_instructions:
+    - path: "{src,examples}/**"
+      instructions: |
+        Review policy (policy).
+        - Design first. docs/COVERAGE.md maps each part to its owning section in
+          docs/design (contexts `contracts` and `generation`) and docs/adr. Flag
+          code that contradicts that unit's interface, invariants or side
+          effects, and a change to designed behavior with no change to its
+          design. A fix that restores designed behavior needs none. When code
+          and design disagree, the design changes first.
+        - Core abstractions. Flag a second representation of a concept the
+          design names (Value, Codec, Schema, Contract, Number, the record
+          continuation), a name that differs from the CONTEXT.typ glossaries,
+          and a public module that reaches into `json/blueprint/internal` or
+          `codegen/internal` past the interface that owns it.
+        - Lean. Flag code no test, caller or unit needs: an unset option, an
+          unvaried parameter, a wrapper that adds no rule, an unreachable
+          branch. Say what to delete.
+        - Migration, never a legacy path. The frozen 1.x root and schema
+          surface (ADR 0007) is a designed contract, not a legacy path. Outside
+          it, flag a compatibility shim, a fallback to an old format, a dual
+          read or write, a deprecated alias, and a flag that keeps old
+          behavior. A change to a public module ships as a breaking release
+          with a migration note.
+        - Composable. In a public module, flag hidden call ordering, global
+          state, a mandatory framework where functions compose, a concept the
+          common caller must learn and does not need, and a module with two
+          responsibilities.
+        - Test first. Flag a behavior change with no test that exercises it,
+          and a test bound to internals.
+        - Typed before foreign. Flag Erlang or JavaScript where Gleam does the
+          job, an unchecked cast, an untyped value that reaches domain logic
+          undecoded, and a crash on a routine failure.
+        - Silence. Report nothing that `gleam format`, the compiler with
+          warnings as errors, the tests or scripts/gate.sh decide, and no
+          layout or naming preference without a written rule.
+
+    - path: "{src,test,examples}/**/*.gleam"
+      instructions: |
+        Gleam (gleam).
+        - Flag a module function, private included, without annotated
+          arguments and return type, and an imported function or constant used
+          unqualified.
+        - Flag a name against the conventions: `Json` not `JSON`,
+          conversions named `x_to_y` or `to_y` inside module `x`, `try_` only
+          for an error-propagating counterpart.
+        - Flag `Option` carrying a failure, and a change that merges omitted,
+          explicit false, empty and failed where they mean different things.
+        - Flag an error a caller must parse as a string to choose recovery.
+        - Flag independent optional fields or booleans standing for exclusive
+          states; they are variants.
+        - Flag a predicate check followed by `let assert` on the same shape,
+          and a catch-all branch that silently accepts a new variant.
+        - Flag `panic` or `let assert` handling a routine external failure in
+          `src/`.
+        - Flag a refactor that changes observable errors, ordering or effects.
+        - Flag a compatibility branch with no comment saying why it exists.
+        - Flag `src/` importing a `test/` or `dev/` module or `gleeunit`.
+        - Flag a new process, module or generic machinery added only for
+          organization, and a local type replacing a compatible ecosystem type.
+
+    - path: "src/**/*.gleam"
+      instructions: |
+        Published library surface (gleam-lib). Exported constructors, fields,
+        variants, module paths and behavior of non-internal modules are the
+        compatibility surface; `internal_modules` in gleam.toml marks
+        instability, not access control.
+        - Flag a removed or changed export, variant, field or behavior in a
+          public module that the pull request does not call breaking.
+        - Flag a public signature that exposes an implementation-state type
+          parameter.
+        - Flag an argument that does not affect behavior, a bound operation
+          that makes callers repeat its name or codecs at each use, a setter
+          per field where a record update works, and two public paths for one
+          common task.
+        - Flag configuration validated after a resource is allocated, and a
+          builder or extension protocol with no distinct use case.
+        - Flag a dynamic dispatcher over heterogeneous parameters where typed
+          operations can be bound.
+        - Flag a deliberate crash on a failure the caller could act on; return
+          a structured error instead.
+        - Flag the library taking over policy that belongs to the consumer:
+          protocol admission, business rules, execution (AGENTS.md).
+
+    - path: "{src,test,examples}/**/*.{gleam,erl,mjs}"
+      instructions: |
+        Foreign boundaries (gleam-ffi). Apply to `*.erl` and `*.mjs` files and
+        to a Gleam module that declares `@external`.
+        - Flag validation, branching or state transitions in foreign code; it
+          performs the native call and the representation conversion only.
+        - Flag an external that declares a native value to be a checked domain
+          value, `Dynamic` or a type variable that accepts every handle, and a
+          generic return that hides an unchecked cast.
+        - Flag a JavaScript foreign function that builds a Gleam `Result`,
+          list or variant as a lookalike object instead of through the
+          generated `gleam.mjs` constructors, and an import of the prelude not
+          resolved relative to the generated module.
+        - Flag an expected native failure not mapped to the declared failure
+          value, and code that assumes Gleam catches a foreign exception.
+        - Flag an `async` export or a callback declared as a plain value; a
+          Promise must be modelled.
+        - Flag an exact integer passed through a JavaScript number beyond the
+          safe range.
+        - Flag a multi-target external with no implementation, or a different
+          contract, on one supported target, and a browser claim backed only
+          by Node (docs/BROWSER-SUPPORT.md).
+        - Flag a foreign function with no remaining caller.
+
+    - path: "{src,examples}/**/*.gleam"
+      instructions: |
+        JSON Blueprint codecs (json-blueprint; rules for 2.2.0).
+        - Flag a change to a union envelope (`type`/`data` for 1.x,
+          `tag`/`value` for modern codecs) or to 1.x wire output in a change
+          that claims wire compatibility.
+        - Flag a callback passed to `field`, `optional_field`, `success` or a
+          getter that has an effect or is not synchronous and pure, and a
+          placeholder value from schema discovery stored as data.
+        - Flag a change that merges omission, null and a value; over
+          `nullable`, `optional_field` yields `None`, `Some(None)` and
+          `Some(Some(value))`.
+        - Flag a definition derived at run time and used without
+          `codec.check`.
+        - Flag a union `match` that returns a value tagged by another union.
+        - Flag a combinator that holds one of its inputs more than once (ADR
+          0018), and a run-time enum built inside its field instead of once
+          before the `use` chain.
+        - Flag untrusted text parsed without `value.default_limits()` or
+          `value.with_max_bytes`, `Float` or `codec.int()` used for an exact
+          number where the `number` API applies, and a reader of `codec.view`
+          that does not handle `OtherSchema`.
+        - Flag a `contract` change that accepts a recursive reference, an
+          untagged union or a pattern without the design widening the
+          Draft 2020-12 profile.
+        - Flag a codec stored with `term_to_binary` or kept across an upgrade.
+        - Flag generator output that emits a feature the typed generator does
+          not support, and generated modules that do not import `gleam_json`.
+
+    - path: "{test,examples/test,examples/codegen/test}/**"
+      instructions: |
+        Tests (testing).
+        - Flag a test that confirms success through internals, private state
+          or a side channel where the public API can show it.
+        - Flag a mock of an internal collaborator, and an assertion on call
+          counts or call order.
+        - Flag a scenario outcome that no design rule states.
+        - Flag tests left in place for an interface the diff replaced.
+        - Flag a refusal or illegal input the change introduces with no test
+          through the public boundary.
+        - Flag a behavior that differs between Erlang and JavaScript tested on
+          one target only.
+
+    - path: "{test,scripts}/**/*.py"
+      instructions: |
+        Python oracles and scripts (python).
+        - Flag `Any`, and an external value (file, JSON, process output) used
+          without parsing.
+        - Flag an abstract base class hierarchy; use `Protocol`.
+        - Flag mutable dataclasses inside the program, and exclusive states as
+          flags instead of tagged frozen dataclasses matched with
+          `assert_never`.
+        - Flag a parser model passed past the boundary.
+
+    - path: "docs/{design,adr}/**"
+      instructions: |
+        Design layer (design; policy).
+        - Fresh reader. The reviewer never saw the change being made. Flag a
+          changed unit that does not tell a reader with no memory what the
+          code does not say, and a unit that copies the code.
+        - Flag content the code states: payloads, fields, limits, timeouts,
+          function or file lists, queries. Name the rule it serves instead; a
+          file or symbol is allowed only where a reader needs it to find where
+          a rule is enforced.
+        - Flag session narration, progress notes, status or delivery history.
+        - Flag a unit missing one of overview, interface, invariants, side
+          effects and verification; an empty part says "none".
+        - Flag a concept defined in a second home, a glossary term with two
+          meanings, and a retired term reused.
+        - Flag an edit to an accepted ADR's text instead of a superseding ADR,
+          and a changed date on a pending entry.
+
+    - path: "issues/**/*.md"
+      instructions: |
+        Local tracker (tracker; AGENTS.md).
+        - Each issue file carries one `Status:` and one `Category:` header
+          with a value AGENTS.md lists.
+        - Flag an issue titled with a solution instead of the observable
+          problem, line numbers or solution code in an issue, and a horizontal
+          task such as "build the data layer".
+        - Flag an AI-written comment that does not start with
+          `AI-assisted contribution.`
+
+    - path: "{scripts/**/*.sh,flake.nix,.github/workflows/**}"
+      instructions: |
+        Gate (gate).
+        - Flag a check that passes or skips when its tool is missing; it
+          fails or reports unmeasured.
+        - Flag a tool not supplied through the Nix flake, and a command that
+          differs between local runs and CI.
+        - Flag a new check that encodes a layout, naming or README
+          convention, and a check that scripts what a tool already performs.
+        - Flag a replaced check that drops security or data-integrity
+          coverage.
+        - Flag a gate that keeps a formatting check but loses compile or
+          behavior tests on either target.
+
+  pre_merge_checks:
+    title:
+      mode: "off"
+    description:
+      mode: warning
+    issue_assessment:
+      mode: "off"
+    docstrings:
+      mode: "off"
+    custom_checks:
+      - name: No weakened test or gate
+        mode: error
+        instructions: |
+          Source: policy, gate. Fail if the diff skips, deletes, disables or
+          loosens a test, an oracle case or a step of scripts/gate.sh or CI
+          (including removing a target from `gleam test`, removing a case from
+          test/schema_manifest.json, or adding `continue-on-error`), and the
+          pull request description does not name the behavior that no longer
+          exists or the stronger check that replaces it. Pass otherwise.
+      - name: Behavior change carries its design
+        mode: warning
+        instructions: |
+          Source: policy, design. Warn if the diff changes public behavior,
+          an invariant or a wire contract in src/ with no change under
+          docs/design or docs/adr, and the pull request description does not
+          say the change restores designed behavior or preserves behavior.
+          Pass for tests, tooling and documentation-only changes.
+      - name: Breaking change is declared
+        mode: warning
+        instructions: |
+          Source: policy, gleam-lib. Warn if the diff removes or changes an
+          exported function, type, constructor, field or module path in a
+          module not listed in `internal_modules`, and the pull request
+          description does not call the change breaking and give its
+          migration. Pass otherwise.
+      - name: Problem-first description
+        mode: warning
+        instructions: |
+          Source: git. Warn unless the pull request description gives the
+          problem, why it matters, one concrete example, the solution in one
+          paragraph, its trade-offs, and what was verified, with no file
+          tour, and its claims match the diff.
+      - name: No attribution text
+        mode: warning
+        instructions: |
+          Source: git. Warn if the pull request title or description contains
+          a co-author credit, `Co-Authored-By`, a "Generated with" or
+          "Generated by" line, or a line starting with the robot emoji.
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+
+  tools:
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    actionlint:
+      enabled: true
+    zizmor:
+      enabled: true
+    shellcheck:
+      enabled: true
+    ruff:
+      enabled: true
+    # The repository runs no JavaScript or prose linter; their findings would
+    # be preferences without a written rule (policy, Silence).
+    biome:
+      enabled: false
+    eslint:
+      enabled: false
+    oxc:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    yamllint:
+      enabled: false
+    github-checks:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # AGENTS.md and CLAUDE.md are read by default.
+    filePatterns:
+      - files: "docs/COVERAGE.md,docs/CONTEXT-MAP.md,docs/design/**/*.typ,docs/adr/*.md"
+        applyTo: "src/**,examples/**,test/**"
+      - files: "docs/CODEC-PRACTICE.md"
+        applyTo: "src/**/*.gleam,examples/**/*.gleam"
+  learnings:
+    scope: local
+  pull_requests:
+    scope: local
