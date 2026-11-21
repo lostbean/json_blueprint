@@ -5,7 +5,7 @@
 # of coderabbit-config itself, and `repository` marks a rule beyond the catalog.
 #
 # Catalogs read:
-#   dash-skills        879841a61c3f83cd809edca9229c4a6bb7f909f8
+#   practice catalog (not public)  879841a61c3f83cd809edca9229c4a6bb7f909f8
 #   gleam-agent-tools  6a9ea2f647e787a32d3c7fa88d9c58c5b81ae9d7
 #
 # Governing skills: coderabbit-config (policy), gleam, gleam-lib, gleam-ffi,
