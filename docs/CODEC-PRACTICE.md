@@ -57,6 +57,14 @@ value tagged by another union's tagging function panics when encoded, and a
 union payload is encoded after `match` returns; the documentation of
 `codec.union` describes both.
 
+The rule beneath this guide holds on every version and for every term, not
+only codecs: a process copy costs the term's flat size, which can be many times
+its in-heap size when the term holds closures, so bound such terms in a test
+(rule 4). The
+`gleam-otp` agent skill states it for process design in general, under "Bound
+what crosses processes"
+([source](https://github.com/gleam-dream/gleam-agent-tools/blob/main/skills/gleam-otp/SKILL.md)).
+
 ## Choose generated codecs or combinators
 
 Copy cost depends on what crosses a process boundary. Sending decoded data,
