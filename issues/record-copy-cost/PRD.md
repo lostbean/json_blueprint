@@ -1,6 +1,6 @@
 # A copied record codec costs about its in-heap size
 
-Status: ready-for-human
+Status: done
 Category: enhancement
 
 AI-assisted contribution.

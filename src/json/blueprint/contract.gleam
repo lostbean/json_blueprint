@@ -208,6 +208,9 @@ pub fn decode(
 /// no independent resource limits. Typed and generated codecs keep their own
 /// encoding checks; this adapter does not add a validation pass to them.
 pub fn value_codec(contract: Contract) -> Codec(Value) {
+  // One stored closure holds the contract; its encode, decode and schema are
+  // built from it when the codec is used.
+  use <- codec.deferred
   codec.custom(
     encode: fn(raw) {
       case validate(contract, raw) {

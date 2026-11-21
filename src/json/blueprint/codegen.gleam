@@ -878,7 +878,10 @@ pub fn combine(
 /// A closed object of the properties.
 pub fn object(properties: Properties(a, a)) -> Definition(a) {
   let Properties(build, object_type, names, lower_properties) = properties
-  let runtime_codec = build(fn(item) { item }, codec.success)
+  // One stored closure holds the property builders; the record codec they
+  // make captures a getter in several closures, so it is built on use.
+  let runtime_codec =
+    codec.deferred(fn() { build(fn(item) { item }, codec.success) })
   Definition(runtime_codec, object_type, fn(prefix) {
     let lowered = lower_properties(prefix <> "_properties")
     let names_name = prefix <> "_property_names"

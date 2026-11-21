@@ -1,16 +1,18 @@
 //// Building child codecs where they are used.
 ////
-//// `use … <- codec.field` turns the rest of a record into a continuation, and
-//// a record codec keeps that continuation in several callbacks. A value bound
+//// `use … <- codec.field` turns the rest of a record into a continuation; on
+//// 2.1.x a record codec kept that continuation in several callbacks. A value bound
 //// with `let` before the chain and used by a later field is captured by the
 //// continuation. Inside one process that capture is shared, but a process copy
 //// (a message, a spawn argument, a child specification) does not preserve
-//// sharing: the captured child codec is copied once per callback that holds it.
+//// sharing. From 2.2.0 a record holds its continuation once, so the captured
+//// child codec is copied once; on 2.1.x it was copied once per callback that
+//// held the continuation.
 ////
-//// Build each child codec in the field that uses it, by calling a function in
-//// the field's codec argument. Both codecs below convert and describe the same
-//// JSON; `captured_answer_codec` shows the pattern to avoid, and the examples
-//// test measures how much more it costs to copy on the BEAM.
+//// Code that may still resolve 2.1.x builds each child codec in the field that
+//// uses it, by calling a function in the field's codec argument. Both codecs
+//// below convert and describe the same JSON; `captured_answer_codec` shows the
+//// pattern to avoid on 2.1.x, and the examples test measures both copies.
 
 import gleam/option.{type Option}
 import json/blueprint/codec.{type Codec}
@@ -72,8 +74,9 @@ pub fn answer_codec() -> Codec(Answer) {
 // snips-end: built-in-fields
 
 // snips-start: let-bound
-/// Avoid: `contact` is bound before the chain and used by later fields, so
-/// every continuation after the first field captures it.
+/// Avoid on 2.1.x: `contact` is bound before the chain and used by later
+/// fields, so every continuation after the first field captures it. From
+/// 2.2.0 it is copied once.
 pub fn captured_answer_codec() -> Codec(Answer) {
   let contact = contact_codec()
   use summary <- codec.field("summary", codec.string(), get: fn(a) { a.summary })
@@ -90,17 +93,18 @@ pub type Reply(a) {
 }
 
 // snips-start: parameter
-/// Avoid when the codec is sent: the `answer` parameter is used by a later
-/// field, so every continuation after the first field captures it, as a
-/// `let`-bound child codec would be.
+/// Avoid on 2.1.x when the codec is sent: the `answer` parameter is used by a
+/// later field, so every continuation after the first field captures it, as a
+/// `let`-bound child codec would be. From 2.2.0 it is copied once.
 pub fn captured_reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   use id <- codec.field("id", codec.string(), get: fn(r) { r.id })
   use answer <- codec.field("answer", answer, get: fn(r) { r.answer })
   codec.success(Reply(id:, answer:))
 }
 
-/// The first field keeps only the operations its callbacks call, so no
-/// continuation captures the parameter. This changes the order of the encoded members and of the
+/// On 2.1.x the first field keeps only the operations its callbacks call, so
+/// no continuation captures the parameter; from 2.2.0 either order copies the
+/// parameter once. This changes the order of the encoded members and of the
 /// schema's properties; decoding accepts members in any order.
 pub fn reply_codec(answer: Codec(a)) -> Codec(Reply(a)) {
   use answer <- codec.field("answer", answer, get: fn(r) { r.answer })

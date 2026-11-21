@@ -307,6 +307,152 @@ from this repository's harness. It informs the
   view codec, a record whose later field holds a caller's 1.5 kB output codec,
   copied in 22.5 kB against 1.8 kB in-heap.
 
+### Codec inputs held once, 2026-11-20
+
+[ADR 0018](adr/0018-hold-each-codec-input-once.md) stores one closure per
+combinator, holding each input once. The baseline is 2.1.1 (`323f133`); the
+candidate is `e4f0b0a`. Environment: Apple M2 Max, Darwin 27.2.0 on arm64,
+Gleam 1.19.2, Erlang/OTP 29 (ERTS 17.1.1) with `+S 1:1`, Node 24.21.0, no
+isolation.
+
+Copy size, bytes on a 64-bit BEAM, flat / in-heap, from
+`copy_cost_profile_runner` (fixtures in `test/copy_cost_fixtures.gleam`):
+
+| Codec | 2.1.1 | 2.2.0 candidate |
+| --- | ---: | ---: |
+| Profile, 12 optional fields | 2,920 / 920 | 408 / 408 |
+| Entry: profile first, two more fields | 4,408 / 1,336 | 536 / 536 |
+| Agent input: record of a list of entries | 5,944 / 1,832 | 736 / 736 |
+| Record of list of profile, depth 1 / 2 / 3 / 4 | 4,456 / 5,992 / 7,528 / 9,064 | 608 / 808 / 1,008 / 1,208 |
+| Record of profile, depth 1 / 2 / 3 / 4 | 4,408 / 6,184 / 8,248 / 10,600 | 536 / 664 / 792 / 920 |
+| Union of profile, depth 1 / 2 / 3 | 3,048 / 4,528 / 6,008 | 1,184 / 1,960 / 2,736 |
+| `nullable` / `pair` of profile, depth 1 | 1,640 / 1,824 | 480 / 528 |
+
+Where flat exceeds in-heap in the candidate, the fixture shares a value between
+layers, or a union variant's reference is held by the variant and its tagging
+function; `test/codec_input_once_test.gleam` asserts both bounds per combinator.
+The schema-generated order codec of `examples/codegen`, unchanged, copies in
+1,912 bytes against 105,112 (1,832 in-heap), and the generated export job codec
+in 944 bytes against 1,376 for the runtime codec from the same definition.
+
+Consumer shapes, from a harness that builds the consumers' codecs against each
+source and compares their encoded payloads and schema text (byte-identical).
+Copy is flat / bytes a receiving process allocated; times are the minimum of
+five fresh VMs, as a time ratio (candidate ÷ 2.1.1; below 1 is faster):
+
+| Shape | 2.1.1 copy | Candidate copy | Encode | Decode | Schema |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Application model-answer codec | 88.6 / 29.2 kB | 1.0 / 0.5 kB | 0.89 | 1.02 | 1.03 |
+| Application expanded codec | 21.5 / 12.8 kB | 0.4 / 0.2 kB | 0.90 | 0.91 | 0.98 |
+| Application batch codec, 1 / 20 run-time sources | 19.1 / 78.4 kB flat | 1.6 / 5.6 kB flat | 0.87 / 0.95 | 0.88 / 0.94 | 0.94 / 0.96 |
+| Application expansion input codec, 20 episodes | 45.5 / 44.8 kB | 3.7 / 3.6 kB | 1.03 | 1.06 | 0.92 |
+| Application expansion tool value | 114.6 / 104.3 kB | 10.0 / 9.4 kB | – | – | – |
+| Application decision card codec | 22.6 / 15.3 kB | 1.8 / 1.2 kB | – | – | – |
+| Application internal agent (a whole agent) | 289.2 / 258.2 kB | 32.7 / 27.5 kB | – | – | – |
+| decisions view codec, Erlang | 102.4 / 66.5 kB | 4.3 / 3.0 kB | 0.87 | 0.95 | 0.96 |
+| decisions view codec, Node | retained 8.2 kB | retained 5.8 kB | 0.90 | 0.98 | 0.99 |
+
+Copies fell 8.8 to 85 times. The expansion input codec, at 1.40 on the
+representation alone, reaches 1.03 / 1.06 with the kept speed slices.
+
+Fixture times, µs per operation, ten entries of a profile record with a
+30-label run-time enum, minimum [range] of five fresh VMs per build. "In field"
+builds the enum inside its field (the 2.1.x guide's form), "prebuilt" before
+the chain:
+
+| Erlang row | 2.1.1 | Candidate | Ratio |
+| --- | ---: | ---: | ---: |
+| In field: construct | 0.75 [0.75–0.80] | 0.42 [0.42–0.43] | 0.56 |
+| In field: encode / decode | 334.8 / 313.7 | 315.2 / 294.0 | 0.94 / 0.94 |
+| In field: schema | 60.3 [60.3–61.6] | 60.1 [60.1–61.2] | 1.00 |
+| Prebuilt: encode / decode | 111.6 / 96.2 | 98.0 / 82.1 | 0.88 / 0.85 |
+| Prebuilt: schema | 33.2 [33.2–34.1] | 33.0 [33.0–34.0] | 0.99 |
+| Generated: encode / decode | 37.5 / 68.9 | 37.8 / 68.3 | 1.01 / 0.99 |
+| Generated: schema of one entry / of the input | 20.8 / 19.4 | 17.4 / 22.7 | 0.84 / 1.17 |
+| Union list, 100 records: encode / decode | 469.4 / 315.3 | 481.3 / 317.0 | 1.03 / 1.01 |
+
+The generated input schema row repeated (1.17) on a second five-VM run. It does
+not reproduce in isolation: the generated codec's schema path is unchanged, the
+rendered document is term-identical, and three paired fresh VMs timing
+`schema_json` alone gave 0.86, 0.95 and 1.06.
+
+| Node row | 2.1.1 | Candidate | Ratio |
+| --- | ---: | ---: | ---: |
+| In field: construct | 3.19 | 0.80 | 0.25 |
+| In field: encode / decode / schema | 273.1 / 294.3 / 48.6 | 201.5 / 255.2 / 40.7 | 0.74 / 0.87 / 0.84 |
+| Prebuilt: encode / decode / schema | 212.0 / 226.3 / 42.2 | 139.2 / 194.6 / 34.9 | 0.66 / 0.86 / 0.83 |
+| Generated: construct | 0.085 | 0.014 | 0.16 |
+| Generated: encode / decode / schema | 115.7 / 165.1 / 15.2 | 116.5 / 166.8 / 15.4 | 1.01 / 1.01 / 1.01 |
+| Union list, 100 records: encode / decode | 896.6 / 795.9 | 593.5 / 833.1 | 0.66 / 1.05 |
+
+Schema discovery alone (`codec.schema`, without rendering) of a prebuilt
+50-label `string_enum`, ns per call, minimum of seven batches of 20,000 calls
+in one fresh VM per build:
+
+| Operation | Erlang 2.1.1 | Erlang candidate | Node 2.1.1 | Node candidate |
+| --- | ---: | ---: | ---: | ---: |
+| `schema` | 770 | 1,332 | 233 | 847 |
+| `check` | 815 | 1,364 | 231 | 810 |
+| `schema_json` | 7,586 | 8,147 | 8,739 | 9,196 |
+| `encode` / `decode` one value | 1,165 / 1,260 | 1,112 / 1,325 | – | – |
+
+An enum's label list grows with its inputs, so it is derived inside the
+operation that needs it and rebuilt on each call: discovery and `check` cost
+about 0.6 µs more per 50 labels for each enum they reach. The "schema" rows of
+the fixture tables include rendering the document and hide it. Conversion of
+the enum is at parity.
+
+Words allocated per conversion (words reclaimed by garbage collection per call
+in a fresh Erlang process):
+
+| Row | 2.1.1 | Candidate | Ratio |
+| --- | ---: | ---: | ---: |
+| In field: encode / decode | 57,569 / 53,421 | 51,970 / 48,452 | 0.90 / 0.91 |
+| Prebuilt: encode / decode | 32,716 / 28,568 | 28,490 / 24,972 | 0.87 / 0.87 |
+| Prebuilt: schema | 7,859 | 7,697 | 0.98 |
+| Union list: encode / decode | 99,776 / 77,495 | 107,660 / 91,165 | 1.08 / 1.18 |
+
+A codec builds its operations on each use, so union-heavy conversion allocates
+more short-lived memory.
+
+`scripts/benchmark.sh`, median of three runs per build (ns per operation, as a
+ratio). The record-input rows, the agent input codec above with ten entries: on
+Erlang construction 0.28, reused encode 0.61, decode 0.67, complete-text
+encode 0.83 and decode 0.81; on Node 0.20, 0.60, 0.82, 0.63 and 0.84.
+`codec_encode_decode_roundtrip` is 0.96 on Erlang and 0.86 on Node. Rows above
+1.10:
+
+| Row | Target | 2.1.1 | Candidate | Ratio |
+| --- | --- | ---: | ---: | ---: |
+| `order_runtime_schema_discovery` | Node | 5,571 | 6,794 | 1.22 |
+| `legacy_value_runtime_reused_decode` | Node | 5,769 | 6,924 | 1.20 |
+| `order_runtime_schema_document` | Erlang | 13,573 | 15,770 | 1.16 |
+
+All three use `codegen.runtime`, whose record codec is built through
+`codec.deferred` on every use; on the other target each is at most 1.10
+(Erlang 1.10 and 1.01, Node 1.10). Timed alone on an idle machine (minimum of
+nine batches, three fresh VMs per build), schema discovery of the order codec
+costs 1.42 → 1.74 µs on Erlang and 3.6 → 4.6 µs on Node, and a decode
+3.8 → 4.5 µs on Node; rendering the discovered schema is unchanged (Erlang
+document 1.55 / 1.57 µs, text 15.7 / 15.4 µs). The extra is the rebuild of the
+record's field chain, which holding the definition once without a cache
+requires; the owner accepted these rows for 2.2.0 on 2026-11-20. Erlang `legacy_value_runtime_inline_encode`
+(1.10) sits beside `vanilla_parsed_dynamic_typed_decode` (1.10), which uses no
+codec.
+
+Each speed slice was measured on its own, cumulatively, in the same runs, and
+kept only if it beat the noise floor (0.94–1.09 between runs of an unchanged
+build):
+
+| Slice | Kept | Effect |
+| --- | --- | --- |
+| Constant operations for input-free leaves | yes | Erlang prebuilt schema 1.18 → 1.09; fewer words |
+| Digits counted by bytes | yes | Node, ten entries: encode 0.91 (in field) and 0.84 (prebuilt); union encode 0.61 |
+| Field names tracked in a short list | yes | Erlang prebuilt, per entry: encode 1.06 → 0.81 and decode 1.04 → 0.94 |
+| Short enums scanned for repeats | yes | Node construction 0.87 → 0.25, encode 0.89 → 0.73 |
+| A record step yields only its fields | yes | Erlang `codec_encode_decode_roundtrip` 1.70 → 0.96; in-field encode 0.98 → 0.94; words 0.94–0.96 → 0.87–0.91 on records |
+| Direct JSON text for `encode_json` | no | Erlang encode 0.98 → 1.06, union encode 1.00 → 1.22; decode slower on both targets |
+
 ## Limits of these claims
 
 - Three fresh VMs identify large differences and variation; they do not establish

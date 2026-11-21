@@ -15,9 +15,9 @@ pub type AcceptanceError {
   EmptyOrder
 }
 
-/// Each child codec is built in its field: one bound before the `use` chain
-/// would be captured by every later continuation and copied once per
-/// callback when the codec is sent to another process.
+/// Each child codec is built in its field: on 2.1.x one bound before the
+/// `use` chain would be captured by every later continuation and copied once
+/// per callback when the codec is sent to another process.
 pub fn submission_codec() -> codec.Codec(Submission) {
   use correlation_id <- codec.field("correlationId", codec.string(), get: fn(s) {
     s.correlation_id

@@ -63,3 +63,8 @@ export function with_parser_capacity(work, capacityError) {
     throw error;
   }
 }
+
+// A union variant's identity: unique, compared by identity.
+export function identity() {
+  return Symbol("json_blueprint variant");
+}

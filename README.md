@@ -86,8 +86,11 @@ The package upgrade and adopting codecs are separate changes.
 
 ## Choosing a codec
 
-Require `json_blueprint >= 2.1.1`: earlier releases multiply a nested codec's
-size when it is sent to another BEAM process.
+Prefer `json_blueprint >= 2.2.0`: from 2.2.0 a codec holds each of its inputs
+once, so sending it to another BEAM process copies about its own size (a codec
+value you use in several places is still copied once per place). Never
+go below 2.1.1: earlier releases multiply a nested codec's size when it is
+sent.
 
 - Generate the codec from a typed definition when its JSON shape is fixed at
   build time and the codec is hot, long-lived, or sent to or held by other
@@ -99,10 +102,11 @@ size when it is sent to another BEAM process.
   tagged unions, shared definitions or recursion, uses `custom`, `value` or
   arbitrary `try_map`, or is used once. For a fixed shape that is neither hot
   nor held by other processes, default to combinators.
-- In a combinator codec, build each child codec in the field that uses it.
-  A child codec bound with `let` before a `use … <- codec.field` chain, or
-  passed in as a parameter and used by a later field, is copied once per
-  callback when the codec is sent to another process.
+- While your package still allows 2.1.x, build each child codec in the field
+  that uses it in a combinator codec. There, a child codec bound with `let`
+  before a `use … <- codec.field` chain, or passed in as a parameter and used
+  by a later field, is copied once per callback when the codec is sent to
+  another process; from 2.2.0 it is copied once.
 
 The [codec practice guide](https://github.com/lostbean/json_blueprint/blob/main/docs/CODEC-PRACTICE.md) gives the measurements, the rules for
 combinator codecs with examples, a copy-size test, and the generator's current

@@ -20,7 +20,6 @@
   #pagebreak(weak: true)
   #pending-ledger(
     pending-entry(title: "Broader schema families need concrete contracts", kind: "build", since: "2026-09-20", adr: [#adr(1)])[String constraints, broader numeric and collection constraints, arbitrary alternatives, numeric enums, aliases, and recursive references are outside the profile. Their limits, annotation policies, and validation rules are undefined; see Unsupported schema families.],
-    pending-entry(title: "A record holds each continuation in many callbacks", kind: "ruling", since: "2026-11-19")[A record codec keeps a field's continuation in about twelve callbacks, so whatever the continuation captures is copied about twelve times, and a copied record costs many times its in-heap size. Holding the continuation once, by passing the field record to the field operations or by representing record codecs as data, would bring copied size toward in-heap size. The #lnk("../../../issues/record-copy-cost/issues/01-hold-a-record-continuation-once.md")[tracker issue] holds the evidence; the representation is undecided.],
     pending-entry(title: "Consumer evolution policies need explicit contracts", kind: "ruling", since: "2026-10-25")[Prioritize optional unknown-field handling, dictionaries, basic string/list lengths, one-sided numeric bounds, configurable union envelopes and local recursive references. Before implementation, define accepted input versus emitted output, retention of extra fields, schema projection and reference identity. The current strict defaults and frozen legacy access remain in force; formal deprecation requires a supported migration for recursive data and established wire formats.],
     pending-entry(title: "Retain complete compatibility verification", kind: "verify", since: "2026-10-02", adr: [#adr(7)])[Published source, legacy wire, recursive references, error paths, numeric boundaries, and deliberate acceptance corrections need separate fixtures. Existing examples and frozen comparators do not prove complete 1.x compatibility.],
     pending-entry(title: "Keep numerical oracle scope separate from projection", kind: "verify", since: "2026-09-20", adr: [#adr(2)])[The finite schema manifest compares Boolean acceptance for its selected cases. Broader numerical evidence must compare exact schema acceptance separately from native overflow, safe-integer refusal, and intentional Float rounding.],
@@ -170,7 +169,11 @@
   ])
 
   #section(title: "Typed codecs", lead: [This unit composes bidirectional conversion for caller-owned native types and discovers the supported schema.], body: [
-    #answers(title: "Codec boundary", responsibility: [Encode and decode native a using one retained definition and known wire shape.], interface: [Primitive codecs, collection codecs, record and union builders, mapping, custom, encode/decode, schema, check, placeholder.], interactions: [On both targets, strict text admission builds a native tree for direct built-in and generated decoding; custom callbacks convert their subtree to Value. Schema publication exposes an opaque schema for consumer admission.], invariants: [Built-in constructors preserve their declared wire shape. Unknown child schema propagates through every enclosing schema query. A combinator's callbacks retain the child operations they call, never a whole child codec, so the copied size of a codec grows additively with nesting.], failure: [Value failures return path and Reason. Source definition mistakes panic at first affected use; check returns DefinitionError instead.])
+    #answers(title: "Codec boundary", responsibility: [Encode and decode native a using one retained definition and known wire shape.], interface: [Primitive codecs, collection codecs, record and union builders, mapping, custom, encode/decode, schema, check, placeholder.], interactions: [On both targets, strict text admission builds a native tree for direct built-in and generated decoding; custom callbacks convert their subtree to Value. Schema publication exposes an opaque schema for consumer admission.], invariants: [Built-in constructors preserve their declared wire shape. Unknown child schema propagates through every enclosing schema query. On Erlang, a codec's #term("term-flat-size") equals its #term("term-in-heap-size") apart from sharing inside the caller's own values, one reference per union variant held by the variant and by its tagging function or tagged value, module literals, which a copy does not copy, and a codec with a definition mistake.], failure: [Value failures return path and Reason. Source definition mistakes panic at first affected use; check returns DefinitionError instead. The exception is a value tagged by a tagging function or tagged value from another union, which panics when encoded and which check cannot see.])
+    #points(
+      [Each input a combinator receives (child codecs, a record's continuation and getter, enum variants, bounds, caller callbacks) is referenced once by the codec's stored terms, through one stored closure per combinator that builds the codec's operations each time they are needed; a union variant also keeps its tag and its identity. Operations are rebuilt per use and per element: a list of records rebuilds each record's field operations for every element, while input-free leaves return constant operations. Union-heavy conversion therefore allocates more short-lived memory than records of prebuilt closures did, in exchange for a copy that holds every input once. #adr(18)],
+      [Derived data that grows with the inputs, such as an enum's label list, may replace them but is never kept beside them; it is derived inside the operation that needs it, so a codec keeps no cache. Fixed-size derived data, such as integer bounds, digit counts and a definition mistake, is computed once when a combinator is built and shares no subterm with an input. Copy-size tests check every public function of the package that returns a codec, and a completeness check fails when one has none. The #lnk("../../../test/codec_probe.gleam")[codec probe] pins results, errors, paths, schemas and the order and number of caller callbacks; its expected lines change only with a named design change.],
+    )
     #subsection(title: "Constructor acceptance")[
       #md-table(3, (
         [Constructor], [Native and JSON shape], [Acceptance and encoding rule],
@@ -224,14 +227,14 @@
         #then[Re-encoding includes the field with null.]
       ]
       #points(
-        [A codec is a value of closures, and a process copy does not preserve sharing: a codec, or a value that holds one, costs its flat size to send. A record codec holds each field's continuation in several callbacks, so a value bound outside the continuation and used inside it is copied once per holding callback. Callers build child codecs in the fields that use them; the #lnk("../../CODEC-PRACTICE.md")[codec practice guide] states the consumer rules, and copy-size tests hold each combinator to additive growth.],
+        [A field holds its child codec, continuation and getter once, so a value bound before the field chain is copied once, however late the field that uses it. The #lnk("../../CODEC-PRACTICE.md")[codec practice guide] states the consumer rules for each minimum version. #adr(18)],
         [A total mapped record has no record-builder continuation capability. A field continuation must remain a field/success record codec; terminating it in another shape is NotARecord.],
         [An Order total that differs from earlier decoded item quantities can return Custom at Field("total") when the check belongs inside that field's codec. Mapping the whole record reports at the record root. #adr(4) records the builder and definition-error policy.],
       )
     ]
     #subsection(title: "Tagged union construction")[
       #points(
-        [union joins variant and unit_variant continuations with match. Each payload variant supplies a typed encoder to the final exhaustive native case; unit variants supply a retained tagged value. Duplicate tags and an empty union are definition errors.],
+        [union joins variant and unit_variant continuations with match. A payload variant passes on a tagging function and a unit variant a tagged value; each holds only the variant's identity, never its payload codec, so a nested union's flat size counts each payload once. The identity is unique across runtimes and nodes (an Erlang reference, a JavaScript symbol) and is minted when variant or unit_variant runs, so building a union is not pure and two separately built unions are not equal. A tagged value carries its payload until the union encodes it: the union finds its variant by identity, which proves the payload's type for the one unchecked conversion. Duplicate tags and an empty union are definition errors. #adr(18)],
         [The #term("term-tagged-union") envelope has tag and value for payload variants, and tag alone for unit variants. All other fields reject. A payload variant requires value; a unit variant rejects even an explicitly null value.],
         [Decoding checks repeated and unknown member names before selecting tag. Missing tag, nonstring tag, unknown tag, missing payload, and invalid payload return distinct reasons at tag or value paths. Nested unions retain nested envelopes rather than implicitly flattening variants.],
       )
@@ -240,8 +243,20 @@
         #when[The application decodes an object containing value.]
         #then[Decoding returns UnknownField at Field("value").]
       ]
+      #behavior(title: "A tagging function belongs to its own union", level: "boundary", area: "Tagged unions")[
+        #given[A union's match returns a value tagged by a tagging function or tagged value from another codec.union block, such as one captured from an enclosing union.]
+        #when[The application encodes that value through the union.]
+        #then[Encoding panics with a message that names the union's tags and says to use only what its own variant and unit_variant pass on.]
+        #then[check reports nothing for this union, because the mistake is in which value match returns.]
+      ]
+      #behavior(title: "A payload is encoded after match returns", level: "boundary", area: "Tagged unions")[
+        #given[A tagging function is called in match, or anywhere else in the union block.]
+        #when[The application encodes a value through the union.]
+        #then[The payload's encode callbacks run when the union encodes the value match returned, and only for it; a panic in them happens outside match.]
+        #then[A tagged value made once in the union block encodes its payload on every encode, so a definition mistake in that payload panics there and check reports it.]
+      ]
       #points(
-        [Encoding trusts match to return the encoder for the selected native case. Reusing a Tagged value from another union is not dynamically certified against a registry; the author owns the union mapping laws. Tests exercise N-ary variants and unit shape in #lnk("../../../test/api_control_test.gleam")[public API cases].],
+        [The author owns the union mapping laws: match selects the variant for each native case. Tests exercise N-ary variants and unit shape in #lnk("../../../test/api_control_test.gleam")[public API cases].],
       )
     ]
     #subsection(title: "Mappings and custom conversion")[
