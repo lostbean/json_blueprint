@@ -269,6 +269,17 @@ reviews:
         - Flag a gate that keeps a formatting check but loses compile or
           behavior tests on either target.
 
+    - path: ".github/workflows/pr-title.yml"
+      instructions: |
+        Pull request title check (gate).
+        - This file mirrors the shared title workflow. Flag a change that
+          makes it differ from the shared copy: types, patterns, action pin,
+          triggers or permissions.
+        - It is the one convention CI checks, so do not flag it as a
+          convention turned into a check.
+        - Its tool is the pinned action in place of a flake tool, because the
+          title exists on the pull request and never in a checkout.
+
   pre_merge_checks:
     title:
       mode: "off"

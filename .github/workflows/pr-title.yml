@@ -1,0 +1,38 @@
+name: Pull request title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  title:
+    name: Conventional title
+    runs-on: ubuntu-24.04
+    steps:
+      # A squash merge makes the title the commit on the default branch.
+      - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6.1.2
+        with:
+          types: |
+            feat
+            fix
+            refactor
+            test
+            docs
+            chore
+            design
+            track
+            perf
+            build
+            ci
+            revert
+          requireScope: false
+          # The action's own pattern accepts a breaking `!` before the colon.
+          headerPattern: '^(\w*)(?:\(([^()]*)\))?: (.*)$'
+          headerPatternCorrespondence: type, scope, subject
+          subjectPattern: ^[a-z].*$
+          subjectPatternError: The subject must start in lower case.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
