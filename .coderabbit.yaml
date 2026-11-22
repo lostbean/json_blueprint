@@ -342,8 +342,9 @@ reviews:
       enabled: true
     trufflehog:
       enabled: true
+    # The repository does not run actionlint.
     actionlint:
-      enabled: true
+      enabled: false
     zizmor:
       enabled: true
     shellcheck:
