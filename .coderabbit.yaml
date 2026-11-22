@@ -5,15 +5,11 @@
 # of coderabbit-config itself, and `repository` marks a rule beyond the catalog.
 #
 # Catalogs read:
-#   practice catalog (not public)  879841a61c3f83cd809edca9229c4a6bb7f909f8
-#   gleam-agent-tools  6a9ea2f647e787a32d3c7fa88d9c58c5b81ae9d7
+#   practice catalog (not public)  a56636a4eed7a0d644b89f5bb7c7d7c9692e0887
+#   gleam-agent-tools  d7b541cb885b3edbf25563b06aee97b28b66074f
 #
 # Governing skills: coderabbit-config (policy), gleam, gleam-lib, gleam-ffi,
 # json-blueprint, testing, python, design, tracker, gate, git.
-#
-# Governing dependency versions: json_blueprint 2.2.0 (this package,
-# gleam.toml). Locked in manifest.toml: gleam_stdlib 1.0.5, gleam_json 3.1.0,
-# gleam_crypto 1.6.0, gleeunit 1.11.0.
 language: en-US
 tone_instructions: >-
   Literal and concise. Report only defects you can evidence from the diff, its
@@ -82,7 +78,7 @@ reviews:
         - Lean. Flag code no test, caller or unit needs: an unset option, an
           unvaried parameter, a wrapper that adds no rule, an unreachable
           branch. Say what to delete.
-        - Migration, never a legacy path. The frozen 1.x root and schema
+        - Migration, never a legacy path. The frozen legacy root and schema
           surface (ADR 0007) is a designed contract, not a legacy path. Outside
           it, flag a compatibility shim, a fallback to an old format, a dual
           read or write, a deprecated alias, and a flag that keeps old
@@ -174,10 +170,10 @@ reviews:
 
     - path: "{src,examples}/**/*.gleam"
       instructions: |
-        JSON Blueprint codecs (json-blueprint; rules for 2.2.0).
-        - Flag a change to a union envelope (`type`/`data` for 1.x,
-          `tag`/`value` for modern codecs) or to 1.x wire output in a change
-          that claims wire compatibility.
+        JSON Blueprint codecs (json-blueprint).
+        - Flag a change to a union envelope (`type`/`data` for legacy unions,
+          `tag`/`value` for modern codecs) or to legacy wire output in a
+          change that claims wire compatibility.
         - Flag a callback passed to `field`, `optional_field`, `success` or a
           getter that has an effect or is not synchronous and pure, and a
           placeholder value from schema discovery stored as data.
@@ -197,9 +193,20 @@ reviews:
         - Flag a `contract` change that accepts a recursive reference, an
           untagged union or a pattern without the design widening the
           Draft 2020-12 profile.
-        - Flag a codec stored with `term_to_binary` or kept across an upgrade.
+        - Flag a codec stored with `term_to_binary` or kept across a hot code
+          upgrade; rebuild it.
+        - Flag strict parsing that bypasses the native parser hooks:
+          JavaScript `JSON.parse` with `context.source`, or Erlang's `json`
+          module.
         - Flag generator output that emits a feature the typed generator does
           not support, and generated modules that do not import `gleam_json`.
+
+    - path: "src/**/*.{erl,mjs}"
+      instructions: |
+        Native JSON parsing (json-blueprint).
+        - Flag strict parsing that bypasses the native parser hooks:
+          JavaScript `JSON.parse` with `context.source`, or Erlang's `json`
+          module.
 
     - path: "{test,examples/test,examples/codegen/test}/**"
       instructions: |
