@@ -29,7 +29,7 @@ jobs:
             ci
             revert
           requireScope: false
-          # The git title rule has no breaking-change `!` after the type.
+          # The action's own pattern accepts a breaking `!` before the colon.
           headerPattern: '^(\w*)(?:\(([^()]*)\))?: (.*)$'
           headerPatternCorrespondence: type, scope, subject
           subjectPattern: ^[a-z].*$
