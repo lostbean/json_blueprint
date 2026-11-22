@@ -201,6 +201,13 @@ reviews:
         - Flag generator output that emits a feature the typed generator does
           not support, and generated modules that do not import `gleam_json`.
 
+    - path: "src/**/*.{erl,mjs}"
+      instructions: |
+        Native JSON parsing (json-blueprint).
+        - Flag strict parsing that bypasses the native parser hooks:
+          JavaScript `JSON.parse` with `context.source`, or Erlang's `json`
+          module.
+
     - path: "{test,examples/test,examples/codegen/test}/**"
       instructions: |
         Tests (testing).
