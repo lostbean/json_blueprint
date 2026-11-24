@@ -166,7 +166,7 @@ it does not add browser-engine certification or test the complete ECMAScript sui
 - An earlier implementation snapshot used a 61-case, 13-family corpus and
   intermediate API names; its all-green status is historical execution
   evidence and cannot certify current coverage. The
-  [original attribution table](https://github.com/lostbean/json_blueprint/blob/4ed1d2efac5166a1feffde891285852926445dc1/test/oracle/schema-aware-core.md)
+  [original attribution table](https://github.com/gleam-dream/json_blueprint/blob/4ed1d2efac5166a1feffde891285852926445dc1/test/oracle/schema-aware-core.md)
   keeps the exact test identities, input families and source revisions.
 
 ## Run it
