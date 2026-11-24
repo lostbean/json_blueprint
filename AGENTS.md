@@ -15,6 +15,13 @@
 - Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the frozen 1.x API and the migration in `examples/test/`), run by the gate on both targets. Compiled module examples and the codegen consumer run as behavioral tests; README and module-documentation text is reviewed manually.
 - Run the examples alone with `cd examples && gleam run` and `gleam test --target erlang|javascript` in the Nix shell.
 
+## Releasing
+
+- `nix run github:gleam-dream/.github#release -- <version>` opens the version-bump pull request from a clean, current `main`. It never tags and never publishes. Nix supplies every tool it calls.
+- After the merge, tag the merge commit `v<version>` and push the tag. The `Release` workflow uploads the package to Hex, where it stays staged.
+- Staged publishing is on for this package on hex.pm, so a release becomes public only when a Hex maintainer approves it there with a second factor. If that setting is ever turned off, a pushed tag publishes at once; never push a release tag while it is off. An agent stops after pushing the tag and reports whether the release waits for approval or is public.
+- Push a release tag only on an explicit request that names the version. The steps and the way to undo a release are in the [shared workflow's README](https://github.com/gleam-dream/.github#publishing-a-package-to-hex).
+
 ## References
 
 - [`docs/ORACLE.md`](docs/ORACLE.md) pins the independent Draft 2020-12 validator (`jsonschema` 4.26.0 through `flake.lock`), the frozen 85-case manifest and the profile fixtures this package is compared against, with the limits of that claim.
