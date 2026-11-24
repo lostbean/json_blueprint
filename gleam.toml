@@ -4,7 +4,7 @@ internal_modules = ["json/blueprint/internal", "json/blueprint/internal/*", "jso
 
 description = "Simplify JSON encoding/decoding while automatically generating JSON schemas for your data types."
 licences = ["MIT"]
-repository = { type = "github", user = "lostbean", repo = "json_blueprint" }
+repository = { type = "github", user = "gleam-dream", repo = "json_blueprint" }
 
 [dependencies]
 gleam_stdlib = ">= 0.60.0 and < 2.0.0"

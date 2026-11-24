@@ -61,7 +61,7 @@ with a native getter for each record member, and finish the record with
 `codec.success`. Use `codec.decode_json`, `codec.encode_json`, and
 `codec.schema_json` at the boundary.
 
-The [compiled migration example](https://github.com/lostbean/json_blueprint/blob/main/examples/test/migration_test.gleam)
+The [compiled migration example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/test/migration_test.gleam)
 converts one legacy `Decoder(Person)` to a `Codec(Person)` and checks both
 implementations. It also exercises these intentional differences:
 
@@ -80,7 +80,7 @@ still use the old form, retain a legacy reader or implement an explicit
 application migration before switching writers. There is no automatic conversion
 between arbitrary legacy decoders and codecs.
 
-The [optional-field example](https://github.com/lostbean/json_blueprint/blob/main/examples/src/examples/optional_fields.gleam)
+The [optional-field example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/src/examples/optional_fields.gleam)
 shows the three-state representation and its encoding behavior.
 
 ## Review parser and number policy
@@ -108,7 +108,7 @@ JavaScript strict parsing requires reviver `context.source` support. The old
 portable parser fallback has been removed. Runtimes without this capability
 return `UnsupportedRuntime`, not a syntax error or rounded values. This applies
 to strict text/byte parsing and codec JSON decoding; the frozen legacy API is
-unchanged. See [browser/runtime requirements and executed checks](https://github.com/lostbean/json_blueprint/blob/main/docs/BROWSER-SUPPORT.md).
+unchanged. See [browser/runtime requirements and executed checks](https://github.com/gleam-dream/json_blueprint/blob/main/docs/BROWSER-SUPPORT.md).
 
 ### Diagnostics and object order
 
@@ -146,7 +146,7 @@ that must retain mathematical JSON precision. Treat projection into native
 `gleam/json` and standard dynamic-decoder bridges retain their native parser
 and number behavior; they do not inherit strict text-admission guarantees.
 
-See the [larger-input example](https://github.com/lostbean/json_blueprint/blob/main/examples/src/examples/larger_inputs.gleam)
+See the [larger-input example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/src/examples/larger_inputs.gleam)
 for explicit limits. Run large-number fixtures on each intended target.
 
 ## Review schemas and runtime contracts
@@ -167,7 +167,7 @@ schema restrictions in the application as well.
 `contract.validate` checks a `Value`. Decoding a validated value requires a
 codec with the same normalized schema. These checks do not certify custom
 callback behavior or application authorization. The
-[oracle documentation](https://github.com/lostbean/json_blueprint/blob/main/docs/ORACLE.md)
+[oracle documentation](https://github.com/gleam-dream/json_blueprint/blob/main/docs/ORACLE.md)
 states the supported profile and the limits of its independent evidence.
 
 ## Keep generation in the build
@@ -215,7 +215,7 @@ covers value, text, and schema operations, not record-builder capability.
 Schema-driven generation supports a narrower closed-object subset than runtime
 contracts. Admitting a schema as a contract does not guarantee generation support.
 
-The [generation consumer](https://github.com/lostbean/json_blueprint/blob/main/examples/codegen/README.md)
+The [generation consumer](https://github.com/gleam-dream/json_blueprint/blob/main/examples/codegen/README.md)
 shows a separate build task, generated records, application policy, and
 production compilation. Generation does not create new native types at
 application runtime.
