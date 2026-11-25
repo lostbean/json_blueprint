@@ -36,12 +36,11 @@ process copy of the `runtime_enum` and `child_codecs` codecs on Erlang. The
 [codec practice guide](../docs/CODEC-PRACTICE.md) explains when to generate a
 codec and when to write it with combinators.
 
-The frozen 1.x API and the move to 2.0 are compiled tests under `test/`:
-[`legacy/`](test/legacy/) holds the 1.x union, enum, tuple, optional, recursive and
-schema-aware examples, and [`migration_test.gleam`](test/migration_test.gleam) moves
-one record from a 1.x `Decoder` to a `Codec` and shows the wire differences that need
-review. Build-time code generation, from a schema and from a typed definition, is the
+The move from the removed 1.x API is a compiled test:
+[`migration_test.gleam`](test/migration_test.gleam) moves one record from a 1.x
+`Decoder` to a `Codec`, shows the wire differences that need review, and reads
+recursive data from a bounded `Value`. Build-time code generation, from a schema and from a typed definition, is the
 separate [`examples/codegen`](codegen/README.md).
 
-Follow the [2.0 migration guide](../docs/MIGRATION.md) for the package upgrade
+Follow the [migration guide](../docs/MIGRATION.md) for the package upgrade
 steps and the separate review of codec wire formats.

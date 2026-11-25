@@ -7,7 +7,7 @@
     #no-goal(title: "Claim general JSON Schema conformance")[The #term("term-finite-profile") has bounded independent evidence. A Draft 2020-12 dialect label does not imply support for every keyword or an arbitrary remote schema.]
     #invariant(title: "Runtime conversion never invokes generation", enforcement: "mechanism")[The package includes both contexts. Runtime conversion never invokes source generation; the application build explicitly calls generation and compiles its returned source. The consumer check compiles a production copy without development dependencies.]
     #points(
-      [Ownership and finite support are recorded in #adr(1). Generation placement is recorded in #adr(8). The owner selected version 2.0.0 for the consolidated package in #adr(13), superseding the hold in #adr(11). The #lnk("../MIGRATION.md")[migration guide] separates legacy API upgrade changes from adopting codec wire formats.],
+      [Ownership and finite support are recorded in #adr(1). Generation placement is recorded in #adr(8). The owner selected version 2.0.0 for the consolidated package in #adr(13), superseding the hold in #adr(11). The 1.x API is removed in #adr(20); the #lnk("../MIGRATION.md")[migration guide] gives its codec and Value equivalents and the wire formats that changed.],
     )
   ])
 
@@ -22,7 +22,7 @@
       (from: "app", to: "json", relation: "dependency", label: "schema-aware conversion"),
       (from: "consumers", to: "json", relation: "dependency", label: "schema and typed boundaries"),
       (from: "app", to: "ordinary", relation: "dependency", label: "ordinary serialization"),
-      (from: "json", to: "ordinary", relation: "dependency", label: "explicit bridges and legacy parsing"),
+      (from: "json", to: "ordinary", relation: "dependency", label: "explicit bridges"),
     ))
     #diagram(altitude: "L2", viewpoint: "context-ownership", title: "Contexts", caption: [The generation context depends on the contracts context and never the reverse. Generated source depends on the contracts runtime only.], nodes: (
       (id: "contracts", label: "Contracts", sub: "values, codecs, schemas, validation", kind: "bounded-context", tint: "teal"),
@@ -35,20 +35,20 @@
     ))
     #points(
       [The package exports pure values and synchronous conversion operations. It starts no process, owns no connection, and stores no mutable runtime state. Building a union is the one impure construction. #adr(18)],
-      [#ctx("contracts") holds Wire values, Typed codecs, Runtime contracts and Legacy compatibility. #ctx("generation") holds the typed-definition generator, schema materialization and the schema-driven native generator. #lnk("../CONTEXT-MAP.md")[The context map] declares their relationship.],
+      [#ctx("contracts") holds Wire values, Typed codecs and Runtime contracts. #ctx("generation") holds the typed-definition generator, schema materialization and the schema-driven native generator. #lnk("../CONTEXT-MAP.md")[The context map] declares their relationship.],
       [Relay owns protocol declarations and revision-specific generation. Fabric owns tool and model execution. LLM adapters own provider lowering and admission. These consumers inspect opaque schema children; they never acquire authority from a dialect label alone.],
       [No operation supplies authorization, identifiers for business entities, correlation, idempotency keys, retries, cancellation, or a wall-clock deadline. Applications own those capabilities where their operation requires them.],
     )
   ])
 
-  #section(title: "Repository verification", lead: [Verification distinguishes finite acceptance, native projection, legacy behavior, generated parity, executable documentation and measurement.], body: [
+  #section(title: "Repository verification", lead: [Verification distinguishes finite acceptance, native projection, generated parity, executable documentation and measurement.], body: [
     #subsection(title: "Gate and continuous integration")[
       #md-table(2, (
         [Check], [Scope],
         [Formatting], [A Nix check formats a copied source tree; frozen oracle bytes, generated fixtures, rendered design evidence and build output are excluded],
         [Native compilation], [Authored Erlang FFI compiles independently with warnings as errors],
         [Package tests], [Compilation with warnings as errors and the test suite on Erlang and JavaScript for the runtime and generators in the root package],
-        [Usage examples], [The examples package builds with warnings as errors, runs its tests on Erlang and JavaScript, and runs once; every usage topic and the legacy and migration forms are compiled code],
+        [Usage examples], [The examples package builds with warnings as errors, runs its tests on Erlang and JavaScript, and runs once; every usage topic and the migration forms are compiled code],
         [Schema consumer], [Fresh generation in disposable packages, tests on both targets, and an isolated production build without development dependencies],
         [Independent oracles], [Python checkers compare schemas with a Draft 2020-12 validator, exact arithmetic with Decimal/Fraction, and both-target parsing with a pinned upstream corpus and generated cases. #lnk("../ORACLE.md")[The oracle document] pins the references and states the limits of each comparison],
       ))
@@ -60,7 +60,7 @@
     ]
     #subsection(title: "Executable documentation")[
       #points(
-        [Usage is compiled code. Each topic is a module of the #lnk("../../examples/README.md")[examples package], which the gate builds and runs on both targets. The shared pinned Snips tool synchronizes README snippets from marked regions of compiled, tested examples. Local bespoke snippet-equality checkers remain removed. The legacy 1.x forms and the move to a codec are compiled tests under #lnk("../../examples/test/legacy/union_type_test.gleam")[examples/test]. Public module examples and the codegen consumer remain executable behavioral tests.],
+        [Usage is compiled code. Each topic is a module of the #lnk("../../examples/README.md")[examples package], which the gate builds and runs on both targets. The shared pinned Snips tool synchronizes README snippets from marked regions of compiled, tested examples. Local bespoke snippet-equality checkers remain removed. The move from the removed 1.x API to codecs is a compiled test, #lnk("../../examples/test/migration_test.gleam")[examples/test/migration_test.gleam]. Public module examples and the codegen consumer remain executable behavioral tests.],
         [Prose and checked examples stay aligned. Documentation that states a limit or default names the design section that owns it.],
       )
     ]

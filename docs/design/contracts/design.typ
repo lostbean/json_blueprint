@@ -5,7 +5,7 @@
   #section(title: "Foundation", lead: [One definition supplies typed conversion and an inspectable JSON contract.], body: [
     #goal(title: "Describe schema-aware data once")[Applications retain one #term("term-codec") for JSON conversion, schema publication, and schema-aware composition. Runtime schema documents produce contracts for wire validation.]
     #goal(title: "Reject hostile input within explicit bounds")[Strict text admission retains exact numbers and duplicate-key evidence. A byte bound and a nesting-depth bound apply by default, and a trusted caller removes them explicitly; consumers own numeric policies and any policy over decoded structure.]
-    #goal(title: "Keep the published 1.x API available")[The frozen 1.x API remains available for its established wire formats and recursive types.]
+    #invariant(title: "Every text decoder parses within the default bounds", enforcement: "mechanism")[Codecs and generated modules decode text only through the strict parser, so the default byte and depth bounds apply to every text decoder the package offers. The 1.x decoders that parsed with gleam/json behind a byte check alone are removed.]
     #invariant(title: "Number comparison preserves mathematical value", enforcement: "mechanism")[#term("term-exact-number") comparison and integrality never pass through Float. Native construction and projection check target representation limits.]
     #invariant(title: "A witness retains the value that was validated", enforcement: "mechanism")[A #term("term-validated-value") retains an immutable value and the accepting normalized schema. A replacement value requires another validation.]
     #invariant(title: "Unknown schema never becomes inferred schema", enforcement: "mechanism")[A custom codec without a schema reports UnknownSchema. Every enclosing schema query propagates that absence.]
@@ -13,34 +13,30 @@
     #principle(title: "Keep wire acceptance separate from native projection")[A schema may accept an exact value that a requested native type cannot represent. Callers distinguish schema rejection, parse rejection, and native conversion failure.]
     #principle(title: "Keep callback ownership explicit")[Caller mappings own their laws and application checks. A retained schema does not certify a callback's inverse, purity, or encoding behavior.]
     #points(
-      [Ownership and finite support are recorded in #adr(1). Number policy is recorded in #adr(2). Native admission supersedes #adr(3) in #adr(14); #adr(19) supersedes its byte-only default with byte and depth bounds on by default.],
+      [Ownership and finite support are recorded in #adr(1). Number policy is recorded in #adr(2). Native admission supersedes #adr(3) in #adr(14); #adr(19) supersedes its byte-only default with byte and depth bounds on by default. #adr(20) removes the 1.x API that #adr(7) froze.],
     )
   ])
 
   #pagebreak(weak: true)
   #pending-ledger(
     pending-entry(title: "Broader schema families need concrete contracts", kind: "build", since: "2026-09-20", adr: [#adr(1)])[String constraints, broader numeric and collection constraints, arbitrary alternatives, numeric enums, aliases, and recursive references are outside the profile. Their limits, annotation policies, and validation rules are undefined; see Unsupported schema families.],
-    pending-entry(title: "Consumer evolution policies need explicit contracts", kind: "ruling", since: "2026-10-25")[Prioritize optional unknown-field handling, dictionaries, basic string/list lengths, one-sided numeric bounds, configurable union envelopes and local recursive references. Before implementation, define accepted input versus emitted output, retention of extra fields, schema projection and reference identity. The current strict defaults and frozen legacy access remain in force; formal deprecation requires a supported migration for recursive data and established wire formats.],
-    pending-entry(title: "Retain complete compatibility verification", kind: "verify", since: "2026-10-02", adr: [#adr(7)])[Published source, legacy wire, recursive references, error paths, numeric boundaries, and deliberate acceptance corrections need separate fixtures. Existing examples and frozen comparators do not prove complete 1.x compatibility.],
+    pending-entry(title: "Consumer evolution policies need explicit contracts", kind: "ruling", since: "2026-10-25")[Prioritize optional unknown-field handling, dictionaries, basic string/list lengths, one-sided numeric bounds, configurable union envelopes and local recursive references. Before implementation, define accepted input versus emitted output, retention of extra fields, schema projection and reference identity. The current strict defaults remain in force. Recursive data has no codec form; applications read it from a parsed Value (#adr(20)).],
     pending-entry(title: "Keep numerical oracle scope separate from projection", kind: "verify", since: "2026-09-20", adr: [#adr(2)])[The finite schema manifest compares Boolean acceptance for its selected cases. Broader numerical evidence must compare exact schema acceptance separately from native overflow, safe-integer refusal, and intentional Float rounding.],
-    pending-entry(title: "Check the legacy and error-path claims against code", kind: "verify", since: "2026-10-17")[The 1 MiB decode precheck, its configurable bound and the object-index cutoff match the source. The remaining provisions carried over from the retired 1.x guides are not yet checked against code: the Draft-07 label statements, error-path rendering, number-projection limits and the legacy wire envelopes. The migration examples and the schema oracle exercise part of them.],
   )
 
   #pagebreak(weak: true)
-  #section(title: "System at a glance", lead: [One context owns values, schemas, typed codecs, contracts and legacy compatibility.], body: [
-    #diagram(altitude: "L3", viewpoint: "runtime", title: "Runtime components", caption: [Arrows declare call and dependency direction. The legacy surface shares only a byte-admission helper with the strict parser.], flow: "top-to-bottom", nodes: (
+  #section(title: "System at a glance", lead: [One context owns values, schemas, typed codecs and contracts.], body: [
+    #diagram(altitude: "L3", viewpoint: "runtime", title: "Runtime components", caption: [Arrows declare call and dependency direction.], flow: "top-to-bottom", nodes: (
       (id: "codec", label: "Typed codecs", kind: "component", tint: "teal"),
       (id: "contract", label: "Runtime contracts", kind: "component", tint: "teal"),
       (id: "value", label: "Value parser / renderer", kind: "component", tint: "teal"),
       (id: "number", label: "Exact number kernel", kind: "component", tint: "teal"),
-      (id: "legacy", label: "Legacy decoder / schema", kind: "component", tint: "teal"),
     ), edges: (
       (from: "codec", to: "value", relation: "call", label: "strict text and bridges"),
       (from: "contract", to: "codec", relation: "dependency", label: "schema / error vocabulary"),
       (from: "contract", to: "value", relation: "call", label: "schema text admission"),
       (from: "value", to: "number", relation: "call", label: "exact tokens / projection"),
       (from: "codec", to: "number", relation: "call", label: "bounds / native conversion"),
-      (from: "legacy", to: "value", relation: "dependency", label: "shared byte-admission helper only"),
     ))
     #points(
       [Work is bounded only at the declared admission surfaces. A manually constructed Value, a caller callback, schema discovery, rendering, and validation have no additional timer or allocation quota.],
@@ -373,23 +369,6 @@
     ]
   ])
 
-  #section(title: "Legacy compatibility", lead: [The frozen 1.x surface retains established one-way decoding, independent encoders, broader schema description, and recursive references.], body: [
-    #answers(title: "Legacy boundary", responsibility: [Keep published combinators and established data readable without inferring modern codec laws.], interface: [json/blueprint Decoder and FieldDecoder, decode0..decode9, field/optional_field, list, tuples, map, union/enum helpers, self_decoder, reuse_decoder; json/blueprint/schema.], interactions: [gleam/json parses after a byte precheck. Legacy schema rendering is independent from native decoder behavior.], invariants: [Legacy wire forms remain available explicitly. Opaque Decoder retains its decoder callback, schema description, and definitions.], failure: [json.DecodeError and dynamic decode errors retain legacy semantics; no strict finite-contract acceptance is inferred.])
-    #entity(id: "legacy-decoder", title: "Legacy Decoder and FieldDecoder", description: [Immutable one-way native decoder with an independent legacy schema description.], kind: "value-object", owner: "Legacy compatibility", domain: "JSON contracts", lifecycle: "immutable", tint: "teal")[
-      #attribute(name: "Callback and description", type: "Dynamic decoder × SchemaDefinition × definitions", provenance: "derived")[Combinators assemble conversion and description. FieldDecoder additionally retains its property name. No modern schema-validation witness is inferred.]
-      #relates(cardinality: "1 : 0..n")[Reusable decoders retain named definitions for references; lazy self-decoding resolves through the caller's retained decoder function.]
-    ]
-    #points(
-      [Legacy unions use type/data; legacy enum encoders use an enum object. Optional fields treat absence and null alike. Nonempty record decoding ignores unknown fields; decode0 permits scalar/nonempty input.],
-      [decode uses a 1 MiB precheck before gleam/json. decode_with_max_bytes changes that bound. Native parsing owns duplicates and precision; there is no depth/value/token bound on this path.],
-      [self_decoder accepts a lazy decoder and describes a root reference. reuse_decoder hashes the rendered schema definition with SHA-1 to name a `$defs` entry and rewrites root self-references to that entry. Nested recursion needs this explicit rebasing; the hash is a deterministic local description key, not a security authority or schema-equivalence proof.],
-      [The legacy schema description supports type combinations, enum/const, nullable/optional, numeric constraints, string lengths/patterns/formats, array and object constraint families, allOf/anyOf/oneOf/not, references, and boolean schemas. This is a rendering surface, not the modern finite validator or proof that each described constraint is enforced by its decoder.],
-      [The legacy renderer declares Draft-07 while some descriptions use later forms such as prefixItems and `$defs`. Consumers must not infer dialect correctness or general validation parity from that label. Changing only the label cannot prove compatibility.],
-      [Callers that use only the published combinators compile unchanged. Direct construction of Decoder and FieldDecoder records and imports from the internal dynamic module are unsupported: callers build decoders with the combinators and import the standard dynamic decode module. get_dynamic_decoder returns a function from a dynamic value to the decoded value or a list of decode errors with the same expected, found and path fields. #adr(7) records the compatibility boundary.],
-      [The #lnk("../../MIGRATION.md")[2.0 migration guide] gives application steps for retaining this API and for separately adopting codecs. Sources: #lnk("../../../src/json/blueprint.gleam")[legacy decoder], #lnk("../../../src/json/blueprint/schema.gleam")[legacy schema renderer], #lnk("../../../examples/test/legacy/union_type_test.gleam")[compiled legacy examples], and #lnk("../../../examples/test/migration_test.gleam")[the compiled migration example].],
-    )
-  ])
-
   #section(title: "Unsupported schema families", lead: [The finite profile is the whole supported schema language. A document outside it is refused and never partially interpreted.], body: [
     #md-table(3, (
       [Family], [Status], [Contract required before support],
@@ -404,12 +383,11 @@
     #points(
       [A family enters the profile only when it defines encoding and decoding agreement, schema semantics, rejection behavior, finite resource policy, and independent oracle fixtures. No constraint is silently discarded to accept a remote schema.],
       [Provider and protocol consumers own admission of a supported schema. They may reject AnySchema, tuple forms, optionality, unions, numeric precision, or future OtherSchema independently of generic local validity. Successful local loading is not proof of remote acceptance.],
-      [The legacy surface describes the broader schema language, but that description is not modern codec or runtime validation support. #adr(1) records the rationale and scope.],
+      [#adr(1) records the rationale and scope. The 1.x schema renderer that described a broader language without enforcing it is removed (#adr(20)).],
     )
   ])
 
-
-  #section(title: "Verification and host boundaries", lead: [Verification distinguishes finite acceptance, native projection and legacy behavior.], body: [
+  #section(title: "Verification and host boundaries", lead: [Verification distinguishes finite acceptance and native projection.], body: [
     #subsection(title: "Oracle and behavioral evidence")[
       #points(
         [The independent oracle compares emitted and normalized schemas, codec decoding, and runtime validation with Python jsonschema Draft202012Validator against a frozen manifest. Selected cases carry stable identifiers and expected schemas/instances; missing, extra, duplicate, or replaced cases fail closed.],

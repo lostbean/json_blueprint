@@ -64,7 +64,6 @@ pub fn generated_integer_digit_boundary_matches_runtime_test() {
     let assert Ok(text) = order_codec.encode_order_json(order)
     codec.encode_json(runtime, order) |> should.equal(Ok(text))
     order_codec.decode_order_json(text) |> should.equal(Ok(order))
-    order_codec.decode_order_json_native(text) |> should.equal(Ok(order))
   })
   list.each([largest + 1, -largest - 1], fn(count) {
     let order =
@@ -371,57 +370,39 @@ pub fn generated_native_json_matches_handwritten_json_and_decodes_test() {
       native_text == json.to_string(handwritten)
       && codec.encode_json(generated, order) == Ok(native_text)
       && order_codec.decode_order_json(native_text) == Ok(order)
-      && order_codec.decode_order_json_native(native_text) == Ok(order)
       && codec.decode_json(generated, native_text) == Ok(order)
     })
 }
 
-pub fn generated_native_json_returns_gleam_json_errors_test() {
-  // Each native failure is one `decode.DecodeError` whose `expected` is the
-  // text of the error that strict decoding reports for the same input.
+pub fn generated_json_reports_strict_decode_errors_test() {
   let wrong_type = order_json(Some(json.string("42")), "pending", False)
   let expected = DecodeError([Field("order_id")], codec.ExpectedInt)
   order_codec.decode_order_json(wrong_type) |> should.equal(Error(expected))
-  native_expected(order_codec.decode_order_json_native(wrong_type))
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 
   let missing_id = order_json(None, "pending", False)
   let expected = DecodeError([Field("order_id")], codec.MissingField)
   order_codec.decode_order_json(missing_id) |> should.equal(Error(expected))
-  native_expected(order_codec.decode_order_json_native(missing_id))
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 
   let unknown_field = order_json(Some(json.int(42)), "pending", True)
   let expected = DecodeError([Field("unexpected")], codec.UnknownField)
   order_codec.decode_order_json(unknown_field) |> should.equal(Error(expected))
-  native_expected(order_codec.decode_order_json_native(unknown_field))
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 
   let unknown_status = order_json(Some(json.int(42)), "unrecognized", False)
   let expected = DecodeError([Field("status")], codec.UnknownEnumLabel)
   order_codec.decode_order_json(unknown_status)
   |> should.equal(Error(expected))
-  native_expected(order_codec.decode_order_json_native(unknown_status))
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 
   let out_of_range = order_json(Some(json.int(1_000_000)), "pending", False)
   let expected =
     DecodeError([Field("order_id")], codec.IntegerOutsideRange(1, 999_999))
   order_codec.decode_order_json(out_of_range) |> should.equal(Error(expected))
-  native_expected(order_codec.decode_order_json_native(out_of_range))
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 
-  // Invalid text fails in the gleam/json parser, not in decoding.
+  // Invalid text fails in the parser, not in decoding.
   let assert Error(DecodeError([], codec.InvalidJson(_))) =
     order_codec.decode_order_json("{")
-  case order_codec.decode_order_json_native("{") {
-    Error(json.UnableToDecode(_)) -> should.fail()
-    Error(_) -> Nil
-    Ok(_) -> should.fail()
-  }
 }
 
-pub fn generated_native_json_rejects_text_above_one_mebibyte_test() {
+pub fn generated_json_rejects_text_above_one_mebibyte_test() {
   let base = order_json_with_note("")
   let fitting =
     order_json_with_note(string.repeat(
@@ -435,21 +416,8 @@ pub fn generated_native_json_rejects_text_above_one_mebibyte_test() {
       one_mebibyte - string.byte_size(base) + 1,
     ))
 
-  order_codec.decode_order_json_native(fitting) |> should.be_ok
   order_codec.decode_order_json(fitting) |> should.be_ok
 
-  order_codec.decode_order_json_native(oversized)
-  |> should.equal(
-    Error(
-      json.UnableToDecode([
-        decode.DecodeError(
-          expected: "JSON text of at most 1048576 bytes",
-          found: "more than 1048576 bytes",
-          path: [],
-        ),
-      ]),
-    ),
-  )
   let assert Error(strict_error) = order_codec.decode_order_json(oversized)
   let assert DecodeError(
     [],
@@ -459,7 +427,7 @@ pub fn generated_native_json_rejects_text_above_one_mebibyte_test() {
   codec.is_limit_exceeded(strict_error) |> should.be_true
 }
 
-pub fn generated_option_codec_native_and_strict_decoding_agree_test() {
+pub fn generated_option_codec_round_trips_omission_null_and_value_test() {
   let cases = [
     #("{}", None),
     #("{\"note\":null}", Some(None)),
@@ -468,35 +436,24 @@ pub fn generated_option_codec_native_and_strict_decoding_agree_test() {
   list.each(cases, fn(pair) {
     let #(text, expected) = pair
     option_codec.decode_option_json(text) |> should.equal(Ok(expected))
-    option_codec.decode_option_json_native(text) |> should.equal(Ok(expected))
     option_codec.encode_option_json(expected) |> should.equal(Ok(text))
   })
 
   let expected = DecodeError([Field("note")], codec.ExpectedString)
   option_codec.decode_option_json("{\"note\":1}")
   |> should.equal(Error(expected))
-  native_expected(option_codec.decode_option_json_native("{\"note\":1}"))
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 }
 
-pub fn generated_native_int_accepts_exact_json_integer_forms_test() {
+pub fn generated_int_accepts_exact_json_integer_forms_test() {
   order_codec.decode_order_json(order_json_source("2.0"))
-  |> should.equal(Ok(empty_order(2)))
-  order_codec.decode_order_json_native(order_json_source("2.0"))
   |> should.equal(Ok(empty_order(2)))
 
   order_codec.decode_order_json(order_json_source("2e0"))
-  |> should.equal(Ok(empty_order(2)))
-  order_codec.decode_order_json_native(order_json_source("2e0"))
   |> should.equal(Ok(empty_order(2)))
 
   let expected = DecodeError([Field("order_id")], codec.ExpectedInt)
   order_codec.decode_order_json(order_json_source("2.5"))
   |> should.equal(Error(expected))
-  native_expected(
-    order_codec.decode_order_json_native(order_json_source("2.5")),
-  )
-  |> should.equal(Ok(codec.describe_decode_error(expected)))
 }
 
 pub fn native_integer_encoding_uses_existing_safety_checks_test() {
@@ -525,33 +482,15 @@ pub fn native_integer_encoding_uses_existing_safety_checks_test() {
   }
 }
 
-pub fn generated_native_int_decoder_rejects_unsafe_integer_results_test() {
-  let unsafe = max_safe_integer + 1
+pub fn generated_int_decoder_rejects_integers_outside_its_range_test() {
   let unsafe_integer = order_json_source("9007199254740992")
-  let strict_expected =
-    DecodeError([Field("order_id")], codec.IntegerOutsideRange(1, 999_999))
   order_codec.decode_order_json(unsafe_integer)
-  |> should.equal(Error(strict_expected))
-  let result =
-    native_expected(order_codec.decode_order_json_native(unsafe_integer))
-
-  case number.from_int(unsafe) {
-    // JavaScript: the native parser's integer is not safe.
-    Error(number.UnsafeNativeInteger) ->
-      result
-      |> should.equal(
-        Ok(
-          codec.describe_decode_error(DecodeError(
-            [Field("order_id")],
-            codec.ExpectedInt,
-          )),
-        ),
-      )
-    Error(number.NonFiniteInteger) -> should.fail()
-    Error(number.NonIntegerValue) -> should.fail()
-    Ok(_) ->
-      result |> should.equal(Ok(codec.describe_decode_error(strict_expected)))
-  }
+  |> should.equal(
+    Error(DecodeError(
+      [Field("order_id")],
+      codec.IntegerOutsideRange(1, 999_999),
+    )),
+  )
 }
 
 pub fn generated_native_nested_integer_encoding_preserves_safety_errors_test() {
@@ -598,28 +537,21 @@ pub fn generated_integer_range_projection_follows_wide_bounds_test() {
     |> should.equal(Ok(raw))
     generated.decode_integer_between(-maximum, maximum, raw)
     |> should.equal(Ok(item))
-    let assert Ok(dynamic) =
-      json.parse(json.to_string(json.int(item)), decode.dynamic)
-    generated.decode_native_integer_between(-maximum, maximum, dynamic)
-    |> should.equal(Ok(item))
   })
 }
 
 @target(erlang)
 pub fn native_integer_between_projects_integers_of_its_bounds_test() {
   // Bounds beyond 24 digits decode their whole range, as `codec.int()` does
-  // not; strict and native decoding agree.
+  // not.
   let maximum = 1_000_000_000_000_000_000_000_000_000_000
   let large = 12_345_678_901_234_567_890_123_456
   let text = "12345678901234567890123456"
   let assert Ok(raw) = value.parse(text, value.default_limits())
-  let assert Ok(dynamic) = json.parse(text, decode.dynamic)
 
   codec.decode(codec.integer_between(0, maximum), raw)
   |> should.equal(Ok(large))
   generated.decode_integer_between(0, maximum, raw)
-  |> should.equal(Ok(large))
-  generated.decode_native_integer_between(0, maximum, dynamic)
   |> should.equal(Ok(large))
 
   generated.encode_integer_between(0, maximum, large)
@@ -631,18 +563,14 @@ pub fn native_integer_between_projects_integers_of_its_bounds_test() {
   // Beyond the bounds, both report the range rather than the digit count.
   let beyond = "10000000000000000000000000000000000000000"
   let assert Ok(raw) = value.parse(beyond, value.default_limits())
-  let assert Ok(dynamic) = json.parse(beyond, decode.dynamic)
   let expected = Error(DecodeError([], codec.IntegerOutsideRange(0, maximum)))
   codec.decode(codec.integer_between(0, maximum), raw)
   |> should.equal(expected)
   generated.decode_integer_between(0, maximum, raw) |> should.equal(expected)
-  generated.decode_native_integer_between(0, maximum, dynamic)
-  |> should.equal(expected)
 }
 
-pub fn native_json_integer_parser_normalization_is_observable_test() {
-  // Explicit native parsing normalizes this decimal to 1; ordinary generated
-  // decoding keeps the exact token and rejects it as a fractional integer.
+pub fn generated_json_keeps_the_exact_integer_token_test() {
+  // A decimal that a float-based parser would normalize to 1 is fractional.
   let source = order_json_source("1.0000000000000001")
   let runtime = materialize_fixtures.build_order_codec()
   let expected = DecodeError([Field("order_id")], codec.ExpectedInt)
@@ -651,11 +579,9 @@ pub fn native_json_integer_parser_normalization_is_observable_test() {
   |> should.equal(Error(expected))
   order_codec.decode_order_json(source)
   |> should.equal(Error(expected))
-  order_codec.decode_order_json_native(source)
-  |> should.equal(Ok(empty_order(1)))
 }
 
-pub fn native_duplicate_keys_follow_backend_parser_semantics_test() {
+pub fn generated_json_rejects_duplicate_keys_test() {
   let duplicate_id =
     "{\"order_id\":41,\"order_id\":42,\"items_\\\"list\\\"\":[],\"type\":true,\"status\":\"pending\"}"
   let runtime = materialize_fixtures.build_order_codec()
@@ -666,16 +592,22 @@ pub fn native_duplicate_keys_follow_backend_parser_semantics_test() {
   )) = codec.decode_json(runtime, duplicate_id)
   order_codec.decode_order_json(duplicate_id)
   |> should.equal(codec.decode_json(runtime, duplicate_id))
+}
 
-  // The named native decoder retains the target parser's collapse policy.
-  let assert Ok(parser_id) =
-    json.parse(from: duplicate_id, using: {
-      use id <- decode.field("order_id", decode.int)
-      decode.success(id)
-    })
-  let assert Ok(native_order) =
-    order_codec.decode_order_json_native(duplicate_id)
-  native_order.order_id |> should.equal(parser_id)
+pub fn generated_json_decoding_refuses_input_nested_beyond_the_default_depth_test() {
+  // 129 nested arrays inside a field exceed the default depth of 128 before
+  // any decoding runs.
+  let deep =
+    "{\"order_id\":"
+    <> string.repeat("[", 129)
+    <> string.repeat("]", 129)
+    <> ",\"items_\\\"list\\\"\":[],\"type\":true,\"status\":\"pending\"}"
+  let assert Error(error) = order_codec.decode_order_json(deep)
+  let assert DecodeError(
+    [],
+    codec.InvalidJson(value.ParseError(_, value.DepthLimitExceeded(128))),
+  ) = error
+  codec.is_limit_exceeded(error) |> should.be_true
 }
 
 // --- compiling --------------------------------------------------------------------
@@ -732,9 +664,12 @@ pub fn codec_generation_is_deterministic_test() {
   contains("generated.encode_native_integer_between(1, 999_999, item)")
   |> should.be_true
   contains("codec.decode_json(order_codec(), source)") |> should.be_true
-  contains("generated.decode_json_native(source, ") |> should.be_true
-  contains(") -> Result(materialize_fixtures.Order, json.DecodeError) {")
-  |> should.be_true
+  // One parser: generated modules decode text only through the bounded
+  // strict parser behind `codec.decode_json`.
+  contains("json.parse") |> should.be_false
+  contains("json.DecodeError") |> should.be_false
+  contains("_json_native") |> should.be_false
+  contains("dynamic.Dynamic") |> should.be_false
   contains("option.Option(option.Option(String))") |> should.be_true
   contains("codec.encode_json(") |> should.be_false
   contains("codec.new(") |> should.be_false
@@ -1024,17 +959,6 @@ pub fn uppercase_string(value: String) -> String {
 }
 
 /// The `expected` text of a native decode failure.
-fn native_expected(
-  result: Result(a, json.DecodeError),
-) -> Result(String, Option(a)) {
-  case result {
-    Error(json.UnableToDecode([decode.DecodeError(expected:, ..)])) ->
-      Ok(expected)
-    Error(_) -> Error(None)
-    Ok(item) -> Error(Some(item))
-  }
-}
-
 fn sample_order() -> materialize_fixtures.Order {
   order_with_note(Some(Some("leave at door")))
 }
