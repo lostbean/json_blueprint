@@ -16,6 +16,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `scripts/contract_encoding_benchmark.py` | Contract validation and encoding costs |
 | `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
 | `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
+| `gleam run -m contract_validate_benchmark_runner` | `contract.validate` against large enums and unions, with ordinary controls, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -452,6 +453,42 @@ build):
 | Short enums scanned for repeats | yes | Node construction 0.87 → 0.25, encode 0.89 → 0.73 |
 | A record step yields only its fields | yes | Erlang `codec_encode_decode_roundtrip` 1.70 → 0.96; in-field encode 0.98 → 0.94; words 0.94–0.96 → 0.87–0.91 on records |
 | Direct JSON text for `encode_json` | no | Erlang encode 0.98 → 1.06, union encode 1.00 → 1.22; decode slower on both targets |
+
+### Validation against large enums and unions, 2026-11-24
+
+`contract.validate` scanned the label list of an enum, or the variant list of
+a union, for every value, so an array of `n` values against `m` alternatives
+cost `n × m` comparisons. A contract now holds an enum or union of more than
+eight alternatives as a set or a dictionary. `gleam run -m
+contract_validate_benchmark_runner` validates an array of 20,000 values that
+all match the alternative sorted last, once untimed and then five times; a
+cell is the median in milliseconds, with the minimum and maximum in brackets.
+The last three rows are controls with no large enum or union. One VM per
+build on a shared ten-core Apple silicon machine with other builds running,
+Erlang/OTP 29 and Node 24.21.0.
+
+| 20,000 values against | Target | Before | After |
+| --- | --- | ---: | ---: |
+| Enum of 1,000 labels | Erlang | 130 [128–134] | 0.37 [0.37–0.38] |
+| Enum of 2,000 labels | Erlang | 250 [242–256] | 0.43 [0.43–0.44] |
+| Enum of 4,000 labels | Erlang | 463 [461–474] | 0.37 [0.37–0.38] |
+| Enum of 8,000 labels | Erlang | 912 [901–944] | 0.50 [0.50–0.51] |
+| Union of 1,000 tags | Erlang | 185 [176–186] | 1.01 [0.99–1.03] |
+| Union of 8,000 tags | Erlang | 1,325 [1,315–1,351] | 1.21 [1.20–1.22] |
+| Enum of 1,000 labels | Node | 217 [201–219] | 3.67 [3.40–4.27] |
+| Enum of 8,000 labels | Node | 1,565 [1,558–1,618] | 3.41 [3.38–3.86] |
+| Union of 1,000 tags | Node | 118 [117–123] | 9.48 [9.48–9.85] |
+| Union of 8,000 tags | Node | 930 [920–940] | 9.66 [9.64–9.69] |
+| Two-field records (control) | Erlang | 2.43 [2.38–2.46] | 1.22 [1.22–1.30] |
+| Enum of 3 labels (control) | Erlang | 0.68 [0.68–0.68] | 0.48 [0.48–0.49] |
+| 1,000 `contract.decode` calls (control) | Erlang | 0.58 [0.57–0.58] | 0.29 [0.29–0.29] |
+| Two-field records (control) | Node | 10.2 [10.2–10.2] | 9.79 [9.74–9.80] |
+| Enum of 3 labels (control) | Node | 1.94 [1.93–2.02] | 1.57 [1.57–1.80] |
+| 1,000 `contract.decode` calls (control) | Node | 3.49 [3.33–3.65] | 3.37 [3.33–3.62] |
+
+Before, the time doubled with the number of alternatives; after, it does not
+depend on it. The controls show no slowdown. Their Erlang "before" cells ran
+while the machine was busier, so the apparent halving is not a claim.
 
 ## Limits of these claims
 

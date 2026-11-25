@@ -56,21 +56,135 @@ import json/blueprint/codec.{
   type Codec, type DecodeError, type DefinitionError, type PathSegment,
   type Schema, Field, Index,
 }
-import json/blueprint/internal/schema_tree.{
-  type PropertySchema, type Tree, type VariantSchema,
-} as tree
+import json/blueprint/internal/schema_tree.{type Tree, type VariantSchema} as tree
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
 /// A schema accepted for validation, normalized so that member and label
 /// order does not matter.
 pub opaque type Contract {
-  Contract(schema: Tree)
+  Contract(plan: Plan)
 }
 
 /// A value that passed `validate`, with the schema it passed.
 pub opaque type ValidatedValue {
-  ValidatedValue(value: Value, schema: Tree)
+  ValidatedValue(value: Value, plan: Plan)
+}
+
+/// A normalized schema in the form validation walks. It holds what the
+/// normalized `Tree` holds, except that an enum or a union with more than
+/// `index_above` alternatives keeps them in a set or a dictionary, so checking
+/// one value does not scan every alternative. The index replaces the list and
+/// is not kept beside it; `plan_tree` rebuilds the sorted list.
+type Plan {
+  PlanDescribed(description: String, inner: Plan)
+  PlanString
+  PlanLabels(labels: List(String))
+  PlanIndexedLabels(labels: Set(String))
+  PlanInt
+  PlanNumber
+  PlanBool
+  PlanPair(left: Plan, right: Plan)
+  PlanList(items: Plan)
+  PlanNullable(inner: Plan)
+  PlanObject(properties: List(PlanProperty))
+  PlanUnion(variants: List(#(String, Option(Plan))))
+  PlanIndexedUnion(variants: Dict(String, Option(Plan)))
+  PlanIntegerRange(minimum: Int, maximum: Int)
+  PlanNumberRange(minimum: Number, maximum: Number)
+  PlanAny
+}
+
+type PlanProperty {
+  PlanProperty(name: String, required: Bool, plan: Plan)
+}
+
+/// Enums and unions with more alternatives than this are indexed. Below it a
+/// scan of the list is as fast and allocates nothing when a contract is built.
+const index_above = 8
+
+/// The plan of a normalized schema.
+fn plan(schema: Tree) -> Plan {
+  case schema {
+    tree.DescribedSchema(description, inner) ->
+      PlanDescribed(description, plan(inner))
+    tree.StringSchema -> PlanString
+    tree.StringEnumSchema(labels) ->
+      case list.drop(labels, index_above) {
+        [] -> PlanLabels(labels)
+        _ -> PlanIndexedLabels(set.from_list(labels))
+      }
+    tree.IntSchema -> PlanInt
+    tree.NumberSchema -> PlanNumber
+    tree.BoolSchema -> PlanBool
+    tree.PairSchema(left, right) -> PlanPair(plan(left), plan(right))
+    tree.ListSchema(items) -> PlanList(plan(items))
+    tree.NullableSchema(inner) -> PlanNullable(plan(inner))
+    tree.ObjectSchema(properties) ->
+      PlanObject(
+        list.map(properties, fn(property) {
+          PlanProperty(property.name, property.required, plan(property.schema))
+        }),
+      )
+    tree.UnionSchema(variants) -> {
+      let planned =
+        list.map(variants, fn(variant) {
+          #(variant.tag, option.map(variant.payload, plan))
+        })
+      case list.drop(planned, index_above) {
+        [] -> PlanUnion(planned)
+        _ -> PlanIndexedUnion(dict.from_list(planned))
+      }
+    }
+    tree.IntegerRangeSchema(minimum, maximum) ->
+      PlanIntegerRange(minimum, maximum)
+    tree.NumberRangeSchema(minimum, maximum) ->
+      PlanNumberRange(minimum, maximum)
+    tree.AnySchema -> PlanAny
+  }
+}
+
+/// The normalized schema a plan was made from.
+fn plan_tree(plan: Plan) -> Tree {
+  case plan {
+    PlanDescribed(description, inner) ->
+      tree.DescribedSchema(description, plan_tree(inner))
+    PlanString -> tree.StringSchema
+    PlanLabels(labels) -> tree.StringEnumSchema(labels)
+    PlanIndexedLabels(labels) ->
+      tree.StringEnumSchema(list.sort(set.to_list(labels), string.compare))
+    PlanInt -> tree.IntSchema
+    PlanNumber -> tree.NumberSchema
+    PlanBool -> tree.BoolSchema
+    PlanPair(left, right) -> tree.PairSchema(plan_tree(left), plan_tree(right))
+    PlanList(items) -> tree.ListSchema(plan_tree(items))
+    PlanNullable(inner) -> tree.NullableSchema(plan_tree(inner))
+    PlanObject(properties) ->
+      tree.ObjectSchema(
+        list.map(properties, fn(property) {
+          tree.PropertySchema(
+            property.name,
+            property.required,
+            plan_tree(property.plan),
+          )
+        }),
+      )
+    PlanUnion(variants) -> tree.UnionSchema(list.map(variants, variant_tree))
+    PlanIndexedUnion(variants) ->
+      dict.to_list(variants)
+      |> list.sort(fn(a, b) { string.compare(a.0, b.0) })
+      |> list.map(variant_tree)
+      |> tree.UnionSchema
+    PlanIntegerRange(minimum, maximum) ->
+      tree.IntegerRangeSchema(minimum, maximum)
+    PlanNumberRange(minimum, maximum) ->
+      tree.NumberRangeSchema(minimum, maximum)
+    PlanAny -> tree.AnySchema
+  }
+}
+
+fn variant_tree(variant: #(String, Option(Plan))) -> VariantSchema {
+  tree.VariantSchema(variant.0, option.map(variant.1, plan_tree))
 }
 
 /// The first failure of `validate`, at `path`. Read fields by label.
@@ -91,18 +205,18 @@ pub fn from_codec(codec: Codec(a)) -> Result(Contract, codec.SchemaError) {
 /// Every `Schema` comes from a codec, a contract or a checked mapping of one
 /// and is already checked, so this cannot fail.
 pub fn from_schema(schema: Schema) -> Contract {
-  Contract(normalize(codec.to_tree(schema)))
+  Contract(plan(normalize(codec.to_tree(schema))))
 }
 
 /// The contract's schema, normalized.
 pub fn schema(contract: Contract) -> Schema {
-  codec.from_tree(contract.schema)
+  codec.from_tree(plan_tree(contract.plan))
 }
 
 /// Whether two contracts have the same normalized schema structure.
 /// Descriptions and property, label, and variant order do not affect matching.
 pub fn same_schema(left: Contract, right: Contract) -> Bool {
-  shape(left.schema) == shape(right.schema)
+  shape(plan_tree(left.plan)) == shape(plan_tree(right.plan))
 }
 
 fn normalize(schema: Tree) -> Tree {
@@ -171,8 +285,8 @@ pub fn validate(
   contract: Contract,
   item: Value,
 ) -> Result(ValidatedValue, ValidationError) {
-  use Nil <- result.map(validate_at(contract.schema, item, []))
-  ValidatedValue(item, contract.schema)
+  use Nil <- result.map(validate_at(contract.plan, item, []))
+  ValidatedValue(item, contract.plan)
 }
 
 /// The value that passed validation.
@@ -189,7 +303,10 @@ pub fn decode(
 ) -> Result(a, DecodeError) {
   case codec.schema(codec) {
     Ok(found) ->
-      case shape(normalize(codec.to_tree(found))) == shape(validated.schema) {
+      case
+        shape(normalize(codec.to_tree(found)))
+        == shape(plan_tree(validated.plan))
+      {
         True -> codec.decode(codec, validated.value)
         False -> Error(codec.DecodeError([], codec.ContractMismatch))
       }
@@ -226,7 +343,7 @@ pub fn value_codec(contract: Contract) -> Codec(Value) {
           Error(codec.DecodeError(path, reason))
       }
     },
-    schema: Some(codec.from_tree(contract.schema)),
+    schema: Some(codec.from_tree(plan_tree(contract.plan))),
     placeholder: value.Null,
   )
 }
@@ -246,59 +363,67 @@ fn invalid(
 
 /// `path` is reversed.
 fn validate_at(
-  schema: Tree,
+  schema: Plan,
   item: Value,
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
   case schema, item {
-    tree.DescribedSchema(_, inner), _ -> validate_at(inner, item, path)
-    tree.StringSchema, value.String(_) -> Ok(Nil)
-    tree.StringSchema, _ -> invalid(path, codec.ExpectedString)
+    PlanDescribed(_, inner), _ -> validate_at(inner, item, path)
+    PlanString, value.String(_) -> Ok(Nil)
+    PlanString, _ -> invalid(path, codec.ExpectedString)
 
-    tree.StringEnumSchema(labels), value.String(label) ->
-      case list.contains(labels, label) {
+    PlanLabels(labels), value.String(label) ->
+      case contains_name(labels, label) {
         True -> Ok(Nil)
         False -> invalid(path, codec.UnknownEnumLabel)
       }
-    tree.StringEnumSchema(_), _ -> invalid(path, codec.ExpectedString)
+    PlanIndexedLabels(labels), value.String(label) ->
+      case set.contains(labels, label) {
+        True -> Ok(Nil)
+        False -> invalid(path, codec.UnknownEnumLabel)
+      }
+    PlanLabels(_), _ | PlanIndexedLabels(_), _ ->
+      invalid(path, codec.ExpectedString)
 
-    tree.IntSchema, value.Number(found) ->
+    PlanInt, value.Number(found) ->
       case number.is_integer(found) {
         True -> Ok(Nil)
         False -> invalid(path, codec.ExpectedInt)
       }
-    tree.IntSchema, _ -> invalid(path, codec.ExpectedInt)
+    PlanInt, _ -> invalid(path, codec.ExpectedInt)
 
-    tree.NumberSchema, value.Number(_) -> Ok(Nil)
-    tree.NumberSchema, _ -> invalid(path, codec.ExpectedNumber)
+    PlanNumber, value.Number(_) -> Ok(Nil)
+    PlanNumber, _ -> invalid(path, codec.ExpectedNumber)
 
-    tree.BoolSchema, value.Bool(_) -> Ok(Nil)
-    tree.BoolSchema, _ -> invalid(path, codec.ExpectedBool)
+    PlanBool, value.Bool(_) -> Ok(Nil)
+    PlanBool, _ -> invalid(path, codec.ExpectedBool)
 
-    tree.PairSchema(left, right), value.Array([first, second]) -> {
+    PlanPair(left, right), value.Array([first, second]) -> {
       use Nil <- result.try(validate_at(left, first, [Index(0), ..path]))
       validate_at(right, second, [Index(1), ..path])
     }
-    tree.PairSchema(_, _), value.Array(items) ->
+    PlanPair(_, _), value.Array(items) ->
       invalid(path, codec.WrongLength(2, list.length(items)))
-    tree.PairSchema(_, _), _ -> invalid(path, codec.ExpectedArray)
+    PlanPair(_, _), _ -> invalid(path, codec.ExpectedArray)
 
-    tree.ListSchema(inner), value.Array(items) ->
-      validate_items(inner, items, 0, path)
-    tree.ListSchema(_), _ -> invalid(path, codec.ExpectedArray)
+    PlanList(inner), value.Array(items) -> validate_items(inner, items, 0, path)
+    PlanList(_), _ -> invalid(path, codec.ExpectedArray)
 
-    tree.NullableSchema(_), value.Null -> Ok(Nil)
-    tree.NullableSchema(inner), _ -> validate_at(inner, item, path)
+    PlanNullable(_), value.Null -> Ok(Nil)
+    PlanNullable(inner), _ -> validate_at(inner, item, path)
 
-    tree.ObjectSchema(properties), value.Object(members) ->
+    PlanObject(properties), value.Object(members) ->
       validate_object(properties, members, path)
-    tree.ObjectSchema(_), _ -> invalid(path, codec.ExpectedObject)
+    PlanObject(_), _ -> invalid(path, codec.ExpectedObject)
 
-    tree.UnionSchema(variants), value.Object(members) ->
-      validate_union(variants, members, path)
-    tree.UnionSchema(_), _ -> invalid(path, codec.ExpectedObject)
+    PlanUnion(variants), value.Object(members) ->
+      validate_union(members, path, find_variant(variants, _))
+    PlanIndexedUnion(variants), value.Object(members) ->
+      validate_union(members, path, dict.get(variants, _))
+    PlanUnion(_), _ | PlanIndexedUnion(_), _ ->
+      invalid(path, codec.ExpectedObject)
 
-    tree.IntegerRangeSchema(minimum, maximum), value.Number(found) ->
+    PlanIntegerRange(minimum, maximum), value.Number(found) ->
       case number.is_integer(found) {
         False -> invalid(path, codec.ExpectedInt)
         True ->
@@ -307,16 +432,30 @@ fn validate_at(
             False -> invalid(path, codec.IntegerOutsideRange(minimum, maximum))
           }
       }
-    tree.IntegerRangeSchema(_, _), _ -> invalid(path, codec.ExpectedInt)
+    PlanIntegerRange(_, _), _ -> invalid(path, codec.ExpectedInt)
 
-    tree.NumberRangeSchema(minimum, maximum), value.Number(found) ->
+    PlanNumberRange(minimum, maximum), value.Number(found) ->
       case within(found, minimum, maximum) {
         True -> Ok(Nil)
         False -> invalid(path, codec.NumberOutsideRange(minimum, maximum))
       }
-    tree.NumberRangeSchema(_, _), _ -> invalid(path, codec.ExpectedNumber)
+    PlanNumberRange(_, _), _ -> invalid(path, codec.ExpectedNumber)
 
-    tree.AnySchema, _ -> Ok(Nil)
+    PlanAny, _ -> Ok(Nil)
+  }
+}
+
+fn find_variant(
+  variants: List(#(String, Option(Plan))),
+  wanted: String,
+) -> Result(Option(Plan), Nil) {
+  case variants {
+    [] -> Error(Nil)
+    [#(tag, payload), ..rest] ->
+      case tag == wanted {
+        True -> Ok(payload)
+        False -> find_variant(rest, wanted)
+      }
   }
 }
 
@@ -333,7 +472,7 @@ fn within_integers(found: Number, minimum: Int, maximum: Int) -> Bool {
 }
 
 fn validate_items(
-  schema: Tree,
+  schema: Plan,
   items: List(Value),
   index: Int,
   path: List(PathSegment),
@@ -449,7 +588,7 @@ fn check_members_prefix(
 }
 
 fn validate_object(
-  properties: List(PropertySchema),
+  properties: List(PlanProperty),
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
@@ -469,7 +608,7 @@ fn validate_object(
 }
 
 fn validate_object_linear(
-  properties: List(PropertySchema),
+  properties: List(PlanProperty),
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
@@ -478,7 +617,7 @@ fn validate_object_linear(
   list.try_each(properties, fn(property) {
     let at = [Field(property.name), ..path]
     case find_member(members, property.name), property.required {
-      Ok(found), _ -> validate_at(property.schema, found, at)
+      Ok(found), _ -> validate_at(property.plan, found, at)
       Error(Nil), True -> invalid(at, codec.MissingField)
       Error(Nil), False -> Ok(Nil)
     }
@@ -486,7 +625,7 @@ fn validate_object_linear(
 }
 
 fn validate_object_indexed(
-  properties: List(PropertySchema),
+  properties: List(PlanProperty),
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
@@ -501,7 +640,7 @@ fn validate_object_indexed(
   list.try_each(properties, fn(property) {
     let at = [Field(property.name), ..path]
     case dict.get(index, property.name), property.required {
-      Ok(Some(found)), _ -> validate_at(property.schema, found, at)
+      Ok(Some(found)), _ -> validate_at(property.plan, found, at)
       _, True -> invalid(at, codec.MissingField)
       _, False -> Ok(Nil)
     }
@@ -509,9 +648,9 @@ fn validate_object_indexed(
 }
 
 fn validate_union(
-  variants: List(VariantSchema),
   members: List(#(String, Value)),
   path: List(PathSegment),
+  find: fn(String) -> Result(Option(Plan), Nil),
 ) -> Result(Nil, ValidationError) {
   use Nil <- result.try(check_members(members, ["tag", "value"], [], path))
   let tag_path = [Field("tag"), ..path]
@@ -519,10 +658,10 @@ fn validate_union(
   case list.key_find(members, "tag") {
     Error(Nil) -> invalid(tag_path, codec.MissingField)
     Ok(value.String(tag)) ->
-      case list.find(variants, fn(variant) { variant.tag == tag }) {
+      case find(tag) {
         Error(Nil) -> invalid(tag_path, codec.UnknownTag)
-        Ok(variant) ->
-          case variant.payload, list.key_find(members, "value") {
+        Ok(payload) ->
+          case payload, list.key_find(members, "value") {
             Some(payload), Ok(found) -> validate_at(payload, found, value_path)
             Some(_), Error(Nil) -> invalid(value_path, codec.MissingField)
             None, Ok(_) -> invalid(value_path, codec.UnknownField)
@@ -616,7 +755,7 @@ pub fn load(document: Value) -> Result(Contract, DocumentError) {
       let schema_members = without_member(members, "$schema")
       use parsed <- result.try(parse_schema(value.Object(schema_members), []))
       case codec.validate_tree(parsed.schema) {
-        Ok(Nil) -> Ok(Contract(normalize(parsed.schema)))
+        Ok(Nil) -> Ok(Contract(plan(normalize(parsed.schema))))
         Error(error) ->
           Error(InvalidDefinition(
             invariant_path(error, parsed.invariants),

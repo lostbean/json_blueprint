@@ -333,6 +333,7 @@
       #points(
         [from_schema is total because every public Schema is checked. from_codec can fail with UnknownSchema and can panic on a source definition mistake. No process-local schema identity token is required.],
         [Normalization recursively sorts object properties by name, enum labels by text, and variants by tag. It retains associations and child order. Descriptions remain available for rendering; matching separately removes them recursively.],
+        [A contract holds an enum or a union of more than eight alternatives as a set or a dictionary, so validating one value does not scan every alternative. The index replaces the list and is never kept beside it; the normalized schema is rebuilt from it with labels and tags sorted. Smaller enums and unions keep their list.],
         [#term("term-contract-match") is exact equality of those normalized shapes. It is not a solver for equivalence, subtyping, satisfiability, or data migration. A rebuilt equal contract can match a witness.],
       )
       #behavior(title: "Different bounds cannot reuse a witness", level: "boundary", area: "Contract matching")[
