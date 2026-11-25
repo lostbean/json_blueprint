@@ -4,7 +4,7 @@
 #let body = [
   #section(title: "Foundation", lead: [One definition supplies typed conversion and an inspectable JSON contract.], body: [
     #goal(title: "Describe schema-aware data once")[Applications retain one #term("term-codec") for JSON conversion, schema publication, and schema-aware composition. Runtime schema documents produce contracts for wire validation.]
-    #goal(title: "Reject hostile input within explicit bounds")[Strict text admission retains exact numbers and duplicate-key evidence. A byte limit bounds admission; consumers own depth, value-count and numeric policies.]
+    #goal(title: "Reject hostile input within explicit bounds")[Strict text admission retains exact numbers and duplicate-key evidence. A byte limit bounds admission by default, and a caller can add a nesting-depth and a value-count bound; consumers own numeric policies and any policy over decoded structure.]
     #goal(title: "Keep the published 1.x API available")[The frozen 1.x API remains available for its established wire formats and recursive types.]
     #invariant(title: "Number comparison preserves mathematical value", enforcement: "mechanism")[#term("term-exact-number") comparison and integrality never pass through Float. Native construction and projection check target representation limits.]
     #invariant(title: "A witness retains the value that was validated", enforcement: "mechanism")[A #term("term-validated-value") retains an immutable value and the accepting normalized schema. A replacement value requires another validation.]
@@ -13,7 +13,7 @@
     #principle(title: "Keep wire acceptance separate from native projection")[A schema may accept an exact value that a requested native type cannot represent. Callers distinguish schema rejection, parse rejection, and native conversion failure.]
     #principle(title: "Keep callback ownership explicit")[Caller mappings own their laws and application checks. A retained schema does not certify a callback's inverse, purity, or encoding behavior.]
     #points(
-      [Ownership and finite support are recorded in #adr(1). Number policy is recorded in #adr(2). Byte-only native admission supersedes #adr(3) in #adr(14).],
+      [Ownership and finite support are recorded in #adr(1). Number policy is recorded in #adr(2). Byte-only native admission supersedes #adr(3) in #adr(14); #adr(19) adds the caller-chosen depth and value-count bounds.],
     )
   ])
 
@@ -92,7 +92,7 @@
     #points(
       [Value objects have no persistent identifiers, mutable state fields, commands that change them, or emitted domain events. There is no vacant or revoked state to model: replacement discards the previous value and requires fresh evidence.],
       [Sum types model Value, SchemaView, typed failures, and union construction. Products model errors with paths, properties, variants, parse locations, and generated source results. Numeric bounds and enum membership are refinements on accepted values.],
-      [Limits are immutable caller-authored settings. The byte setter retains its supplied value; a nonpositive byte limit rejects every input.],
+      [Limits are immutable caller-authored settings. Each setter retains its supplied value and keeps the other bounds. A nonpositive byte limit, a negative depth limit, or a nonpositive value limit rejects every input.],
     )
   ])
 
@@ -131,12 +131,15 @@
       #md-table(3, (
         [Bound], [Default], [Change],
         [Input bytes], [1,048,576], [with_max_bytes],
+        [Nesting depth], [None], [with_max_depth],
+        [Values], [None], [with_max_values],
       ))
       #points(
-        [There is no global depth, value-count or numeric-token admission bound, streaming admission or request-wide time budget. The caller has already allocated input text; byte admission is not a heap quota. Consumers own structural policy.],
+        [A root that is not an array or object has depth 0 and each enclosing array or object adds one level. Every value counts once, the root and containers included; object names do not count. A document over either bound is refused as a limit failure before a Value tree or typed result exists. Input from an untrusted peer should set both bounds, because every function that walks a parsed value recurses once per level.],
+        [There is no numeric-token admission bound, streaming admission or request-wide time budget. The caller has already allocated input text; byte admission is not a heap quota. Consumers own any further structural policy.],
         [String admission validates escapes and surrogate pairing. Literal control characters, malformed escapes, and unterminated strings reject. Object duplicate detection compares decoded names, so escaped equivalent names collide.],
         [Erlang object members follow native map order. JavaScript follows Object.keys order, placing array-index names before other names. Arrays retain input order. Value conversion copies strings so small retained values do not retain the complete source binary.],
-        [Native syntax, duplicate and JavaScript raw Unicode-scalar errors have an unavailable location, represented by zeroes; their description does not invent a source position. Malformed escaped surrogates report NativeSyntax. Native grammar and numeric admission can precede duplicate rejection on multiply-invalid input. Public parse errors retain no input text. Syntax validation completes before typed callbacks run.],
+        [Native syntax, duplicate and JavaScript raw Unicode-scalar errors have an unavailable location, represented by zeroes; their description does not invent a source position. Malformed escaped surrogates report NativeSyntax. Native grammar and numeric admission can precede duplicate rejection on multiply-invalid input. A document that is malformed and also over a structural bound, or over both structural bounds, can report either failure depending on the target. Public parse errors retain no input text. Syntax validation completes before typed callbacks run.],
       )
       #behavior(title: "Unsupported JavaScript runtimes refuse strict parsing", level: "boundary", area: "Strict admission")[
         #given[The JavaScript runtime does not provide numeric source text to JSON.parse revivers.]
@@ -154,7 +157,7 @@
         #then[Parsing fails with InvalidUnicodeScalar and an unavailable native location without retaining source text in the error.]
       ]
       #points(
-        [#adr(15) records JavaScript native hybrid admission. #adr(14) records byte-only native admission and supersedes the independent limits in #adr(3). Source: #lnk("../../../src/json/blueprint/value.gleam")[value parser]. #lnk("../../../test/bounded_parsing_test.gleam")[admission tests] and #lnk("../../../test/value_parse_test.gleam")[grammar cases] cover the boundary. Benchmark observations are not hard heap quotas.],
+        [#adr(15) records JavaScript native hybrid admission. #adr(14) records byte-only native admission and supersedes the independent limits in #adr(3). #adr(19) records the caller-chosen depth and value-count bounds. Source: #lnk("../../../src/json/blueprint/value.gleam")[value parser]. #lnk("../../../test/bounded_parsing_test.gleam")[admission tests] and #lnk("../../../test/value_parse_test.gleam")[grammar cases] cover the boundary. Benchmark observations are not hard heap quotas.],
       )
     ]
     #subsection(title: "Rendering and standard JSON bridges")[

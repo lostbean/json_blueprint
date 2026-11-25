@@ -2,6 +2,7 @@
 -module(json_blueprint_native_ffi).
 -export([
     parse/1,
+    parse_bounded/3,
     kind/1,
     string/1,
     boolean/1,
@@ -25,15 +26,45 @@ parse(Source) ->
         array_finish => fun array_finish/2,
         float => fun(Token) -> {json_blueprint_decimal, Token} end
     },
-    try json:decode(Source, nil, Decoders) of
-        {Value, _, Rest} ->
+    decode(Source, nil, Decoders, fun(_) -> none end).
+
+% The decoder accumulator carries the nesting depth and the number of values
+% seen so far, so both bounds are checked in the callbacks that already run for
+% every container and member. A container's accumulator is
+% {Items, Error, Depth, Count}; Count excludes the root value.
+parse_bounded(Source, MaxDepth, MaxValues) ->
+    Decoders = #{
+        object_start => fun(Outer) -> open(#{}, Outer, MaxDepth) end,
+        object_push => fun(K, V, Acc) -> bounded_object_push(K, V, Acc, MaxValues) end,
+        object_finish => fun close_object/2,
+        array_start => fun(Outer) -> open([], Outer, MaxDepth) end,
+        array_push => fun(V, Acc) -> bounded_array_push(V, Acc, MaxValues) end,
+        array_finish => fun close_array/2,
+        float => fun(Token) -> {json_blueprint_decimal, Token} end
+    },
+    Root = {root, none, 0, 0},
+    decode(Source, Root, Decoders, fun({root, none, 0, Count}) ->
+        case Count + 1 > MaxValues of
+            true -> value_limit;
+            false -> none
+        end
+    end).
+
+decode(Source, Acc, Decoders, Refusal) ->
+    try json:decode(Source, Acc, Decoders) of
+        {Value, Final, Rest} ->
             case whitespace(Rest) of
                 false ->
                     {error, {syntax, <<"trailing content">>}};
                 true ->
                     case Value of
-                        {json_blueprint_parse_error, Error} -> {error, Error};
-                        _ -> {ok, Value}
+                        {json_blueprint_parse_error, Error} ->
+                            {error, Error};
+                        _ ->
+                            case Refusal(Final) of
+                                none -> {ok, Value};
+                                Error -> {error, Error}
+                            end
                     end
             end
     catch
@@ -44,6 +75,48 @@ parse(Source) ->
         error:unexpected_end ->
             {error, {syntax, <<"unexpected end">>}}
     end.
+
+% A container opened inside a refused one stays refused, so nothing more is
+% retained once a bound is exceeded.
+open(Empty, {_, none, Depth, Count}, MaxDepth) when Depth < MaxDepth ->
+    {Empty, none, Depth + 1, Count};
+open(Empty, {_, none, Depth, Count}, _) ->
+    {Empty, depth_limit, Depth + 1, Count};
+open(Empty, {_, Error, Depth, Count}, _) ->
+    {Empty, Error, Depth + 1, Count}.
+% The root is one more value, so the last admitted member has Count + 2 =<
+% MaxValues. These repeat object_push/3 and array_push/2 on the wider
+% accumulator, because rebuilding the narrow one per member doubled the cost.
+bounded_object_push(K, V, {Map, none, Depth, Count}, MaxValues) when Count + 2 =< MaxValues ->
+    case maps:is_key(K, Map) of
+        true ->
+            {#{}, {duplicate_key, K}, Depth, Count};
+        false ->
+            case V of
+                {json_blueprint_parse_error, Error} -> {#{}, Error, Depth, Count};
+                _ -> {Map#{K => V}, none, Depth, Count + 1}
+            end
+    end;
+bounded_object_push(_, _, {_, none, Depth, Count}, _) ->
+    {#{}, value_limit, Depth, Count};
+bounded_object_push(_, _, Refused, _) ->
+    Refused.
+bounded_array_push({json_blueprint_parse_error, Error}, {_, none, Depth, Count}, _) ->
+    {[], Error, Depth, Count};
+bounded_array_push(V, {Items, none, Depth, Count}, MaxValues) when Count + 2 =< MaxValues ->
+    {[V | Items], none, Depth, Count + 1};
+bounded_array_push(_, {_, none, Depth, Count}, _) ->
+    {[], value_limit, Depth, Count};
+bounded_array_push(_, Refused, _) ->
+    Refused.
+close_object({Map, none, _, Count}, Outer) ->
+    {Map, setelement(4, Outer, Count)};
+close_object({_, Error, _, Count}, Outer) ->
+    {{json_blueprint_parse_error, Error}, setelement(4, Outer, Count)}.
+close_array({Items, none, _, Count}, Outer) ->
+    {lists:reverse(Items), setelement(4, Outer, Count)};
+close_array({_, Error, _, Count}, Outer) ->
+    {{json_blueprint_parse_error, Error}, setelement(4, Outer, Count)}.
 
 % OTP's float path catches exceptions across downstream callbacks. Carry
 % duplicate failures through container results instead of throwing them.

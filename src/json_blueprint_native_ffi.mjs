@@ -6,6 +6,8 @@ import {
   RuntimeCapacity,
   NumberRepresentation,
   UnsupportedRuntime,
+  DepthLimit,
+  ValueLimit,
   Null,
   Bool,
   String as StringKind,
@@ -139,21 +141,57 @@ function strictScan(source) {
   }
   return duplicate === undefined ? undefined : new DuplicateKey(duplicate);
 }
-export function parse(source) {
+const valueLimitFailure = {};
+
+// Whether any array or object in `source` is nested deeper than `max`. Brackets
+// inside strings are text. This runs before JSON.parse, so a document nested
+// beyond the host stack is refused as a limit and never reaches the parser.
+function exceedsDepth(source, max) {
+  let depth = 0;
+  for (let i = 0; i < source.length; i++) {
+    const c = source.charCodeAt(i);
+    if (c === 34) {
+      for (i++; i < source.length; i++) {
+        const s = source.charCodeAt(i);
+        if (s === 92) i++;
+        else if (s === 34) break;
+      }
+    } else if (c === 91 || c === 123) {
+      if (++depth > max) return true;
+    } else if (c === 93 || c === 125) depth--;
+  }
+  return false;
+}
+function parseWith(source, reviver) {
   if (!sourceContext) return new GleamError(new UnsupportedRuntime());
   try {
-    const raw = JSON.parse(source, revive);
+    const raw = JSON.parse(source, reviver);
     const refusal = strictScan(source);
     return refusal === undefined ? new Ok(raw) : new GleamError(refusal);
   } catch (error) {
     if (error === representationFailure)
       return new GleamError(new NumberRepresentation());
+    if (error === valueLimitFailure) return new GleamError(new ValueLimit());
     if (error instanceof SyntaxError)
       return new GleamError(new Syntax("invalid JSON"));
     if (error instanceof RangeError)
       return new GleamError(new RuntimeCapacity());
     throw error;
   }
+}
+export function parse(source) {
+  return parseWith(source, revive);
+}
+// JSON.parse calls the reviver once for every value, the root and containers
+// included, after the whole text has passed its grammar.
+export function parse_bounded(source, maxDepth, maxValues) {
+  if (!sourceContext) return new GleamError(new UnsupportedRuntime());
+  if (exceedsDepth(source, maxDepth)) return new GleamError(new DepthLimit());
+  let count = 0;
+  return parseWith(source, (key, value, context) => {
+    if (++count > maxValues) throw valueLimitFailure;
+    return revive(key, value, context);
+  });
 }
 function isObject(raw) {
   return (
