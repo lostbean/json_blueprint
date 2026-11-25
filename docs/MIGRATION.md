@@ -31,8 +31,9 @@ oracle dependency merely to make it match the application dependency.
 `reuse_decoder`, `decode` and `decode_with_max_bytes`) and
 `json/blueprint/schema` are gone in 3.0. They parsed with `gleam/json` behind a
 1 MiB byte check only, so they admitted documents nested deeper than the
-default depth bound, repeated keys and rounded numbers that every other text
-decoder refuses. Generated modules lose `decode_<name>_json_native` for the
+default depth bound and repeated keys, which every other text decoder refuses,
+and they rounded a number such as `0.1` to a float, where every other text
+decoder keeps its exact decimal value. Generated modules lose `decode_<name>_json_native` for the
 same reason. Code that still uses either does not compile against 3.0.
 
 | 1.x                                                | Replacement                                                                                                    |
@@ -178,7 +179,7 @@ was an unpublished checkout package; remove that dependency if you used it.
 Keep the same generator imports and depend on `json_blueprint` alone.
 
 Generation returns source. Your build task writes, formats, compiles, and reviews
-that source for each target. Regenerate checked-in modules with the 2.0
+that source for each target. Regenerate checked-in modules with the 3.0
 generator, review the diff, and rerun parity and application tests before
 committing the output. The schema generator's attribution header now names
 JSON Blueprint. Do not edit generator output by hand to make a drift check pass.

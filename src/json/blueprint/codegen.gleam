@@ -1024,9 +1024,10 @@ pub fn describe(
 }
 
 /// Compile one canonical typed definition into Blueprint Value operations,
-/// gleam/json-native text operations, a schema, and an interchangeable Codec.
-/// Ordinary text decoding uses Blueprint's strict parser. An explicitly named
-/// native decoder remains available for callers needing `gleam/json` parsing.
+/// gleam/json-native text encoding, a schema, and an interchangeable Codec.
+/// The generated `decode_<name>_json` parses with Blueprint's strict parser
+/// within the default limits; callers needing other bounds pass the codec
+/// accessor to `codec.decode_json_with_limits`.
 pub fn compile(
   module_path: String,
   name: String,
