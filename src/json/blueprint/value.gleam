@@ -393,26 +393,50 @@ fn find_invalid_utf8(
 /// such as `12.5` or `0.001`; other numbers use `number.to_string`, such as
 /// `1e-9`.
 pub fn to_string(value: Value) -> String {
+  string.concat(list.reverse(render(value, [])))
+}
+
+// Every level adds only its own tokens to one reversed list, and the text is
+// assembled once at the root. Concatenating strings per level copied each
+// descendant again at every enclosing level.
+fn render(value: Value, done: List(String)) -> List(String) {
   case value {
-    Null -> "null"
-    Bool(True) -> "true"
-    Bool(False) -> "false"
-    String(item) -> json.to_string(json.string(item))
+    Null -> ["null", ..done]
+    Bool(True) -> ["true", ..done]
+    Bool(False) -> ["false", ..done]
+    String(item) -> [json.to_string(json.string(item)), ..done]
     Number(item) ->
       case number.to_int(item, 50) {
-        Ok(integer) -> int.to_string(integer)
-        Error(_) -> decimal_text(number.to_string(item))
+        Ok(integer) -> [int.to_string(integer), ..done]
+        Error(_) -> [decimal_text(number.to_string(item)), ..done]
       }
-    Array(items) -> "[" <> string.join(list.map(items, to_string), ",") <> "]"
-    Object(pairs) ->
-      "{"
-      <> string.join(
-        list.map(pairs, fn(pair) {
-          json.to_string(json.string(pair.0)) <> ":" <> to_string(pair.1)
-        }),
-        ",",
-      )
-      <> "}"
+    Array([]) -> ["[]", ..done]
+    Array([first, ..rest]) -> render_items(rest, render(first, ["[", ..done]))
+    Object([]) -> ["{}", ..done]
+    Object([first, ..rest]) ->
+      render_members(rest, render_member(first, ["{", ..done]))
+  }
+}
+
+fn render_items(items: List(Value), done: List(String)) -> List(String) {
+  case items {
+    [] -> ["]", ..done]
+    [item, ..rest] -> render_items(rest, render(item, [",", ..done]))
+  }
+}
+
+fn render_member(member: #(String, Value), done: List(String)) -> List(String) {
+  render(member.1, [":", json.to_string(json.string(member.0)), ..done])
+}
+
+fn render_members(
+  members: List(#(String, Value)),
+  done: List(String),
+) -> List(String) {
+  case members {
+    [] -> ["}", ..done]
+    [member, ..rest] ->
+      render_members(rest, render_member(member, [",", ..done]))
   }
 }
 

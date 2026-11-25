@@ -16,6 +16,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `scripts/contract_encoding_benchmark.py` | Contract validation and encoding costs |
 | `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
 | `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
+| `gleam run -m render_benchmark_runner` | `value.to_string` on deeply nested and wide values, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -452,6 +453,38 @@ build):
 | Short enums scanned for repeats | yes | Node construction 0.87 → 0.25, encode 0.89 → 0.73 |
 | A record step yields only its fields | yes | Erlang `codec_encode_decode_roundtrip` 1.70 → 0.96; in-field encode 0.98 → 0.94; words 0.94–0.96 → 0.87–0.91 on records |
 | Direct JSON text for `encode_json` | no | Erlang encode 0.98 → 1.06, union encode 1.00 → 1.22; decode slower on both targets |
+
+### Value rendering, 2026-11-24
+
+`value.to_string` built the text of every array and object by string
+concatenation, so each enclosing level copied the text of all its descendants
+again and the cost grew with the square of the nesting depth on Erlang. It now
+collects tokens in one list and assembles the text once. `gleam run -m
+render_benchmark_runner` renders each value once untimed and then five times;
+a cell is the median of those five, with the minimum and maximum in brackets,
+in milliseconds. One VM per build on a shared ten-core Apple silicon machine
+with other builds running, Erlang/OTP 29 and Node 24.21.0.
+
+| Value | Target | Before | After |
+| --- | --- | ---: | ---: |
+| Arrays nested 12,500 deep | Erlang | 17.3 [17.3–17.4] | 0.31 [0.23–0.34] |
+| Arrays nested 25,000 deep | Erlang | 112 [112–112] | 0.75 [0.47–1.28] |
+| Arrays nested 50,000 deep | Erlang | 1,027 [1,020–1,041] | 1.04 [0.96–1.37] |
+| Arrays nested 100,000 deep | Erlang | 7,369 [7,025–7,567] | 2.17 [1.97–3.02] |
+| Objects nested 12,500 deep | Erlang | 250 [118–284] | 1.04 [0.86–1.19] |
+| Objects nested 25,000 deep | Erlang | 1,749 [954–1,864] | 1.97 [1.59–2.71] |
+| Objects nested 50,000 deep | Erlang | 10,037 [7,115–10,976] | 5.08 [4.08–5.83] |
+| Array of 250,000 integers | Erlang | 18.3 [14.3–20.9] | 13.7 [11.8–14.5] |
+| Object of 50,000 string members | Erlang | 26.7 [17.6–31.8] | 7.06 [6.33–7.56] |
+| Arrays nested 4,000 deep | Node | 0.35 [0.27–0.75] | 0.29 [0.19–0.68] |
+| Objects nested 2,000 deep | Node | 0.25 [0.24–0.27] | 0.28 [0.26–0.73] |
+| Array of 250,000 integers | Node | 41.7 [39.8–43.7] | 33.6 [31.8–43.7] |
+| Object of 50,000 string members | Node | 6.61 [5.33–14.9] | 6.63 [5.85–13.5] |
+
+Doubling the depth multiplied the Erlang time by six to nine before and by
+about two after. Node was already linear, because V8 concatenates strings
+lazily; its deep cases stay shallow because rendering recurses on the host
+stack.
 
 ## Limits of these claims
 

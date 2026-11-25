@@ -2,6 +2,7 @@ import gleam/dict
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
+import gleam/string
 import gleeunit/should
 import json/blueprint/number
 import json/blueprint/value
@@ -49,6 +50,33 @@ pub fn to_string_is_compact_and_keeps_member_order_test() {
   |> should.equal(
     "{\"b\":[null,true,false],\"a\":\"x\\\"y\",\"n\":12.5,\"i\":-42,\"big\":1e60}",
   )
+}
+
+fn nested_arrays(depth: Int, inner: value.Value) -> value.Value {
+  case depth {
+    0 -> inner
+    _ -> nested_arrays(depth - 1, value.Array([inner]))
+  }
+}
+
+pub fn to_string_renders_deep_and_wide_values_test() {
+  // Deep enough to exercise every level, shallow enough for the JavaScript
+  // host stack.
+  let depth = 1000
+  nested_arrays(depth, value.Object([#("k", value.Array([]))]))
+  |> value.to_string
+  |> should.equal(
+    string.repeat("[", depth) <> "{\"k\":[]}" <> string.repeat("]", depth),
+  )
+
+  let wide = list.repeat(value.Array([value.Bool(True), value.Null]), 20_000)
+  value.to_string(value.Array(wide))
+  |> should.equal(
+    "[" <> string.join(list.repeat("[true,null]", 20_000), ",") <> "]",
+  )
+
+  value.to_string(value.Array([])) |> should.equal("[]")
+  value.to_string(value.Object([])) |> should.equal("{}")
 }
 
 pub fn to_string_writes_plain_decimals_in_a_readable_range_test() {
