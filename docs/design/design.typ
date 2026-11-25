@@ -35,7 +35,7 @@
     ))
     #points(
       [The package exports pure values and synchronous conversion operations. It starts no process, owns no connection, and stores no mutable runtime state. Building a union is the one impure construction. #adr(18)],
-      [#ctx("contracts") holds Wire values, Typed codecs, Runtime contracts and Legacy compatibility. #ctx("generation") holds the typed-definition generator, schema materialization and the schema-driven native generator. #lnk("../CONTEXT-MAP.md")[The context map] declares their relationship.],
+      [#ctx("contracts") holds Wire values, Typed codecs and Runtime contracts. #ctx("generation") holds the typed-definition generator, schema materialization and the schema-driven native generator. #lnk("../CONTEXT-MAP.md")[The context map] declares their relationship.],
       [Relay owns protocol declarations and revision-specific generation. Fabric owns tool and model execution. LLM adapters own provider lowering and admission. These consumers inspect opaque schema children; they never acquire authority from a dialect label alone.],
       [No operation supplies authorization, identifiers for business entities, correlation, idempotency keys, retries, cancellation, or a wall-clock deadline. Applications own those capabilities where their operation requires them.],
     )
