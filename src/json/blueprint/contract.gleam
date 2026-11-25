@@ -1546,7 +1546,8 @@ fn without_annotations(
   |> result.map(list.reverse)
 }
 
-/// Whether `name` is an annotation keyword, and its value has the right type.
+/// Whether `name` is an annotation keyword to drop, and its value has the
+/// right type. `description` is checked but kept.
 fn annotation(name: String, raw: Value) -> Result(Bool, MalformedReason) {
   case name, raw {
     "title", value.String(_)
@@ -1562,6 +1563,10 @@ fn annotation(name: String, raw: Value) -> Result(Bool, MalformedReason) {
     "examples", value.Array(_) -> Ok(True)
     "examples", _ -> Error(ExpectedArray)
     "default", _ -> Ok(True)
+    // `description` is kept for the schema it describes, but its type is
+    // checked here so annotation errors follow document order.
+    "description", value.String(_) -> Ok(False)
+    "description", _ -> Error(ExpectedText)
     _, _ -> Ok(False)
   }
 }

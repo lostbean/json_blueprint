@@ -323,3 +323,26 @@ pub fn annotations_with_the_wrong_type_are_malformed_test() {
     ),
   )
 }
+
+/// `description` is checked in the same pass as the other annotations, so a
+/// wrong `description` is reported before a later member's error. Members are
+/// listed in an order both targets parse alike.
+pub fn a_malformed_description_is_reported_before_later_members_test() {
+  let malformed_at = fn(path: List(codec.PathSegment)) {
+    Error(
+      contract.InvalidDocument(contract.MalformedDocument(
+        path,
+        contract.ExpectedText,
+      )),
+    )
+  }
+  load("{" <> dialect <> ",\"type\":\"string\",\"description\":1,\"title\":2}")
+  |> should.equal(malformed_at([Field("description")]))
+  load(
+    "{"
+    <> dialect
+    <> ",\"description\":1,\"items\":{\"type\":\"string\",\"title\":2},"
+    <> "\"type\":\"array\"}",
+  )
+  |> should.equal(malformed_at([Field("description")]))
+}
