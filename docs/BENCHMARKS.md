@@ -17,6 +17,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
 | `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
 | `gleam run -m render_benchmark_runner` | `value.to_string` on deeply nested and wide values, on either target |
+| `gleam run -m limit_benchmark_runner` | Strict native parsing with the default byte and depth bounds and with `value.unlimited()`, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -485,6 +486,39 @@ Doubling the depth multiplied the Erlang time by six to nine before and by
 about two after. Node was already linear, because V8 concatenates strings
 lazily; its deep cases stay shallow because rendering recurses on the host
 stack.
+
+### Default depth bound, 2026-11-25
+
+[ADR 0019](adr/0019-bound-nesting-depth-by-default.md) bounds nesting depth to
+128 by default. `gleam run -m limit_benchmark_runner` parses each document to
+the native tree, without building a `Value`, in seven batches of five parses
+after one untimed batch, and prints the median batch mean. "Before" is the
+parent `main` commit, whose default is bytes only, run from a copy of the same
+runner. Before and after ran back to back in three rounds, one VM per run. A
+cell is the median of the three run medians in milliseconds, with the lowest
+and highest run median in brackets. Every document passes both bounds. Shared
+ten-core Apple silicon machine with other builds running, Erlang/OTP 29 and
+Node 24.21.0.
+
+| Document | Target | Before | Default limits | `unlimited()` |
+| --- | --- | ---: | ---: | ---: |
+| 15,000 records, 1 MiB | Erlang | 14.2 [14.2–14.5] | 9.5 [9.4–9.8] | 9.9 [9.5–11.9] |
+| 250,000 integers, 0.5 MiB | Erlang | 9.4 [9.3–9.4] | 9.0 [8.9–9.1] | 9.3 [9.1–9.4] |
+| 2,000 chains nested 100 deep, 0.4 MiB | Erlang | 8.8 [8.7–12.4] | 9.7 [9.6–9.8] | 9.8 [9.8–11.2] |
+| 15,000 records, 1 MiB | Node | 27.8 [27.7–28.2] | 28.4 [27.7–28.6] | 25.9 [25.9–26.0] |
+| 250,000 integers, 0.5 MiB | Node | 63.7 [61.9–67.0] | 65.3 [63.6–68.5] | 61.1 [60.7–66.3] |
+| 2,000 chains nested 100 deep, 0.4 MiB | Node | 43.6 [43.0–44.0] | 45.0 [43.4–45.2] | 43.5 [43.4–43.7] |
+
+On Erlang the default limits cost about a tenth on the document made only of
+nested arrays, where the earlier opt-in design that also counted values cost
+about two thirds (9.9 to 16.8 ms on the same machine, 2026-11-24). The record
+row was faster than before in every round, also with `unlimited()`, and two
+further rounds in the reverse order agreed (before 16.1 and 14.2, after 10.0
+and 9.4); the cause was not investigated. The Erlang `unlimited()` column
+comes from three later runs of the final build. An earlier build marked the
+absent bound with an atom, and its comparison with an integer depth made the
+unlimited chain row slower than the bounded one (10.9 ms); the final build
+uses the largest small integer. On Node the rows overlap.
 
 ## Limits of these claims
 

@@ -1,11 +1,13 @@
 // Native JSON parsing with exact numeric evidence and strict name/Unicode checks.
 import { Ok, Error as GleamError, List } from "./gleam.mjs";
+import { Some } from "../gleam_stdlib/gleam/option.mjs";
 import {
   Syntax,
   DuplicateKey,
   RuntimeCapacity,
   NumberRepresentation,
   UnsupportedRuntime,
+  DepthLimit,
   Null,
   Bool,
   String as StringKind,
@@ -76,19 +78,23 @@ function revive(_key, value, context) {
 }
 
 // Syntax is native-owned. This scan sees every original member, including those
-// JSON.parse overwrote, and keeps only key sets for currently open objects.
-function strictScan(source) {
+// JSON.parse overwrote, and keeps only key sets for currently open objects. It
+// counts the nesting depth of arrays and objects in the same pass.
+function strictScan(source, maxDepth) {
   const objects = [];
-  let duplicate;
+  let duplicate,
+    depth = 0;
   for (let i = 0; i < source.length;) {
     const c = source.charCodeAt(i);
-    if (c === 123) {
-      objects.push(new Set());
+    if (c === 123 || c === 91) {
+      if (++depth > maxDepth) return new DepthLimit(maxDepth);
+      if (c === 123) objects.push(new Set());
       i++;
       continue;
     }
-    if (c === 125) {
-      objects.pop();
+    if (c === 125 || c === 93) {
+      depth--;
+      if (c === 125) objects.pop();
       i++;
       continue;
     }
@@ -139,11 +145,17 @@ function strictScan(source) {
   }
   return duplicate === undefined ? undefined : new DuplicateKey(duplicate);
 }
-export function parse(source) {
+// JSON.parse checks the grammar first, so a malformed document reports its
+// syntax error on both targets. The depth scan runs after it; when the
+// reviver's recursion exhausts the stack first, the same scan decides whether
+// the document was over the depth bound or within it.
+export function parse(source, maxDepthOption) {
   if (!sourceContext) return new GleamError(new UnsupportedRuntime());
+  const maxDepth =
+    maxDepthOption instanceof Some ? maxDepthOption[0] : Infinity;
   try {
     const raw = JSON.parse(source, revive);
-    const refusal = strictScan(source);
+    const refusal = strictScan(source, maxDepth);
     return refusal === undefined ? new Ok(raw) : new GleamError(refusal);
   } catch (error) {
     if (error === representationFailure)
@@ -151,9 +163,31 @@ export function parse(source) {
     if (error instanceof SyntaxError)
       return new GleamError(new Syntax("invalid JSON"));
     if (error instanceof RangeError)
-      return new GleamError(new RuntimeCapacity());
+      return new GleamError(
+        exceedsDepth(source, maxDepth)
+          ? new DepthLimit(maxDepth)
+          : new RuntimeCapacity(),
+      );
     throw error;
   }
+}
+// Whether any array or object in `source` is nested deeper than `max`.
+// Brackets inside strings are text.
+function exceedsDepth(source, max) {
+  let depth = 0;
+  for (let i = 0; i < source.length; i++) {
+    const c = source.charCodeAt(i);
+    if (c === 34) {
+      for (i++; i < source.length; i++) {
+        const s = source.charCodeAt(i);
+        if (s === 92) i++;
+        else if (s === 34) break;
+      }
+    } else if (c === 91 || c === 123) {
+      if (++depth > max) return true;
+    } else if (c === 93 || c === 125) depth--;
+  }
+  return false;
 }
 function isObject(raw) {
   return (

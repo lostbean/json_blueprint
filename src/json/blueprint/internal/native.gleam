@@ -2,10 +2,11 @@
 ////
 //// Erlang keeps exact native integers and decimal source tokens until a
 //// numeric projection is requested. Parsing rejects duplicate object keys
-//// and applies only the caller's byte bound. Callers choose their own limits
-//// for already-decoded structure. JavaScript retains source tokens with the
+//// and applies the caller's byte and nesting-depth bounds. Callers choose
+//// their own limits for already-decoded structure. JavaScript retains source tokens with the
 //// native parser reviver and scans the original names and escaped Unicode.
 
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import json/blueprint/internal/text
 import json/blueprint/number
@@ -17,7 +18,8 @@ pub type Raw
 pub type ParseError {
   Syntax(String)
   DuplicateKey(String)
-  ByteLimitExceeded
+  ByteLimitExceeded(max: Int)
+  DepthLimit(max: Int)
   InvalidUnicodeScalar
   UnsupportedRuntime
   RuntimeCapacity
@@ -57,22 +59,45 @@ pub fn supported() -> Bool
 
 @external(erlang, "json_blueprint_native_ffi", "parse")
 @external(javascript, "../../../json_blueprint_native_ffi.mjs", "parse")
-fn parse_native(_source: String) -> Result(Raw, ParseError) {
+fn parse_native(
+  _source: String,
+  _max_depth: Option(Int),
+) -> Result(Raw, ParseError) {
   Error(UnsupportedRuntime)
 }
 
-/// The byte check occurs before native parsing and tree allocation.
+/// Parse `source` within an optional byte bound and an optional depth bound.
+/// The byte check is one comparison before native parsing and tree
+/// allocation. A scalar root has depth 0 and every enclosing array or object
+/// adds one level; the parser checks the depth when it opens a container.
 /// Full syntax admission finishes before any typed decoder is invoked.
-pub fn parse(source: String, max_bytes: Int) -> Result(Raw, ParseError) {
-  case text.exceeds_byte_limit(source, max_bytes) {
-    True -> Error(ByteLimitExceeded)
-    False -> {
-      use _ <- result.try(
-        text.validate_scalars(source)
-        |> result.map_error(fn(_) { InvalidUnicodeScalar }),
-      )
-      parse_native(source)
-    }
+pub fn parse(
+  source: String,
+  max_bytes: Option(Int),
+  max_depth: Option(Int),
+) -> Result(Raw, ParseError) {
+  case max_bytes {
+    Some(bytes) ->
+      case text.exceeds_byte_limit(source, bytes) {
+        True -> Error(ByteLimitExceeded(bytes))
+        False -> parse_admitted(source, max_depth)
+      }
+    None -> parse_admitted(source, max_depth)
+  }
+}
+
+fn parse_admitted(
+  source: String,
+  max_depth: Option(Int),
+) -> Result(Raw, ParseError) {
+  use _ <- result.try(
+    text.validate_scalars(source)
+    |> result.map_error(fn(_) { InvalidUnicodeScalar }),
+  )
+  case max_depth {
+    // The root value is at depth 0, so a negative bound admits nothing.
+    Some(depth) if depth < 0 -> Error(DepthLimit(depth))
+    _ -> parse_native(source, max_depth)
   }
 }
 

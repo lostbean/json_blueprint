@@ -330,7 +330,7 @@ pub fn duplicate_escaped_names_reject_on_both_backends_test() {
 @target(javascript)
 pub fn native_parser_distinguishes_syntax_and_capacity_test() {
   let opens = string.repeat("[", 20_000)
-  value.parse(opens, value.default_limits())
+  value.parse(opens, value.unlimited())
   |> should.equal(
     Error(value.ParseError(value.Location(0, 0, 0), value.NativeSyntax)),
   )
@@ -340,8 +340,8 @@ pub fn native_parser_distinguishes_syntax_and_capacity_test() {
         value.Location(0, 0, 0),
         value.RuntimeCapacityExceeded,
       ))
-    value.parse(source, value.default_limits()) |> should.equal(expected)
-    value.parse_bits(bit_array.from_string(source), value.default_limits())
+    value.parse(source, value.unlimited()) |> should.equal(expected)
+    value.parse_bits(bit_array.from_string(source), value.unlimited())
     |> should.equal(expected)
   })
 }

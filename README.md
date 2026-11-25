@@ -19,7 +19,7 @@ and schema modules remain available for applications upgrading from 1.x.
 - Validate arguments against a schema received at runtime, such as a tool
   declaration, when the schema fits the supported profile below.
 - Admit untrusted JSON text with duplicate-key rejection, exact numbers, and
-  a configurable byte limit. Applications own additional structural limits.
+  byte and nesting-depth limits that are on by default.
 
 For ordinary serialization, `gleam/json` is enough. Applications own HTTP,
 authorization, protocol policy, and effects in custom callbacks.
@@ -211,11 +211,13 @@ Gleam checks that the `case` covers every constructor.
 
 ## Parsing and runtime requirements
 
-`value.default_limits()` admits at most 1 MiB of UTF-8 text. Change this with
-`value.with_max_bytes` and pass the result to `codec.decode_json_with_limits`,
-`value.parse`, or `contract.parse`. There are no global depth, value-count or
-numeric-token limits. Consumers own structural admission policies; a byte
-limit is not a heap quota.
+`value.default_limits()` admits at most 1 MiB of UTF-8 text nested at most 128
+levels deep, the recursion limit `serde_json` uses. Change either bound with
+`value.with_max_bytes` or `value.with_max_depth` and pass the result to
+`codec.decode_json_with_limits`, `value.parse`, or `contract.parse`. A deeper
+document fails with `DepthLimitExceeded`. `value.unlimited()` removes both
+bounds; use it only for trusted text. The byte limit also bounds the number of
+values. There is no numeric-token limit, and a byte limit is not a heap quota.
 
 Both targets decode built-in codecs directly from native parser output, avoiding
 an intermediate `Value` tree. Erlang/OTP 27+ uses JSON parser hooks; JavaScript

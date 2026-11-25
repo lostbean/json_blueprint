@@ -14,3 +14,5 @@ Retain the design conclusions here and current comparisons in the maintained
 benchmark harnesses. Remove disposable prototypes, archived sources, raw
 captures and experiment reports from the checkout. Git history retains prior
 records; they are not part of the maintained implementation or release package.
+
+The byte-only default is superseded on 2026-11-25 by [ADR 0019](0019-bound-nesting-depth-by-default.md#adr-0019), which bounds nesting depth to 128 by default.

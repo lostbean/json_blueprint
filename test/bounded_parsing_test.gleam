@@ -38,12 +38,14 @@ fn nested_arrays(depth: Int) -> String {
   string.repeat("[", depth) <> string.repeat("]", depth)
 }
 
-pub fn default_limits_bound_only_input_bytes_test() {
+pub fn default_limits_bound_input_bytes_and_depth_test() {
   let limits = value.default_limits()
   value.parse(padded("[1]", one_mib), limits) |> should.be_ok
   let assert Error(value.ParseError(_, value.ByteLimitExceeded(1_048_576))) =
     value.parse(padded("[1]", one_mib + 1), limits)
-  value.parse(nested_arrays(100), limits) |> should.be_ok
+  value.parse(nested_arrays(128), limits) |> should.be_ok
+  let assert Error(value.ParseError(_, value.DepthLimitExceeded(128))) =
+    value.parse(nested_arrays(129), limits)
 }
 
 /// An array of `count` ones: `count + 1` values.

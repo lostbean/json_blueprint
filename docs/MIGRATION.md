@@ -85,11 +85,12 @@ shows the three-state representation and its encoding behavior.
 
 ## Review parser and number policy
 
-`codec.decode_json` admits at most 1 MiB of UTF-8 by default and rejects
-repeated object keys. Use `codec.decode_json_with_limits` and
-`value.with_max_bytes` to select another byte limit. Depth, value-count and
-global numeric admission limits and their setters have been removed. Consumers
-that require those policies must inspect their decoded data. Explicit
+`codec.decode_json` admits at most 1 MiB of UTF-8 nested at most 128 levels
+deep by default, and rejects repeated object keys. Use
+`codec.decode_json_with_limits` with `value.with_max_bytes` or
+`value.with_max_depth` to select other bounds, or `value.unlimited()` for
+trusted text. Value-count and global numeric admission limits and their
+setters have been removed; the byte bound also bounds the number of values. Explicit
 `number.parse(token, limits)` still supports caller-selected numeric limits.
 On JavaScript, raising those limits cannot bypass exact integer representation:
 unrepresentable written or normalized exponents and comparison magnitudes
