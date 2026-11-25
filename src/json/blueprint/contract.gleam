@@ -12,6 +12,12 @@
 //// `UnsupportedDocument`, including default-open objects and one-sided numeric
 //// bounds. Wrong keyword types return `MalformedDocument`. These are first
 //// error diagnostics, not general JSON Schema meta-schema validation.
+//// Annotation keywords, which never constrain a value (`title`,
+//// `description`, `default`, `examples`, `deprecated`, `readOnly`,
+//// `writeOnly`, `$comment` and `$id`), are accepted anywhere a schema object
+//// appears and do not affect validation; `description` is kept where the codec
+//// model holds one. Every keyword that constrains a value outside the profile,
+//// including `format`, is refused.
 ////
 //// `validate` checks a `Value` and returns a `ValidatedValue` or a
 //// `ValidationError` with the path of the first failure; validation uses the
@@ -783,11 +789,12 @@ pub fn parse(
 
 /// Load a Draft 2020-12 schema document. Its `$schema` must be the Draft
 /// 2020-12 URI, and it must stay inside the codec profile; `description`
-/// keywords are kept. The root must be an object with that dialect declaration.
+/// keywords are kept and the other annotation keywords are ignored. The root
+/// must be an object with that dialect declaration.
 /// An otherwise empty object schema, or nested boolean `true`, accepts any
 /// value, like `codec.value()`.
 /// Missing profile-required keywords and otherwise valid unsupported forms
-/// return `UnsupportedDocument`; no constraints are silently discarded.
+/// return `UnsupportedDocument`; no constraint is silently discarded.
 pub fn load(document: Value) -> Result(Contract, DocumentError) {
   use members <- result.try(schema_members(document, []))
   use dialect <- result.try(required_member(members, "$schema", []))
@@ -931,7 +938,7 @@ fn parse_schema_object(
   document: Value,
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
-  use members <- result.try(object_members(document, path))
+  use members <- result.try(schema_members(document, path))
   let description = list.key_find(members, "description")
   let schema_members = without_member(members, "description")
   use parsed <- result.try(parse_schema_members(schema_members, path))
@@ -951,7 +958,7 @@ fn parse_schema_members(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   case members {
-    // `{}`, or only a description: any value.
+    // `{}`, or only annotations: any value.
     [] -> Ok(ParsedSchema(tree.AnySchema, []))
     _ -> parse_constrained(members, path)
   }
@@ -1299,7 +1306,15 @@ fn parse_nullable(
       let left_path = at(path, Index(0))
       let right_path = at(path, Index(1))
       use left_members <- result.try(schema_members(left, left_path))
+      use left_members <- result.try(without_description(
+        left_members,
+        left_path,
+      ))
       use right_members <- result.try(schema_members(right, right_path))
+      use right_members <- result.try(without_description(
+        right_members,
+        right_path,
+      ))
       case is_null_schema(left_members), is_null_schema(right_members) {
         True, False -> {
           use parsed <- result.map(parse_schema(right, right_path))
@@ -1365,6 +1380,7 @@ fn parse_variant(
   path: List(PathSegment),
 ) -> Result(#(VariantSchema, List(InvariantLocation)), DocumentError) {
   use members <- result.try(schema_members(alternative, path))
+  use members <- result.try(without_description(members, path))
   use Nil <- result.try(only_members(
     members,
     ["type", "properties", "required", "additionalProperties"],
@@ -1411,6 +1427,7 @@ fn parse_tag(
   path: List(PathSegment),
 ) -> Result(String, DocumentError) {
   use members <- result.try(schema_members(tag_schema, path))
+  use members <- result.try(without_description(members, path))
   use Nil <- result.try(only_members(members, ["const"], path))
   use tag <- result.try(required_member(members, "const", path))
   case tag {
@@ -1492,13 +1509,73 @@ fn expect_integer_bound(
   }
 }
 
+/// The members of a schema object without its annotation keywords.
 fn schema_members(
   raw: Value,
   path: List(PathSegment),
 ) -> Result(List(#(String, Value)), DocumentError) {
   case raw {
     value.Bool(_) -> Error(unsupported(path, UnsupportedSchemaForm))
-    _ -> object_members(raw, path)
+    _ -> {
+      use members <- result.try(object_members(raw, path))
+      without_annotations(members, path)
+    }
+  }
+}
+
+/// Drop the Draft 2020-12 keywords that annotate an instance and never
+/// constrain it: the meta-data vocabulary (`title`, `default`, `examples`,
+/// `deprecated`, `readOnly`, `writeOnly`) and the core `$comment` and `$id`.
+/// `description` is also an annotation; `parse_schema_object` keeps it where
+/// the codec model holds one, and `without_description` drops it elsewhere.
+/// `format` and the content keywords are annotations by default in Draft
+/// 2020-12 too, but they state a constraint the schema author expects to
+/// hold, so they stay refused. Each annotation must have the type the
+/// meta-schema gives it.
+fn without_annotations(
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(List(#(String, Value)), DocumentError) {
+  list.try_fold(members, [], fn(kept, member) {
+    case annotation(member.0, member.1) {
+      Ok(True) -> Ok(kept)
+      Ok(False) -> Ok([member, ..kept])
+      Error(reason) -> Error(malformed(at(path, Field(member.0)), reason))
+    }
+  })
+  |> result.map(list.reverse)
+}
+
+/// Whether `name` is an annotation keyword, and its value has the right type.
+fn annotation(name: String, raw: Value) -> Result(Bool, MalformedReason) {
+  case name, raw {
+    "title", value.String(_)
+    | "$comment", value.String(_)
+    | "$id", value.String(_)
+    -> Ok(True)
+    "title", _ | "$comment", _ | "$id", _ -> Error(ExpectedText)
+    "deprecated", value.Bool(_)
+    | "readOnly", value.Bool(_)
+    | "writeOnly", value.Bool(_)
+    -> Ok(True)
+    "deprecated", _ | "readOnly", _ | "writeOnly", _ -> Error(ExpectedBoolean)
+    "examples", value.Array(_) -> Ok(True)
+    "examples", _ -> Error(ExpectedArray)
+    "default", _ -> Ok(True)
+    _, _ -> Ok(False)
+  }
+}
+
+/// Drop a `description` where the codec model has no place for one: a union
+/// variant, its tag, and the null alternative of a nullable schema.
+fn without_description(
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(List(#(String, Value)), DocumentError) {
+  case list.key_find(members, "description") {
+    Error(Nil) -> Ok(members)
+    Ok(value.String(_)) -> Ok(without_member(members, "description"))
+    Ok(_) -> Error(malformed(at(path, Field("description")), ExpectedText))
   }
 }
 

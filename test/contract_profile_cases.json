@@ -655,5 +655,87 @@
     },
     "kind": "unsupported",
     "path": "$[\"oneOf\"][0][\"properties\"][\"tag\"]"
+  },
+  {
+    "name": "annotations-meta-data-and-core",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "urn:example:args",
+      "$comment": "c",
+      "title": "Args",
+      "description": "Arguments.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Name",
+          "examples": [
+            "a"
+          ],
+          "default": "a",
+          "deprecated": false,
+          "readOnly": true,
+          "writeOnly": false
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "accepted",
+    "path": "$"
+  },
+  {
+    "name": "annotation-title-not-text",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "title": 1
+    },
+    "kind": "malformed",
+    "path": "$[\"title\"]"
+  },
+  {
+    "name": "annotation-examples-not-array",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "examples": "a"
+    },
+    "kind": "malformed",
+    "path": "$[\"examples\"]"
+  },
+  {
+    "name": "annotation-read-only-not-boolean",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "readOnly": "yes"
+    },
+    "kind": "malformed",
+    "path": "$[\"readOnly\"]"
+  },
+  {
+    "name": "annotated-format-still-refused",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "title": "Email",
+      "format": "email"
+    },
+    "kind": "unsupported",
+    "path": "$[\"format\"]"
+  },
+  {
+    "name": "annotated-content-media-type-still-refused",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "title": "Payload",
+      "contentMediaType": "application/json"
+    },
+    "kind": "unsupported",
+    "path": "$[\"contentMediaType\"]"
   }
 ]

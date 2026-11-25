@@ -300,7 +300,7 @@
       )
       #md-table(3, (
         [Shape], [Accepted members], [Restriction],
-        [Any], [Empty object, optionally description; nested true], [Root still requires an object and `$schema`; false is not accepted],
+        [Any], [Empty object, optionally annotations; nested true], [Root still requires an object and `$schema`; false is not accepted],
         [String / boolean], [type; strings optionally enum], [Enum is nonempty unique string labels],
         [Integer / number], [type; optional minimum and maximum], [Both bounds or neither; inclusive and ordered; integer bounds project to safe native Int],
         [Closed object], [type, properties, required, additionalProperties], [All three structure members explicit; additionalProperties must be false],
@@ -310,7 +310,7 @@
         [Tagged union], [type object, oneOf], [Nonempty closed variants; tag const string; exactly declared payload presence],
       ))
       #points(
-        [description is permitted as an annotation on interpreted object schemas. Other keywords reject at their member path. The loader does not accept equivalent arbitrary forms, references, open objects, boolean false, standalone null, type arrays, or general anyOf/oneOf.],
+        [Annotation keywords are accepted on every schema object and never constrain a value: the Draft 2020-12 meta-data vocabulary (title, description, default, examples, deprecated, readOnly, writeOnly) and the core `$comment` and `$id`. description is kept where the codec model holds one; the others are dropped after a check of their meta-schema type, and a wrong type is malformed. format and the content keywords are annotations by default in Draft 2020-12, but they state a constraint the author expects to hold, so they are refused like every other keyword at their member path. The loader does not accept equivalent arbitrary forms, references, open objects, boolean false, standalone null, type arrays, or general anyOf/oneOf.],
         [Duplicate raw document members reject before interpretation. MalformedDocument reports observed keyword type and shape violations. UnsupportedDocument reports unhandled keywords, omitted profile-required members, and restrictions on otherwise valid schema forms. UnsupportedDialect retains the declared dialect; InvalidDefinition locates contradictions in the codec model such as reversed bounds or duplicate enum labels/tags.],
         [Object profile restrictions return UnsupportedDocument: omitted additionalProperties reports OpenObject; omitted properties or required and undeclared required names report UnsupportedSchemaForm at the member or name path. Schema-valued additionalProperties also rejects as UnsupportedSchemaForm. Explicit wrong member types and duplicate required names remain malformed. No omitted member is filled in to admit a new shape.],
         [Document errors describe the first profile rejection, not complete Draft 2020-12 meta-schema validation. UnsupportedDocument does not certify that the rest of the schema is valid. Boolean roots, missing dialect/type, type arrays, one-sided or nonnative integer bounds, nonstring enum values and tags, and noncanonical tuple/nullable/tagged forms remain refused as unsupported. Actual wrong keyword types remain malformed. Arbitrary third-party protocol schemas are outside the supported profile.],
@@ -320,6 +320,12 @@
         #when[The application requests a runtime contract.]
         #then[Loading refuses it as unsupported at the relevant path.]
         #then[No broader schema form is admitted by changing the diagnostic.]
+      ]
+      #behavior(title: "Annotation keywords do not block loading", level: "boundary", area: "Document loading")[
+        #given[A finite-profile schema carries annotation keywords, as Pydantic, Zod and tool schemas do.]
+        #when[The application requests a contract for that schema.]
+        #then[Loading succeeds with the same contract as the schema without them.]
+        #then[An annotation whose value has the wrong type is malformed at its path.]
       ]
       #behavior(title: "An unsupported keyword remains an error", level: "boundary", area: "Document loading")[
         #given[A finite-profile schema includes an unhandled keyword.]
