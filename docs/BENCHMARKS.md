@@ -18,6 +18,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
 | `gleam run -m render_benchmark_runner` | `value.to_string` on deeply nested and wide values, on either target |
 | `gleam run -m limit_benchmark_runner` | Strict native parsing with the default byte and depth bounds and with `value.unlimited()`, on either target |
+| `gleam run -m contract_load_benchmark_runner` | `contract.load` on deeply nested schema documents, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -519,6 +520,33 @@ comes from three later runs of the final build. An earlier build marked the
 absent bound with an atom, and its comparison with an integer depth made the
 unlimited chain row slower than the bounded one (10.9 ms); the final build
 uses the largest small integer. On Node the rows overlap.
+
+### Schema loading by nesting depth, 2026-11-24
+
+`contract.load` extended the document path with `list.append` at every
+keyword it entered, on the success path too, so a schema nested `d` levels
+allocated on the order of `d` squared list cells. It now keeps the path
+reversed and reverses it only when an error is reported. `gleam run -m
+contract_load_benchmark_runner` loads `{"type":"array","items":…}` nested to
+each depth once untimed and then five times; a cell is the median in
+milliseconds, with the minimum and maximum in brackets. One VM per build on a
+shared ten-core Apple silicon machine with other builds running, Erlang/OTP
+29 and Node 24.21.0.
+
+| List schemas nested | Target | Before | After |
+| --- | --- | ---: | ---: |
+| 2,500 deep | Erlang | 28.9 [15.8–47.4] | 0.84 [0.81–0.96] |
+| 5,000 deep | Erlang | 110 [81.7–119] | 1.71 [1.63–1.81] |
+| 10,000 deep | Erlang | 477 [434–502] | 3.28 [3.08–3.77] |
+| 20,000 deep | Erlang | 3,663 [1,712–7,498] | 6.85 [6.57–7.79] |
+| 125 deep | Node | 0.91 [0.53–1.04] | 0.54 [0.44–0.82] |
+| 250 deep | Node | 1.76 [1.47–1.79] | 0.69 [0.52–0.75] |
+| 500 deep | Node | 5.15 [4.25–11.0] | 1.15 [1.11–1.24] |
+| 1,000 deep | Node | 19.6 [13.0–20.2] | 2.31 [2.29–2.84] |
+
+Doubling the depth multiplied the time by about four or more before and by
+about two after. The Node cases stay shallow because loading recurses on the
+host stack.
 
 ## Limits of these claims
 
