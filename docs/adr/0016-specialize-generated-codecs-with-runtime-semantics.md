@@ -2,6 +2,8 @@
 
 <a id="adr-0016"></a>
 
+- **Status.** Partly superseded by [ADR-0020](0020-remove-the-1x-api.md#adr-0020), which removes the standard-native generated decoder.
+
 - **Decision.** The typed-definition generator emits specialized text encoders,
   strict native-tree decoders and schema structures. Its codec accessor registers
   the specialized functions so ordinary codec operations use them. Emit directly
@@ -15,9 +17,8 @@
   validation and byte limits. No new parser or global cache is introduced.
 - **Compatibility.** The shared generated Value decoder uses runtime field-first
   error precedence, including for existing generated modules. Regenerated
-  accessors evaluate mapped placeholders on demand rather than at construction. The explicitly named standard-native decoder remained
-  separate and weaker until [ADR-0020](0020-remove-the-1x-api.md#adr-0020)
-  removed it. Version 2.0.0 is unchanged.
+  accessors evaluate mapped placeholders on demand rather than at construction. The explicitly named standard-native decoder remains
+  separate and weaker. Frozen legacy APIs and version 2.0.0 are unchanged.
 - **Tradeoff.** Specialized output is larger than ordinary combinator output,
   but avoids interpretation and intermediate Value construction during strict
   decoding. Ordinary container and map composition retains behavior and direct
