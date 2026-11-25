@@ -12,10 +12,6 @@ pub fn to_native_decode(item: Int) -> Int {
   item
 }
 
-pub fn from_dynamic(item: Int) -> dynamic.Dynamic {
-  dynamic.int(item)
-}
-
 pub fn to_dynamic(item: dynamic.Dynamic) -> Int {
   let assert Ok(item) = decode.run(item, decode.int)
   item
@@ -40,8 +36,9 @@ pub fn named_definition() -> codegen.Definition(Int) {
 pub fn dynamic_definition() -> codegen.Definition(dynamic.Dynamic) {
   let assert Ok(mapping) =
     codegen.named_mapping(
-      from_dynamic,
-      "generated_emitter_fixtures.from_dynamic",
+      // Naming the gleam/dynamic function imports the output type's module.
+      dynamic.int,
+      "gleam/dynamic.int",
       to_dynamic,
       "generated_emitter_fixtures.to_dynamic",
     )

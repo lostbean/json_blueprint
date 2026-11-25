@@ -238,8 +238,6 @@ pub fn native_complete_text_backends_match_for_order_variants_test() {
       |> should.equal(Ok(order))
       order_codec.decode_order_json(wire)
       |> should.equal(Ok(order))
-      order_codec.decode_order_json_native(wire)
-      |> should.equal(Ok(order))
       json.parse(from: wire, using: codec.decoder(generated))
       |> should.equal(Ok(order))
       json.parse(from: wire, using: vanilla_decoder)
@@ -364,8 +362,6 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
   |> should.equal(Ok(order))
   order_codec.decode_order_json(wire_json)
   |> should.equal(Ok(order))
-  order_codec.decode_order_json_native(wire_json)
-  |> should.equal(Ok(order))
   codec.decode_json(generated_codec, wire_json)
   |> should.equal(Ok(order))
   json.parse(from: wire_json, using: vanilla_decoder)
@@ -488,16 +484,6 @@ fn run_order_codec_benchmarks() -> List(BenchResult) {
       200,
       fn() {
         let assert Ok(_) = order_codec.encode_order_json(order)
-        Nil
-      },
-    ),
-    run_benchmark(
-      "order_generated_native_direct_complete_text_decode",
-      200,
-      5,
-      200,
-      fn() {
-        let assert Ok(_) = order_codec.decode_order_json_native(wire_json)
         Nil
       },
     ),

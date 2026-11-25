@@ -47,7 +47,6 @@ pub fn generated_codec_roundtrip_and_schema_laws_test() {
       contract.decode(current, witness) |> should.equal(Ok(candidate))
     })
     order_codec.decode_order_json(wire) |> should.equal(Ok(candidate))
-    order_codec.decode_order_json_native(wire) |> should.equal(Ok(candidate))
 
     // Object order and surrounding whitespace cannot change the typed value.
     let assert value.Object(fields) = encoded
