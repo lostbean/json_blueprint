@@ -1,5 +1,5 @@
-//// Admission observations only: strict native parsing with and without the
-//// optional nesting-depth and value-count bounds.
+//// Admission observations only: strict native parsing with the default byte
+//// and depth bounds, and with `value.unlimited()`.
 //// Run with `gleam run -m limit_benchmark_runner --target erlang|javascript`.
 //// Each row prints the median and range of seven timed batches.
 
@@ -82,11 +82,8 @@ fn observe(name: String, source: String, limits: value.Limits) -> Nil {
 
 pub fn main() -> Nil {
   io.println("strict native parse on " <> target_runtime())
-  let unbounded = value.default_limits()
-  let bounded =
-    unbounded
-    |> value.with_max_depth(128)
-    |> value.with_max_values(262_144)
+  let bounded = value.default_limits()
+  let unbounded = value.unlimited()
   let documents = [
     #("15,000 records, 1 MiB", records(15_000)),
     #("250,000 integers, 0.5 MiB", integers(250_000)),
@@ -94,7 +91,7 @@ pub fn main() -> Nil {
   ]
   list.each(documents, fn(document) {
     let #(name, source) = document
-    observe(name <> ", bytes only", source, unbounded)
-    observe(name <> ", depth 128 and 262,144 values", source, bounded)
+    observe(name <> ", unlimited", source, unbounded)
+    observe(name <> ", default limits", source, bounded)
   })
 }

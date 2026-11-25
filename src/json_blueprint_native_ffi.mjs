@@ -1,5 +1,6 @@
 // Native JSON parsing with exact numeric evidence and strict name/Unicode checks.
 import { Ok, Error as GleamError, List } from "./gleam.mjs";
+import { Some } from "../gleam_stdlib/gleam/option.mjs";
 import {
   Syntax,
   DuplicateKey,
@@ -7,7 +8,6 @@ import {
   NumberRepresentation,
   UnsupportedRuntime,
   DepthLimit,
-  ValueLimit,
   Null,
   Bool,
   String as StringKind,
@@ -78,19 +78,23 @@ function revive(_key, value, context) {
 }
 
 // Syntax is native-owned. This scan sees every original member, including those
-// JSON.parse overwrote, and keeps only key sets for currently open objects.
-function strictScan(source) {
+// JSON.parse overwrote, and keeps only key sets for currently open objects. It
+// counts the nesting depth of arrays and objects in the same pass.
+function strictScan(source, maxDepth) {
   const objects = [];
-  let duplicate;
+  let duplicate,
+    depth = 0;
   for (let i = 0; i < source.length;) {
     const c = source.charCodeAt(i);
-    if (c === 123) {
-      objects.push(new Set());
+    if (c === 123 || c === 91) {
+      if (++depth > maxDepth) return new DepthLimit(maxDepth);
+      if (c === 123) objects.push(new Set());
       i++;
       continue;
     }
-    if (c === 125) {
-      objects.pop();
+    if (c === 125 || c === 93) {
+      depth--;
+      if (c === 125) objects.pop();
       i++;
       continue;
     }
@@ -141,11 +145,34 @@ function strictScan(source) {
   }
   return duplicate === undefined ? undefined : new DuplicateKey(duplicate);
 }
-const valueLimitFailure = {};
-
-// Whether any array or object in `source` is nested deeper than `max`. Brackets
-// inside strings are text. This runs before JSON.parse, so a document nested
-// beyond the host stack is refused as a limit and never reaches the parser.
+// JSON.parse checks the grammar first, so a malformed document reports its
+// syntax error on both targets. The depth scan runs after it; when the
+// reviver's recursion exhausts the stack first, the same scan decides whether
+// the document was over the depth bound or within it.
+export function parse(source, maxDepthOption) {
+  if (!sourceContext) return new GleamError(new UnsupportedRuntime());
+  const maxDepth =
+    maxDepthOption instanceof Some ? maxDepthOption[0] : Infinity;
+  try {
+    const raw = JSON.parse(source, revive);
+    const refusal = strictScan(source, maxDepth);
+    return refusal === undefined ? new Ok(raw) : new GleamError(refusal);
+  } catch (error) {
+    if (error === representationFailure)
+      return new GleamError(new NumberRepresentation());
+    if (error instanceof SyntaxError)
+      return new GleamError(new Syntax("invalid JSON"));
+    if (error instanceof RangeError)
+      return new GleamError(
+        exceedsDepth(source, maxDepth)
+          ? new DepthLimit(maxDepth)
+          : new RuntimeCapacity(),
+      );
+    throw error;
+  }
+}
+// Whether any array or object in `source` is nested deeper than `max`.
+// Brackets inside strings are text.
 function exceedsDepth(source, max) {
   let depth = 0;
   for (let i = 0; i < source.length; i++) {
@@ -161,37 +188,6 @@ function exceedsDepth(source, max) {
     } else if (c === 93 || c === 125) depth--;
   }
   return false;
-}
-function parseWith(source, reviver) {
-  if (!sourceContext) return new GleamError(new UnsupportedRuntime());
-  try {
-    const raw = JSON.parse(source, reviver);
-    const refusal = strictScan(source);
-    return refusal === undefined ? new Ok(raw) : new GleamError(refusal);
-  } catch (error) {
-    if (error === representationFailure)
-      return new GleamError(new NumberRepresentation());
-    if (error === valueLimitFailure) return new GleamError(new ValueLimit());
-    if (error instanceof SyntaxError)
-      return new GleamError(new Syntax("invalid JSON"));
-    if (error instanceof RangeError)
-      return new GleamError(new RuntimeCapacity());
-    throw error;
-  }
-}
-export function parse(source) {
-  return parseWith(source, revive);
-}
-// JSON.parse calls the reviver once for every value, the root and containers
-// included, after the whole text has passed its grammar.
-export function parse_bounded(source, maxDepth, maxValues) {
-  if (!sourceContext) return new GleamError(new UnsupportedRuntime());
-  if (exceedsDepth(source, maxDepth)) return new GleamError(new DepthLimit());
-  let count = 0;
-  return parseWith(source, (key, value, context) => {
-    if (++count > maxValues) throw valueLimitFailure;
-    return revive(key, value, context);
-  });
 }
 function isObject(raw) {
   return (

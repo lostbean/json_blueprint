@@ -1,8 +1,7 @@
 % Native JSON representation and accessors for json/blueprint/internal/native.
 -module(json_blueprint_native_ffi).
 -export([
-    parse/1,
-    parse_bounded/3,
+    parse/2,
     kind/1,
     string/1,
     boolean/1,
@@ -16,55 +15,35 @@
     floating/1
 ]).
 
-parse(Source) ->
+% MaxDepth is none or {some, N}. Each container accumulator is {Items, State}:
+% State is the container's depth while it is admitted, or the refusal that
+% replaced its contents. The depth check is one comparison when a container
+% opens; pushes keep the two-element accumulator of the unbounded parser.
+parse(Source, MaxDepth) ->
+    % An integer compares less than any atom, so infinity admits every depth.
+    Max =
+        case MaxDepth of
+            {some, N} -> N;
+            none -> infinity
+        end,
     Decoders = #{
-        object_start => fun(_) -> {#{}, none} end,
+        object_start => fun(Outer) -> open(#{}, Outer, Max) end,
         object_push => fun object_push/3,
         object_finish => fun object_finish/2,
-        array_start => fun(_) -> {[], none} end,
+        array_start => fun(Outer) -> open([], Outer, Max) end,
         array_push => fun array_push/2,
         array_finish => fun array_finish/2,
         float => fun(Token) -> {json_blueprint_decimal, Token} end
     },
-    decode(Source, nil, Decoders, fun(_) -> none end).
-
-% The decoder accumulator carries the nesting depth and the number of values
-% seen so far, so both bounds are checked in the callbacks that already run for
-% every container and member. A container's accumulator is
-% {Items, Error, Depth, Count}; Count excludes the root value.
-parse_bounded(Source, MaxDepth, MaxValues) ->
-    Decoders = #{
-        object_start => fun(Outer) -> open(#{}, Outer, MaxDepth) end,
-        object_push => fun(K, V, Acc) -> bounded_object_push(K, V, Acc, MaxValues) end,
-        object_finish => fun close_object/2,
-        array_start => fun(Outer) -> open([], Outer, MaxDepth) end,
-        array_push => fun(V, Acc) -> bounded_array_push(V, Acc, MaxValues) end,
-        array_finish => fun close_array/2,
-        float => fun(Token) -> {json_blueprint_decimal, Token} end
-    },
-    Root = {root, none, 0, 0},
-    decode(Source, Root, Decoders, fun({root, none, 0, Count}) ->
-        case Count + 1 > MaxValues of
-            true -> value_limit;
-            false -> none
-        end
-    end).
-
-decode(Source, Acc, Decoders, Refusal) ->
-    try json:decode(Source, Acc, Decoders) of
-        {Value, Final, Rest} ->
+    try json:decode(Source, {root, 0}, Decoders) of
+        {Value, _, Rest} ->
             case whitespace(Rest) of
                 false ->
                     {error, {syntax, <<"trailing content">>}};
                 true ->
                     case Value of
-                        {json_blueprint_parse_error, Error} ->
-                            {error, Error};
-                        _ ->
-                            case Refusal(Final) of
-                                none -> {ok, Value};
-                                Error -> {error, Error}
-                            end
+                        {json_blueprint_parse_error, Error} -> {error, Error};
+                        _ -> {ok, Value}
                     end
             end
     catch
@@ -76,73 +55,40 @@ decode(Source, Acc, Decoders, Refusal) ->
             {error, {syntax, <<"unexpected end">>}}
     end.
 
-% A container opened inside a refused one stays refused, so nothing more is
-% retained once a bound is exceeded.
-open(Empty, {_, none, Depth, Count}, MaxDepth) when Depth < MaxDepth ->
-    {Empty, none, Depth + 1, Count};
-open(Empty, {_, none, Depth, Count}, _) ->
-    {Empty, depth_limit, Depth + 1, Count};
-open(Empty, {_, Error, Depth, Count}, _) ->
-    {Empty, Error, Depth + 1, Count}.
-% The root is one more value, so the last admitted member has Count + 2 =<
-% MaxValues. These repeat object_push/3 and array_push/2 on the wider
-% accumulator, because rebuilding the narrow one per member doubled the cost.
-bounded_object_push(K, V, {Map, none, Depth, Count}, MaxValues) when Count + 2 =< MaxValues ->
-    case maps:is_key(K, Map) of
-        true ->
-            {#{}, {duplicate_key, K}, Depth, Count};
-        false ->
-            case V of
-                {json_blueprint_parse_error, Error} -> {#{}, Error, Depth, Count};
-                _ -> {Map#{K => V}, none, Depth, Count + 1}
-            end
-    end;
-bounded_object_push(_, _, {_, none, Depth, Count}, _) ->
-    {#{}, value_limit, Depth, Count};
-bounded_object_push(_, _, Refused, _) ->
-    Refused.
-bounded_array_push({json_blueprint_parse_error, Error}, {_, none, Depth, Count}, _) ->
-    {[], Error, Depth, Count};
-bounded_array_push(V, {Items, none, Depth, Count}, MaxValues) when Count + 2 =< MaxValues ->
-    {[V | Items], none, Depth, Count + 1};
-bounded_array_push(_, {_, none, Depth, Count}, _) ->
-    {[], value_limit, Depth, Count};
-bounded_array_push(_, Refused, _) ->
-    Refused.
-close_object({Map, none, _, Count}, Outer) ->
-    {Map, setelement(4, Outer, Count)};
-close_object({_, Error, _, Count}, Outer) ->
-    {{json_blueprint_parse_error, Error}, setelement(4, Outer, Count)}.
-close_array({Items, none, _, Count}, Outer) ->
-    {lists:reverse(Items), setelement(4, Outer, Count)};
-close_array({_, Error, _, Count}, Outer) ->
-    {{json_blueprint_parse_error, Error}, setelement(4, Outer, Count)}.
+% A container opened inside a refused one stays refused, so nothing is
+% retained below a refusal.
+open(Empty, {_, Depth}, Max) when is_integer(Depth), Depth < Max ->
+    {Empty, Depth + 1};
+open(Empty, {_, Depth}, Max) when is_integer(Depth) ->
+    {Empty, {depth_limit, Max}};
+open(Empty, {_, Error}, _) ->
+    {Empty, Error}.
 
 % OTP's float path catches exceptions across downstream callbacks. Carry
-% duplicate failures through container results instead of throwing them.
-% Syntax validation therefore completes before a duplicate error is returned.
-object_push(K, V, {Map, none}) ->
+% duplicate and depth failures through container results instead of throwing
+% them. Syntax validation therefore completes before a refusal is returned.
+object_push(K, V, {Map, Depth}) when is_integer(Depth) ->
     Error =
         case maps:is_key(K, Map) of
             true -> {duplicate_key, K};
             false -> admission(V)
         end,
     case Error of
-        none -> {Map#{K => V}, none};
+        none -> {Map#{K => V}, Depth};
         _ -> {#{}, Error}
     end;
 object_push(_, _, {_, Error}) ->
     {#{}, Error}.
-object_finish({Map, none}, Old) -> {Map, Old};
+object_finish({Map, Depth}, Old) when is_integer(Depth) -> {Map, Old};
 object_finish({_, Error}, Old) -> {{json_blueprint_parse_error, Error}, Old}.
-array_push(V, {Items, none}) ->
+array_push(V, {Items, Depth}) when is_integer(Depth) ->
     case admission(V) of
-        none -> {[V | Items], none};
+        none -> {[V | Items], Depth};
         Error -> {[], Error}
     end;
 array_push(_, {_, Error}) ->
     {[], Error}.
-array_finish({Items, none}, Old) -> {lists:reverse(Items), Old};
+array_finish({Items, Depth}, Old) when is_integer(Depth) -> {lists:reverse(Items), Old};
 array_finish({_, Error}, Old) -> {{json_blueprint_parse_error, Error}, Old}.
 admission({json_blueprint_parse_error, Error}) -> Error;
 admission(_) -> none.

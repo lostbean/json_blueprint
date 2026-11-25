@@ -9,15 +9,14 @@
 //// UnsupportedRuntime. There is no alternate parser.
 //// Manually constructed `Object` values retain the supplied member order.
 ////
-//// `default_limits()` admits at most 1 MiB (1,048,576 bytes). Change that bound
-//// with `with_max_bytes`. By default there is no document-depth or value-count
-//// bound; `with_max_depth` and `with_max_values` add them, and input from an
-//// untrusted peer should set both, for example a depth of 128 and 262,144
-//// values. There is no global numeric-token admission limit, and the byte
-//// bound is not a heap-memory quota.
+//// `default_limits()` admits at most 1 MiB (1,048,576 bytes) nested at most
+//// 128 levels deep. Change either bound with `with_max_bytes` and
+//// `with_max_depth`; `unlimited()` removes both for trusted text. The byte
+//// bound also bounds the number of values. There is no global numeric-token
+//// admission limit, and the byte bound is not a heap-memory quota.
 //// Numeric native projection and codec constraints still apply independently.
 //// Without a depth bound, JavaScript recursion is subject to the host stack
-//// capacity; exhaustion returns `RuntimeCapacityExceeded`.
+//// capacity; exhaustion during parsing returns `RuntimeCapacityExceeded`.
 ////
 //// `to_string` renders compact JSON. `to_json` and `decoder` bridge native
 //// `gleam/json` values, whose parsing policy differs from this module.
@@ -88,44 +87,46 @@ fn find_duplicate_key(
 
 // --- limits ------------------------------------------------------------------
 
-/// The admission bounds for `parse` and `parse_bits`: input bytes, and
-/// optionally nesting depth and the number of values.
+/// The admission bounds for `parse` and `parse_bits`: input bytes and
+/// nesting depth. A bound that is not set admits any size.
 pub opaque type Limits {
-  Limits(max_bytes: Int, max_depth: Option(Int), max_values: Option(Int))
+  Limits(max_bytes: Option(Int), max_depth: Option(Int))
 }
 
-/// Admit at most 1 MiB (1,048,576 bytes) of JSON text, with no bound on
-/// nesting depth or on the number of values. For input from an untrusted
-/// peer, add `with_max_depth` and `with_max_values`.
+/// Admit at most 1 MiB (1,048,576 bytes) of JSON text nested at most 128
+/// levels deep.
+///
+/// The byte bound limits the work and memory of one parse, and with it the
+/// number of values. The depth bound limits the stack every recursive walk
+/// over the parsed value uses. 128 is the recursion limit of `serde_json`;
+/// ordinary data, generated schemas and tool arguments stay far below it.
 pub fn default_limits() -> Limits {
-  Limits(max_bytes: 1_048_576, max_depth: None, max_values: None)
+  Limits(max_bytes: Some(1_048_576), max_depth: Some(128))
+}
+
+/// Admit text of any size and nesting depth. Use it only for text from a
+/// trusted source, such as a file the application ships. Without a depth
+/// bound, a deep document can exhaust the JavaScript stack in a later walk
+/// over the parsed value, where the failure is thrown, not returned.
+pub fn unlimited() -> Limits {
+  Limits(max_bytes: None, max_depth: None)
 }
 
 /// Accept at most `bytes` bytes of UTF-8 text. Below 1 rejects every input.
-/// The other bounds of `limits` are kept.
+/// The depth bound of `limits` is kept.
 pub fn with_max_bytes(limits: Limits, bytes: Int) -> Limits {
-  Limits(..limits, max_bytes: bytes)
+  Limits(..limits, max_bytes: Some(bytes))
 }
 
 /// Accept arrays and objects nested at most `depth` levels. A root that is
 /// not an array or object has depth 0, and each enclosing array or object adds
-/// one level, so `[[1]]` has depth 2. Below 0 rejects every input.
+/// one level, so `[[1]]` has depth 2. Below 0 rejects every input. The byte
+/// bound of `limits` is kept.
 ///
 /// A document nested deeper fails with `DepthLimitExceeded` before a value
-/// tree is built. Functions that walk a parsed value recurse once per level,
-/// so a depth bound also bounds their stack use; 128 admits ordinary data.
+/// tree is built.
 pub fn with_max_depth(limits: Limits, depth: Int) -> Limits {
   Limits(..limits, max_depth: Some(depth))
-}
-
-/// Accept at most `count` values. Every value counts once: the root, each
-/// array and object, and each array item and member value. Object names do
-/// not count, so `[1,2,{"k":"v"}]` has five values. Below 1 rejects every
-/// input.
-///
-/// A document with more values fails with `ValueLimitExceeded`.
-pub fn with_max_values(limits: Limits, count: Int) -> Limits {
-  Limits(..limits, max_values: Some(count))
 }
 
 // --- errors ------------------------------------------------------------------
@@ -137,8 +138,8 @@ pub type Location {
   Location(byte_offset: Int, line: Int, column: Int)
 }
 
-/// Why parsing failed. `ByteLimitExceeded`, `DepthLimitExceeded` and
-/// `ValueLimitExceeded` are the admission failures.
+/// Why parsing failed. `ByteLimitExceeded` and `DepthLimitExceeded` are the
+/// admission failures.
 /// May gain variants in a minor release; match with a `_` branch.
 pub type ParseReason {
   UnexpectedCharacter
@@ -154,8 +155,6 @@ pub type ParseReason {
   ByteLimitExceeded(max: Int)
   /// An array or object is nested deeper than `with_max_depth` allows.
   DepthLimitExceeded(max: Int)
-  /// The document holds more values than `with_max_values` allows.
-  ValueLimitExceeded(max: Int)
   InvalidNumber(number.NumberError)
   DuplicateObjectKey
   UnterminatedString
@@ -173,7 +172,7 @@ pub type ParseError {
 /// invalid JSON.
 pub fn is_limit_exceeded(error: ParseError) -> Bool {
   case error.reason {
-    ByteLimitExceeded(_) | DepthLimitExceeded(_) | ValueLimitExceeded(_) -> True
+    ByteLimitExceeded(_) | DepthLimitExceeded(_) -> True
     _ -> False
   }
 }
@@ -212,8 +211,6 @@ fn describe_reason(reason: ParseReason) -> String {
       "nested more than "
       <> int.to_string(max)
       <> " levels deep (value.with_max_depth)"
-    ValueLimitExceeded(max) ->
-      "more than " <> int.to_string(max) <> " values (value.with_max_values)"
     InvalidNumber(number.InvalidSyntax) -> "invalid number"
     InvalidNumber(number.TokenTooLong) -> "number token too long"
     InvalidNumber(number.TooManySignificandDigits) ->
@@ -231,8 +228,8 @@ fn describe_reason(reason: ParseReason) -> String {
 
 /// Parse JSON with byte admission, duplicate rejection and exact numbers.
 /// Both targets use native parsing; object order may differ between targets.
-/// Depth and value-count bounds apply only when `limits` sets them, and no
-/// global numeric cap is applied.
+/// `limits` bounds input bytes and nesting depth; no global numeric cap is
+/// applied.
 pub fn parse(source: String, limits: Limits) -> Result(Value, ParseError) {
   parse_native(source, limits) |> result.try(from_native)
 }
@@ -245,26 +242,13 @@ pub fn parse_native(
   source: String,
   limits: Limits,
 ) -> Result(native.Raw, ParseError) {
-  native.parse_within(
-    source,
-    limits.max_bytes,
-    limits.max_depth,
-    limits.max_values,
-  )
+  native.parse(source, limits.max_bytes, limits.max_depth)
   |> result.map_error(fn(error) {
     case error {
-      native.ByteLimitExceeded ->
-        ParseError(Location(0, 1, 1), ByteLimitExceeded(limits.max_bytes))
-      native.DepthLimit ->
-        ParseError(
-          Location(0, 0, 0),
-          DepthLimitExceeded(option.unwrap(limits.max_depth, 0)),
-        )
-      native.ValueLimit ->
-        ParseError(
-          Location(0, 0, 0),
-          ValueLimitExceeded(option.unwrap(limits.max_values, 0)),
-        )
+      native.ByteLimitExceeded(max) ->
+        ParseError(Location(0, 1, 1), ByteLimitExceeded(max))
+      native.DepthLimit(max) ->
+        ParseError(Location(0, 0, 0), DepthLimitExceeded(max))
       native.InvalidUnicodeScalar ->
         ParseError(Location(0, 0, 0), InvalidUnicodeScalar)
       native.DuplicateKey(_) ->
@@ -344,10 +328,11 @@ pub fn parse_bits(
   bytes: BitArray,
   limits: Limits,
 ) -> Result(Value, ParseError) {
-  case bit_array.byte_size(bytes) > limits.max_bytes {
-    True ->
-      Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(limits.max_bytes)))
-    False ->
+  let size = bit_array.byte_size(bytes)
+  case limits.max_bytes {
+    Some(max) if size > max ->
+      Error(ParseError(Location(0, 1, 1), ByteLimitExceeded(max)))
+    _ ->
       case bit_array.is_utf8(bytes) {
         False ->
           Error(ParseError(find_invalid_utf8(bytes, 0, 1, 1), InvalidUtf8))

@@ -2,9 +2,8 @@
 ////
 //// Erlang keeps exact native integers and decimal source tokens until a
 //// numeric projection is requested. Parsing rejects duplicate object keys
-//// and applies the caller's byte bound and, when the caller sets them, a
-//// nesting-depth and a value-count bound. Callers choose their own limits for
-//// already-decoded structure. JavaScript retains source tokens with the
+//// and applies the caller's byte and nesting-depth bounds. Callers choose
+//// their own limits for already-decoded structure. JavaScript retains source tokens with the
 //// native parser reviver and scans the original names and escaped Unicode.
 
 import gleam/option.{type Option, None, Some}
@@ -19,9 +18,8 @@ pub type Raw
 pub type ParseError {
   Syntax(String)
   DuplicateKey(String)
-  ByteLimitExceeded
-  DepthLimit
-  ValueLimit
+  ByteLimitExceeded(max: Int)
+  DepthLimit(max: Int)
   InvalidUnicodeScalar
   UnsupportedRuntime
   RuntimeCapacity
@@ -61,60 +59,45 @@ pub fn supported() -> Bool
 
 @external(erlang, "json_blueprint_native_ffi", "parse")
 @external(javascript, "../../../json_blueprint_native_ffi.mjs", "parse")
-fn parse_native(_source: String) -> Result(Raw, ParseError) {
-  Error(UnsupportedRuntime)
-}
-
-@external(erlang, "json_blueprint_native_ffi", "parse_bounded")
-@external(javascript, "../../../json_blueprint_native_ffi.mjs", "parse_bounded")
-fn parse_native_bounded(
+fn parse_native(
   _source: String,
-  _max_depth: Int,
-  _max_values: Int,
+  _max_depth: Option(Int),
 ) -> Result(Raw, ParseError) {
   Error(UnsupportedRuntime)
 }
 
-/// Stands for an absent structural bound when only the other one is set. No
-/// admitted text has this many levels or values, and both targets hold it
-/// exactly.
-const unbounded = 9_007_199_254_740_991
-
-/// The byte check occurs before native parsing and tree allocation.
+/// Parse `source` within an optional byte bound and an optional depth bound.
+/// The byte check is one comparison before native parsing and tree
+/// allocation. A scalar root has depth 0 and every enclosing array or object
+/// adds one level; the parser checks the depth when it opens a container.
 /// Full syntax admission finishes before any typed decoder is invoked.
-pub fn parse(source: String, max_bytes: Int) -> Result(Raw, ParseError) {
-  parse_within(source, max_bytes, None, None)
+pub fn parse(
+  source: String,
+  max_bytes: Option(Int),
+  max_depth: Option(Int),
+) -> Result(Raw, ParseError) {
+  case max_bytes {
+    Some(bytes) ->
+      case text.exceeds_byte_limit(source, bytes) {
+        True -> Error(ByteLimitExceeded(bytes))
+        False -> parse_admitted(source, max_depth)
+      }
+    None -> parse_admitted(source, max_depth)
+  }
 }
 
-/// `parse` with optional bounds on nesting depth and on the number of values.
-/// A scalar root has depth 0 and every array or object adds one level; every
-/// value counts, the root and containers included. Without either bound this
-/// is `parse` and does no structural accounting.
-pub fn parse_within(
+fn parse_admitted(
   source: String,
-  max_bytes: Int,
   max_depth: Option(Int),
-  max_values: Option(Int),
 ) -> Result(Raw, ParseError) {
-  case text.exceeds_byte_limit(source, max_bytes) {
-    True -> Error(ByteLimitExceeded)
-    False -> {
-      use _ <- result.try(
-        text.validate_scalars(source)
-        |> result.map_error(fn(_) { InvalidUnicodeScalar }),
-      )
-      case max_depth, max_values {
-        None, None -> parse_native(source)
-        // The root value is at depth 0, so a negative bound admits nothing.
-        Some(depth), _ if depth < 0 -> Error(DepthLimit)
-        _, _ ->
-          parse_native_bounded(
-            source,
-            option.unwrap(max_depth, unbounded),
-            option.unwrap(max_values, unbounded),
-          )
-      }
-    }
+  use _ <- result.try(
+    text.validate_scalars(source)
+    |> result.map_error(fn(_) { InvalidUnicodeScalar }),
+  )
+  case max_depth {
+    // The root value is at depth 0, so a negative bound admits nothing.
+    Some(depth) if depth < 0 -> Error(DepthLimit(depth))
+    _ -> parse_native(source, max_depth)
   }
 }
 
