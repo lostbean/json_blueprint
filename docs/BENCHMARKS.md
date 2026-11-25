@@ -19,6 +19,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `gleam run -m render_benchmark_runner` | `value.to_string` on deeply nested and wide values, on either target |
 | `gleam run -m limit_benchmark_runner` | Strict native parsing with the default byte and depth bounds and with `value.unlimited()`, on either target |
 | `gleam run -m contract_load_benchmark_runner` | `contract.load` on deeply nested schema documents, on either target |
+| `gleam run -m contract_decode_benchmark_runner` | `contract.decode` against a function prepared with `contract.decoder`, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -547,6 +548,30 @@ shared ten-core Apple silicon machine with other builds running, Erlang/OTP
 Doubling the depth multiplied the time by about four or more before and by
 about two after. The Node cases stay shallow because loading recurses on the
 host stack.
+
+### Decoding validated values, 2026-11-24
+
+`contract.decode` discovers the codec's schema, normalizes it and compares it
+with the validating contract on every call. `contract.decoder` does that once
+and returns a function. `gleam run -m contract_decode_benchmark_runner` times
+seven batches of 2,000 calls after one untimed batch; a cell is the median
+batch mean in nanoseconds per call, with the minimum and maximum in
+brackets. The last column is `codec.decode` with no contract check. One VM on
+a shared ten-core Apple silicon machine with other builds running, Erlang/OTP
+29 and Node 24.21.0.
+
+| Value | Target | `contract.decode` | Prepared decoder | `codec.decode` alone |
+| --- | --- | ---: | ---: | ---: |
+| Two-field record | Erlang | 473 [457–484] | 274 [273–278] | 253 [253–257] |
+| List of 20 two-field records | Erlang | 3,278 [3,184–3,312] | 3,032 [3,016–3,045] | 2,956 [2,952–2,970] |
+| Enum of 200 labels | Erlang | 10,534 [10,405–10,722] | 863 [863–870] | 865 [863–866] |
+| Two-field record | Node | 3,716 [3,416–4,468] | 987 [956–1,119] | 944 [923–964] |
+| List of 20 two-field records | Node | 20,417 [20,206–20,863] | 17,262 [17,011–17,485] | 16,965 [16,821–17,091] |
+| Enum of 200 labels | Node | 47,577 [45,000–48,796] | 7,020 [6,956–7,047] | 6,913 [6,896–6,970] |
+
+The per-call check costs about as much as the schema is large, so it dominates
+a small value under a large schema and disappears under a large value. The
+prepared function is within a few percent of decoding alone.
 
 ## Limits of these claims
 
