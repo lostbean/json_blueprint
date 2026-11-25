@@ -16,7 +16,7 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `scripts/contract_encoding_benchmark.py` | Contract validation and encoding costs |
 | `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
 | `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
-| `gleam run -m limit_benchmark_runner` | Strict native parsing with and without the depth and value-count bounds, on either target |
+| `gleam run -m limit_benchmark_runner` | Strict native parsing with the default byte and depth bounds and with `value.unlimited()`, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -454,34 +454,38 @@ build):
 | A record step yields only its fields | yes | Erlang `codec_encode_decode_roundtrip` 1.70 → 0.96; in-field encode 0.98 → 0.94; words 0.94–0.96 → 0.87–0.91 on records |
 | Direct JSON text for `encode_json` | no | Erlang encode 0.98 → 1.06, union encode 1.00 → 1.22; decode slower on both targets |
 
-### Structural admission bounds, 2026-11-24
+### Default depth bound, 2026-11-25
 
-[ADR 0019](adr/0019-offer-opt-in-depth-and-value-count-admission.md) adds the
-optional depth and value-count bounds. `gleam run -m limit_benchmark_runner`
-parses each document to the native tree, without building a `Value`, in seven
-batches of five parses after one untimed batch. A cell is the median batch
-mean in milliseconds, with the minimum and maximum in brackets. "Before" is
-the parent commit; "bytes only" is `value.default_limits()`; "bounded" adds a
-depth of 128 and 262,144 values, which every document passes. One VM per
-build on a shared ten-core Apple silicon machine with other builds running,
-Erlang/OTP 29 and Node 24.21.0.
+[ADR 0019](adr/0019-bound-nesting-depth-by-default.md) bounds nesting depth to
+128 by default. `gleam run -m limit_benchmark_runner` parses each document to
+the native tree, without building a `Value`, in seven batches of five parses
+after one untimed batch, and prints the median batch mean. "Before" is the
+parent `main` commit, whose default is bytes only, run from a copy of the same
+runner. Before and after ran back to back in three rounds, one VM per run. A
+cell is the median of the three run medians in milliseconds, with the lowest
+and highest run median in brackets. Every document passes both bounds. Shared
+ten-core Apple silicon machine with other builds running, Erlang/OTP 29 and
+Node 24.21.0.
 
-| Document | Target | Before | Bytes only | Bounded |
+| Document | Target | Before | Default limits | `unlimited()` |
 | --- | --- | ---: | ---: | ---: |
-| 15,000 records, 1 MiB | Erlang | 15.6 [15.2–16.0] | 16.3 [15.8–16.7] | 21.7 [20.0–22.7] |
-| 250,000 integers, 0.5 MiB | Erlang | 10.0 [9.2–10.3] | 15.5 [10.1–18.8] | 9.9 [9.4–10.1] |
-| 2,000 chains nested 100 deep, 0.4 MiB | Erlang | 9.9 [9.2–10.0] | 10.1 [9.2–10.6] | 16.8 [16.5–17.5] |
-| 15,000 records, 1 MiB | Node | 33.2 [30.9–36.0] | 33.8 [32.6–36.1] | 33.1 [31.6–35.0] |
-| 250,000 integers, 0.5 MiB | Node | 77.5 [75.7–80.7] | 69.6 [67.7–74.7] | 69.7 [68.6–71.4] |
-| 2,000 chains nested 100 deep, 0.4 MiB | Node | 51.4 [50.1–53.8] | 46.7 [45.3–48.9] | 47.9 [46.1–50.1] |
+| 15,000 records, 1 MiB | Erlang | 14.2 [14.2–14.5] | 9.5 [9.4–9.8] | 9.9 [9.5–11.9] |
+| 250,000 integers, 0.5 MiB | Erlang | 9.4 [9.3–9.4] | 9.0 [8.9–9.1] | 9.3 [9.1–9.4] |
+| 2,000 chains nested 100 deep, 0.4 MiB | Erlang | 8.8 [8.7–12.4] | 9.7 [9.6–9.8] | 9.8 [9.8–11.2] |
+| 15,000 records, 1 MiB | Node | 27.8 [27.7–28.2] | 28.4 [27.7–28.6] | 25.9 [25.9–26.0] |
+| 250,000 integers, 0.5 MiB | Node | 63.7 [61.9–67.0] | 65.3 [63.6–68.5] | 61.1 [60.7–66.3] |
+| 2,000 chains nested 100 deep, 0.4 MiB | Node | 43.6 [43.0–44.0] | 45.0 [43.4–45.2] | 43.5 [43.4–43.7] |
 
-The bytes-only path runs the same Erlang callbacks as before; its integer row
-moved with machine load (an earlier run of the same build gave 9.0
-[8.8–9.9]). On Erlang the bounded path costs nothing measurable per scalar
-array item, about a third on small records and about two thirds on a
-document made only of containers, because each array or object opened and
-closed carries a wider accumulator. On Node the bounded and bytes-only rows
-overlap.
+On Erlang the default limits cost about a tenth on the document made only of
+nested arrays, where the earlier opt-in design that also counted values cost
+about two thirds (9.9 to 16.8 ms on the same machine, 2026-11-24). The record
+row was faster than before in every round, also with `unlimited()`, and two
+further rounds in the reverse order agreed (before 16.1 and 14.2, after 10.0
+and 9.4); the cause was not investigated. The Erlang `unlimited()` column
+comes from three later runs of the final build. An earlier build marked the
+absent bound with an atom, and its comparison with an integer depth made the
+unlimited chain row slower than the bounded one (10.9 ms); the final build
+uses the largest small integer. On Node the rows overlap.
 
 ## Limits of these claims
 

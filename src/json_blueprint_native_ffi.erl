@@ -20,11 +20,13 @@
 % replaced its contents. The depth check is one comparison when a container
 % opens; pushes keep the two-element accumulator of the unbounded parser.
 parse(Source, MaxDepth) ->
-    % An integer compares less than any atom, so infinity admits every depth.
+    % Without a bound, the largest small integer stands in: no document within
+    % memory nests that deep, and the comparison stays between small integers,
+    % which an atom such as infinity would slow down.
     Max =
         case MaxDepth of
             {some, N} -> N;
-            none -> infinity
+            none -> 1 bsl 59 - 1
         end,
     Decoders = #{
         object_start => fun(Outer) -> open(#{}, Outer, Max) end,

@@ -17,6 +17,7 @@ fn rejection(reason: value.ParseReason) -> String {
     value.InvalidUnicodeEscape -> "unicode_escape"
     value.InvalidNumber(_) -> "number"
     value.RuntimeCapacityExceeded -> "capacity"
+    value.DepthLimitExceeded(_) -> "depth"
     _ -> "syntax"
   }
 }
