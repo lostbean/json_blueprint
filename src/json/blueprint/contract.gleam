@@ -17,7 +17,8 @@
 //// `ValidationError` with the path of the first failure; validation uses the
 //// same `codec.Reason` vocabulary as decoding. `decode` decodes a validated
 //// value with a codec whose schema matches the contract, and fails with
-//// `ContractMismatch` otherwise. `value_codec` is a `Codec(Value)` that
+//// `ContractMismatch` otherwise; `decoder` does that match once for many
+//// values. `value_codec` is a `Codec(Value)` that
 //// validates while encoding and decoding, for passing schema-checked JSON
 //// through without changing its representation.
 ////
@@ -183,6 +184,9 @@ pub fn value(validated: ValidatedValue) -> Value {
 /// Decode a validated value with a codec whose normalized schema structure
 /// matches the validating contract. A codec with another schema, or none,
 /// fails with `DecodeError([], ContractMismatch)`.
+///
+/// Each call discovers and compares the codec's schema. To decode many
+/// values with one codec, prepare it once with `decoder`.
 pub fn decode(
   codec: Codec(a),
   validated: ValidatedValue,
@@ -195,6 +199,43 @@ pub fn decode(
       }
     Error(codec.UnknownSchema) ->
       Error(codec.DecodeError([], codec.ContractMismatch))
+  }
+}
+
+/// Check once that `codec` matches `contract`, and return a function that
+/// decodes values validated by that contract. Use it where the same codec
+/// decodes many validated values: `decode` discovers, normalizes and compares
+/// the codec's schema on every call, and the returned function does not.
+///
+/// A codec with another schema, or none, fails here with
+/// `DecodeError([], ContractMismatch)`. The returned function fails with the
+/// same error for a value validated by a contract of another normalized schema
+/// structure, and otherwise returns what `codec.decode` returns.
+pub fn decoder(
+  codec: Codec(a),
+  for contract: Contract,
+) -> Result(fn(ValidatedValue) -> Result(a, DecodeError), DecodeError) {
+  let mismatch = codec.DecodeError([], codec.ContractMismatch)
+  let expected = shape(contract.schema)
+  case codec.schema(codec) {
+    Ok(found) ->
+      case shape(normalize(codec.to_tree(found))) == expected {
+        True ->
+          Ok(fn(validated: ValidatedValue) {
+            // A value validated by this very contract holds the same schema
+            // term, which equality settles without walking it. Another
+            // contract of the same structure may differ in descriptions.
+            case
+              validated.schema == contract.schema
+              || shape(validated.schema) == expected
+            {
+              True -> codec.decode(codec, validated.value)
+              False -> Error(mismatch)
+            }
+          })
+        False -> Error(mismatch)
+      }
+    Error(codec.UnknownSchema) -> Error(mismatch)
   }
 }
 

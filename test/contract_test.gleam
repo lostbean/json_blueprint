@@ -746,6 +746,70 @@ pub fn decode_contract_mismatch_test() {
   contract.decode(other, deferred) |> should.equal(mismatch())
 }
 
+pub fn prepared_decoder_decodes_values_validated_by_its_contract_test() {
+  let assert Ok(people) = contract.from_codec(person_codec())
+  let assert Ok(decode) = contract.decoder(person_codec(), for: people)
+  let ada = object([#("age", int_value(36)), #("name", value.String("Ada"))])
+  let assert Ok(validated) = contract.validate(people, ada)
+  decode(validated) |> should.equal(Ok(#("Ada", 36)))
+  decode(validated) |> should.equal(contract.decode(person_codec(), validated))
+
+  // The same structure from another contract value, with a description and
+  // another property order, is the same contract match as `decode` uses.
+  let described =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema("age", True, tree.IntSchema),
+        tree.PropertySchema(
+          "name",
+          True,
+          tree.DescribedSchema("Full name", tree.StringSchema),
+        ),
+      ]),
+    )
+  let assert Ok(validated_elsewhere) = contract.validate(described, ada)
+  decode(validated_elsewhere) |> should.equal(Ok(#("Ada", 36)))
+
+  // The codec's own decoding still runs and reports its own failures.
+  let assert Ok(small) =
+    contract.decoder(codec.integer_between(0, 10), for: {
+      contract.from_schema(codec.from_tree(tree.IntegerRangeSchema(0, 10)))
+    })
+  let assert Ok(ranged) = contract.from_codec(codec.integer_between(0, 10))
+  let assert Ok(five) = contract.validate(ranged, int_value(5))
+  small(five) |> should.equal(Ok(5))
+}
+
+pub fn prepared_decoder_refuses_a_mismatch_test() {
+  let assert Ok(pairs) =
+    contract.from_codec(codec.pair(codec.string(), codec.int()))
+
+  // The codec does not match the contract it is prepared for.
+  let assert Error(error) =
+    contract.decoder(codec.pair(codec.string(), codec.number()), for: pairs)
+  error |> should.equal(codec.DecodeError([], codec.ContractMismatch))
+  let unknown =
+    codec.custom(
+      encode: fn(_: Int) { Ok(value.Null) },
+      decode: fn(_) { Ok(0) },
+      schema: None,
+      placeholder: 0,
+    )
+  let assert Error(error) = contract.decoder(unknown, for: pairs)
+  error |> should.equal(codec.DecodeError([], codec.ContractMismatch))
+
+  // A value validated by a contract of another structure is refused on each
+  // call, even when the codec would accept the value.
+  let assert Ok(decode) =
+    contract.decoder(codec.int(), for: {
+      let assert Ok(ints) = contract.from_codec(codec.int())
+      ints
+    })
+  let assert Ok(ranged) = contract.from_codec(codec.integer_between(0, 10))
+  let assert Ok(five) = contract.validate(ranged, int_value(5))
+  decode(five) |> should.equal(mismatch())
+}
+
 // --- value_codec -------------------------------------------------------------
 
 fn limit_contract() -> contract.Contract {
