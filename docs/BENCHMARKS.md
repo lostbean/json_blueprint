@@ -608,7 +608,10 @@ Erlang/OTP 29 and Node 24.21.0.
 
 Before, the time doubled with the number of alternatives; after, it does not
 depend on it. The controls show no slowdown. Their Erlang "before" cells ran
-while the machine was busier, so the apparent halving is not a claim.
+while the machine was busier, so the apparent halving is not a claim. The
+`contract.decode` rows were measured with the codec built inside each call;
+the runner now builds it once before timing, and those rows were not measured
+again.
 
 ## Limits of these claims
 

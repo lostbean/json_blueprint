@@ -148,9 +148,10 @@ pub fn main() -> Nil {
   )
   let assert Ok(one) = contract.from_codec(person_codec())
   let assert Ok(validated) = contract.validate(one, person())
+  let decoding = person_codec()
   observe("1,000 contract.decode calls of a two-field record", 5, fn() {
     repeat(1000, fn() {
-      let outcome = contract.decode(person_codec(), validated)
+      let outcome = contract.decode(decoding, validated)
       let assert True = result.is_ok(outcome)
       consume(outcome)
     })
