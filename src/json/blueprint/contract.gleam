@@ -709,12 +709,30 @@ type ParsedSchema {
 }
 
 /// Where a definition mistake found by `from_schema` sits in the document.
+/// `path` is reversed, innermost segment first.
 type InvariantLocation {
   InvariantLocation(error: DefinitionError, path: List(PathSegment))
 }
 
+/// Loading keeps each path reversed, innermost segment first, so entering a
+/// level is one list cell. `malformed`, `unsupported` and `invariant_path`
+/// reverse it when an error is reported.
 fn at(path: List(PathSegment), segment: PathSegment) -> List(PathSegment) {
-  list.append(path, [segment])
+  [segment, ..path]
+}
+
+fn malformed(
+  path: List(PathSegment),
+  reason: MalformedReason,
+) -> DocumentError {
+  MalformedDocument(list.reverse(path), reason)
+}
+
+fn unsupported(
+  path: List(PathSegment),
+  reason: UnsupportedReason,
+) -> DocumentError {
+  UnsupportedDocument(list.reverse(path), reason)
 }
 
 fn parse_schema(
@@ -724,7 +742,7 @@ fn parse_schema(
   case document {
     // The boolean schema `true` accepts every value, like `{}`.
     value.Bool(True) -> Ok(ParsedSchema(tree.AnySchema, []))
-    value.Bool(False) -> Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+    value.Bool(False) -> Error(unsupported(path, UnsupportedSchemaForm))
     _ -> parse_schema_object(document, path)
   }
 }
@@ -744,8 +762,7 @@ fn parse_schema_object(
         tree.DescribedSchema(text, parsed.schema),
         parsed.invariants,
       ))
-    Ok(_) ->
-      Error(MalformedDocument(at(path, Field("description")), ExpectedText))
+    Ok(_) -> Error(malformed(at(path, Field("description")), ExpectedText))
   }
 }
 
@@ -788,14 +805,10 @@ fn parse_constrained(
           parse_primitive(members, path, tree.BoolSchema)
         value.String("object") -> parse_object_or_union(members, path)
         value.String("array") -> parse_array(members, path)
-        value.String(_) ->
-          Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+        value.String(_) -> Error(unsupported(path, UnsupportedSchemaForm))
         value.Array(_) ->
-          Error(UnsupportedDocument(
-            at(path, Field("type")),
-            UnsupportedSchemaForm,
-          ))
-        _ -> Error(MalformedDocument(at(path, Field("type")), ExpectedText))
+          Error(unsupported(at(path, Field("type")), UnsupportedSchemaForm))
+        _ -> Error(malformed(at(path, Field("type")), ExpectedText))
       }
     }
   }
@@ -840,13 +853,10 @@ fn enum_labels(
         case pair.0 {
           value.String(text) -> Ok(text)
           _ ->
-            Error(UnsupportedDocument(
-              at(path, Index(pair.1)),
-              UnsupportedSchemaForm,
-            ))
+            Error(unsupported(at(path, Index(pair.1)), UnsupportedSchemaForm))
         }
       })
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -860,10 +870,10 @@ fn text_items(
       |> list.try_map(fn(pair) {
         case pair.0 {
           value.String(text) -> Ok(text)
-          _ -> Error(MalformedDocument(at(path, Index(pair.1)), ExpectedText))
+          _ -> Error(malformed(at(path, Index(pair.1)), ExpectedText))
         }
       })
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -967,7 +977,7 @@ fn unsupported_bound(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   use _ <- result.try(expect_number(bound, at(path, Field(name))))
-  Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+  Error(unsupported(path, UnsupportedSchemaForm))
 }
 
 fn parse_object_or_union(
@@ -1059,8 +1069,8 @@ fn parse_array(
       ParsedSchema(tree.ListSchema(parsed.schema), parsed.invariants)
     }
     Error(Nil), Ok(prefix_items) -> parse_tuple(members, prefix_items, path)
-    Error(Nil), Error(Nil) -> Error(UnsupportedDocument(path, UnboundedArray))
-    Ok(_), Ok(_) -> Error(UnsupportedDocument(path, UnsupportedTupleForm))
+    Error(Nil), Error(Nil) -> Error(unsupported(path, UnboundedArray))
+    Ok(_), Ok(_) -> Error(unsupported(path, UnsupportedTupleForm))
   }
 }
 
@@ -1094,11 +1104,9 @@ fn parse_tuple(
         list.append(left.invariants, right.invariants),
       )
     }
-    value.Array([]), _, _ ->
-      Error(MalformedDocument(items_path, InvalidTupleShape))
-    value.Array(_), _, _ ->
-      Error(UnsupportedDocument(path, UnsupportedTupleForm))
-    _, _, _ -> Error(MalformedDocument(items_path, ExpectedArray))
+    value.Array([]), _, _ -> Error(malformed(items_path, InvalidTupleShape))
+    value.Array(_), _, _ -> Error(unsupported(path, UnsupportedTupleForm))
+    _, _, _ -> Error(malformed(items_path, ExpectedArray))
   }
 }
 
@@ -1121,13 +1129,12 @@ fn parse_nullable(
           use parsed <- result.map(parse_schema(left, left_path))
           ParsedSchema(tree.NullableSchema(parsed.schema), parsed.invariants)
         }
-        _, _ -> Error(UnsupportedDocument(path, ArbitraryUnion))
+        _, _ -> Error(unsupported(path, ArbitraryUnion))
       }
     }
-    value.Array([]) ->
-      Error(MalformedDocument(path, InvalidNullableAlternatives))
-    value.Array(_) -> Error(UnsupportedDocument(path, ArbitraryUnion))
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    value.Array([]) -> Error(malformed(path, InvalidNullableAlternatives))
+    value.Array(_) -> Error(unsupported(path, ArbitraryUnion))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -1143,7 +1150,7 @@ fn parse_union(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   case alternatives {
-    value.Array([]) -> Error(MalformedDocument(path, InvalidTaggedAlternatives))
+    value.Array([]) -> Error(malformed(path, InvalidTaggedAlternatives))
     value.Array(items) -> {
       use parsed <- result.try(
         list.index_map(items, fn(item, index) { #(item, index) })
@@ -1169,7 +1176,7 @@ fn parse_union(
         list.append(duplicate, list.flat_map(parsed, fn(variant) { variant.1 })),
       ))
     }
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -1187,15 +1194,14 @@ fn parse_variant(
   use Nil <- result.try(case kind {
     value.String("object") -> Ok(Nil)
     value.String(_) | value.Array(_) ->
-      Error(UnsupportedDocument(at(path, Field("type")), UnsupportedTaggedShape))
-    _ -> Error(MalformedDocument(at(path, Field("type")), ExpectedText))
+      Error(unsupported(at(path, Field("type")), UnsupportedTaggedShape))
+    _ -> Error(malformed(at(path, Field("type")), ExpectedText))
   })
   use #(properties, required) <- result.try(closed_object_parts(members, path))
   let properties_path = at(path, Field("properties"))
   use tag <- result.try(case list.key_find(properties, "tag") {
     Ok(tag_schema) -> parse_tag(tag_schema, at(properties_path, Field("tag")))
-    Error(Nil) ->
-      Error(UnsupportedDocument(properties_path, UnsupportedTaggedShape))
+    Error(Nil) -> Error(unsupported(properties_path, UnsupportedTaggedShape))
   })
   let names = list.map(properties, fn(property) { property.0 })
   let required_path = at(path, Field("required"))
@@ -1203,7 +1209,7 @@ fn parse_variant(
     Ok(payload), 2 -> {
       use Nil <- result.try(case list.sort(required, string.compare) {
         ["tag", "value"] -> Ok(Nil)
-        _ -> Error(UnsupportedDocument(required_path, UnsupportedTaggedShape))
+        _ -> Error(unsupported(required_path, UnsupportedTaggedShape))
       })
       use parsed <- result.map(parse_schema(
         payload,
@@ -1214,9 +1220,9 @@ fn parse_variant(
     Error(Nil), 1 ->
       case required {
         ["tag"] -> Ok(#(tree.VariantSchema(tag, None), []))
-        _ -> Error(UnsupportedDocument(required_path, UnsupportedTaggedShape))
+        _ -> Error(unsupported(required_path, UnsupportedTaggedShape))
       }
-    _, _ -> Error(UnsupportedDocument(path, UnsupportedTaggedShape))
+    _, _ -> Error(unsupported(path, UnsupportedTaggedShape))
   }
 }
 
@@ -1229,11 +1235,7 @@ fn parse_tag(
   use tag <- result.try(required_member(members, "const", path))
   case tag {
     value.String(text) -> Ok(text)
-    _ ->
-      Error(UnsupportedDocument(
-        at(path, Field("const")),
-        UnsupportedTaggedShape,
-      ))
+    _ -> Error(unsupported(at(path, Field("const")), UnsupportedTaggedShape))
   }
 }
 
@@ -1243,9 +1245,9 @@ fn check_closed_object(
 ) -> Result(Nil, DocumentError) {
   case additional {
     value.Bool(False) -> Ok(Nil)
-    value.Bool(True) -> Error(UnsupportedDocument(path, OpenObject))
-    value.Object(_) -> Error(UnsupportedDocument(path, UnsupportedSchemaForm))
-    _ -> Error(MalformedDocument(path, ExpectedBoolean))
+    value.Bool(True) -> Error(unsupported(path, OpenObject))
+    value.Object(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+    _ -> Error(malformed(path, ExpectedBoolean))
   }
 }
 
@@ -1256,10 +1258,7 @@ fn required_names(
   use names <- result.try(text_items(raw, path))
   case repeated_at(names, set.new(), 0) {
     Some(#(name, index)) ->
-      Error(MalformedDocument(
-        at(path, Index(index)),
-        DuplicateRequiredName(name),
-      ))
+      Error(malformed(at(path, Index(index)), DuplicateRequiredName(name)))
     None -> Ok(names)
   }
 }
@@ -1276,10 +1275,7 @@ fn check_declared_required(
       case set.contains(declared, name) {
         True -> check_declared_required(rest, declared, path, index + 1)
         False ->
-          Error(UnsupportedDocument(
-            at(path, Index(index)),
-            UnsupportedSchemaForm,
-          ))
+          Error(unsupported(at(path, Index(index)), UnsupportedSchemaForm))
       }
   }
 }
@@ -1292,16 +1288,15 @@ fn expect_array_length(
   case raw {
     value.Number(found) ->
       case number.is_integer(found), number.compare(found, zero) {
-        False, _ -> Error(MalformedDocument(path, ExpectedInteger))
-        True, order.Lt -> Error(MalformedDocument(path, InvalidTupleShape))
+        False, _ -> Error(malformed(path, ExpectedInteger))
+        True, order.Lt -> Error(malformed(path, InvalidTupleShape))
         True, _ ->
-          number.to_int(found, 2000)
-          |> result.replace_error(UnsupportedDocument(
-            path,
-            UnsupportedSchemaForm,
-          ))
+          case number.to_int(found, 2000) {
+            Ok(length) -> Ok(length)
+            Error(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+          }
       }
-    _ -> Error(MalformedDocument(path, ExpectedInteger))
+    _ -> Error(malformed(path, ExpectedInteger))
   }
 }
 
@@ -1311,8 +1306,10 @@ fn expect_integer_bound(
 ) -> Result(Int, DocumentError) {
   use found <- result.try(expect_number(raw, path))
   // Numeric bounds are valid even when the integer codec cannot represent them.
-  number.to_int(found, 2000)
-  |> result.replace_error(UnsupportedDocument(path, UnsupportedSchemaForm))
+  case number.to_int(found, 2000) {
+    Ok(bound) -> Ok(bound)
+    Error(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+  }
 }
 
 fn schema_members(
@@ -1320,7 +1317,7 @@ fn schema_members(
   path: List(PathSegment),
 ) -> Result(List(#(String, Value)), DocumentError) {
   case raw {
-    value.Bool(_) -> Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+    value.Bool(_) -> Error(unsupported(path, UnsupportedSchemaForm))
     _ -> object_members(raw, path)
   }
 }
@@ -1331,7 +1328,7 @@ fn expect_number(
 ) -> Result(Number, DocumentError) {
   case raw {
     value.Number(found) -> Ok(found)
-    _ -> Error(MalformedDocument(path, ExpectedNumber))
+    _ -> Error(malformed(path, ExpectedNumber))
   }
 }
 
@@ -1345,10 +1342,10 @@ fn object_members(
         repeated_at(list.map(members, fn(member) { member.0 }), set.new(), 0)
       {
         Some(#(name, _)) ->
-          Error(MalformedDocument(at(path, Field(name)), DuplicateKey(name)))
+          Error(malformed(at(path, Field(name)), DuplicateKey(name)))
         None -> Ok(members)
       }
-    _ -> Error(MalformedDocument(path, ExpectedObject))
+    _ -> Error(malformed(path, ExpectedObject))
   }
 }
 
@@ -1359,16 +1356,12 @@ fn only_members(
 ) -> Result(Nil, DocumentError) {
   list.try_each(members, fn(member) {
     case member.0 {
-      "$schema" ->
-        Error(UnsupportedDocument(at(path, Field("$schema")), NestedDialect))
+      "$schema" -> Error(unsupported(at(path, Field("$schema")), NestedDialect))
       name ->
         case list.contains(allowed, name) {
           True -> Ok(Nil)
           False ->
-            Error(UnsupportedDocument(
-              at(path, Field(name)),
-              UnsupportedKeyword(name),
-            ))
+            Error(unsupported(at(path, Field(name)), UnsupportedKeyword(name)))
         }
     }
   })
@@ -1379,11 +1372,11 @@ fn required_member(
   name: String,
   path: List(PathSegment),
 ) -> Result(Value, DocumentError) {
-  list.key_find(members, name)
-  |> result.replace_error(UnsupportedDocument(
-    at(path, Field(name)),
-    UnsupportedSchemaForm,
-  ))
+  case list.key_find(members, name) {
+    Ok(found) -> Ok(found)
+    Error(Nil) ->
+      Error(unsupported(at(path, Field(name)), UnsupportedSchemaForm))
+  }
 }
 
 fn without_member(
@@ -1398,7 +1391,7 @@ fn invariant_path(
   locations: List(InvariantLocation),
 ) -> List(PathSegment) {
   case list.find(locations, fn(location) { location.error == error }) {
-    Ok(location) -> location.path
+    Ok(location) -> list.reverse(location.path)
     Error(Nil) -> []
   }
 }
