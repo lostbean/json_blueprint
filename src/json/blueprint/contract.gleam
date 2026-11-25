@@ -339,18 +339,18 @@ pub fn decoder(
   for contract: Contract,
 ) -> Result(fn(ValidatedValue) -> Result(a, DecodeError), DecodeError) {
   let mismatch = codec.DecodeError([], codec.ContractMismatch)
-  let expected = shape(contract.schema)
+  let expected = shape(plan_tree(contract.plan))
   case codec.schema(codec) {
     Ok(found) ->
       case shape(normalize(codec.to_tree(found))) == expected {
         True ->
           Ok(fn(validated: ValidatedValue) {
-            // A value validated by this very contract holds the same schema
+            // A value validated by this very contract holds the same plan
             // term, which equality settles without walking it. Another
             // contract of the same structure may differ in descriptions.
             case
-              validated.schema == contract.schema
-              || shape(validated.schema) == expected
+              validated.plan == contract.plan
+              || shape(plan_tree(validated.plan)) == expected
             {
               True -> codec.decode(codec, validated.value)
               False -> Error(mismatch)
