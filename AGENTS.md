@@ -2,8 +2,8 @@
 
 - JSON Blueprint owns schema-aware values, codecs, schema projection and finite runtime contracts. Protocol admission, business policy and execution belong to consumers.
 - Read the design (`docs/design/`), glossary, coverage and the relevant ADRs before changing behavior. Keep unbuilt intent in the pending ledgers and out of the present-tense design.
-- Preserve the frozen root/schema 1.x surface. Source generators belong to this package and run through explicit build tasks. Version 2.0.0 is the published baseline (ADR 0013); further version changes require an explicit release decision.
-- Strict Value parsing and standard JSON/native paths have different precision, duplicate-key and resource guarantees.
+- The 1.x root and schema modules are removed (ADR 0020); every text decoder parses through the bounded strict parser. Source generators belong to this package and run through explicit build tasks. Version 2.0.0 is the published baseline (ADR 0013); further version changes require an explicit release decision.
+- Strict Value parsing and the `gleam/json` bridges (`codec.decoder`, `value.decoder`) have different precision, duplicate-key and resource guarantees; the bridges leave them to whoever parsed the text.
 
 ## Commands
 
@@ -12,7 +12,7 @@
 - Application checks, in the Nix shell: `nix develop --command sh scripts/gate.sh` (native compilation, both-target tests for the runtime and generators in the root package, schema consumer, Python oracles).
 - Focused checks: `sh scripts/check-schema-consumer.sh`, `python3 test/schema_check.py`, `python3 test/schema_profile_check.py`, `python3 test/number_check.py` (independent Erlang arithmetic oracle).
 - Format named authored files with `nix fmt -- PATH...`. Benchmarks (`sh scripts/benchmark.sh`) are observations and never gate.
-- Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the frozen 1.x API and the migration in `examples/test/`), run by the gate on both targets. Compiled module examples and the codegen consumer run as behavioral tests; README and module-documentation text is reviewed manually.
+- Usage lives as compiled, executed code in `examples/` (codec topics in `examples/src/examples/`, the migration from 1.x in `examples/test/`), run by the gate on both targets. Compiled module examples and the codegen consumer run as behavioral tests; README and module-documentation text is reviewed manually.
 - Run the examples alone with `cd examples && gleam run` and `gleam test --target erlang|javascript` in the Nix shell.
 
 ## Releasing

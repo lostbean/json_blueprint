@@ -1,10 +1,7 @@
-import gleam/dynamic/decode
-import gleam/json
 import gleam/list
 import gleam/order
 import gleam/string
 import gleeunit/should
-import json/blueprint
 import json/blueprint/codec
 import json/blueprint/number
 import json/blueprint/value
@@ -75,8 +72,6 @@ pub fn strict_decode_counts_utf8_bytes_test() {
   codec.decode_json(codec.string(), fits) |> should.be_ok
   codec.decode_json(codec.string(), over)
   |> should.equal(Error(byte_limit_failure(one_mib)))
-  blueprint.decode(blueprint.string(), fits) |> should.be_ok
-  blueprint.decode(blueprint.string(), over) |> should.be_error
 }
 
 pub fn raised_limits_admit_larger_text_test() {
@@ -90,32 +85,6 @@ pub fn raised_limits_admit_larger_text_test() {
   )
   |> should.equal(Ok([1]))
   value.parse(nested_arrays(100), limits) |> should.be_ok
-}
-
-pub fn legacy_decode_rejects_text_above_one_mib_test() {
-  let decoder = blueprint.list(blueprint.int())
-  blueprint.decode(decoder, padded("[1]", one_mib))
-  |> should.equal(Ok([1]))
-  blueprint.decode(decoder, padded("[1]", one_mib + 1))
-  |> should.equal(
-    Error(
-      json.UnableToDecode([
-        decode.DecodeError(
-          expected: "JSON text of at most 1048576 bytes",
-          found: "more than 1048576 bytes",
-          path: [],
-        ),
-      ]),
-    ),
-  )
-  blueprint.decode_with_max_bytes(
-    decoder,
-    padded("[1]", one_mib + 1),
-    max_bytes: 2 * one_mib,
-  )
-  |> should.equal(Ok([1]))
-  blueprint.decode_with_max_bytes(decoder, "[1]", max_bytes: 2)
-  |> should.be_error
 }
 
 pub fn parsed_integers_are_compact_test() {

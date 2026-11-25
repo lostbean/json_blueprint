@@ -14,7 +14,7 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 | JSON Schema Draft 2020-12 meta-schema | <https://json-schema.org/draft/2020-12/schema> | the copy bundled with the pinned `jsonschema` | `Draft202012Validator.check_schema` over the finite-profile diagnostic fixtures |
 | Frozen manifest [`test/schema_manifest.json`](../test/schema_manifest.json) | this repository | checked-in behavioral fixtures | Case identities, instances, schemas and expected outcomes |
 | Diagnostic fixtures [`test/contract_profile_cases.json`](../test/contract_profile_cases.json) | this repository | checked in; 50 fixtures | Valid, unsupported and malformed schema documents with their diagnostic paths |
-| Source baseline 1.7.1 | this repository, commit `0e379c6491d34aca49795f716e87b9003df0130e` (MIT) | commit | The frozen 1.x source and wire contracts |
+| Source baseline 1.7.1 | this repository, commit `0e379c6491d34aca49795f716e87b9003df0130e` (MIT) | commit | The 1.x source and wire forms that the migration guide compares with |
 | JSONTestSuite | <https://github.com/nst/JSONTestSuite> (MIT, Nicolas Seriot) | `1ef36fa01286573e846ac449e8683f8833c5b26a`; all 318 `test_parsing` files, original bytes in [`corpus.zip`](../test/oracle/json-test-suite/corpus.zip), with [license](../test/oracle/json-test-suite/LICENSE) and [hash/provenance](../test/oracle/json-test-suite/provenance.json) | Independent parser acceptance fixtures on both targets |
 | Oversight interface-laboratory probes | sibling workspace, commit `bd0b83743533313eb9b4eee2bf7f99ed68a26750` | commit | Origin of the initial exact-number and finite-schema cases; the source ledger declared no license, so no third-party grant is claimed |
 
@@ -94,8 +94,7 @@ supported contract, and [AGENTS.md](../AGENTS.md#references) points here.
 8. **Unsupported JavaScript runtimes** ([`test/unsupported_runtime_check.mjs`](../test/unsupported_runtime_check.mjs))
    remove reviver source context before importing the built modules in a separate
    Node process. The ordinary gate checks explicit `UnsupportedRuntime` refusal,
-   text/byte admission precedence, callback suppression and unchanged legacy
-   decoding. This simulates a missing capability; it does not certify an old
+   text/byte admission precedence and callback suppression. This simulates a missing capability; it does not certify an old
    browser release.
 
 9. **Codec and generated-code laws** ([`test/codec_laws_test.gleam`](../test/codec_laws_test.gleam))
@@ -155,14 +154,11 @@ it does not add browser-engine certification or test the complete ECMAScript sui
 
 - The corpus is a finite profile. It does not establish general JSON Schema
   conformance, native numeric projection laws, complete published-version
-  compatibility or all hostile-input bounds. Number, parser, hostile-input,
-  legacy and code-generation tests exercise those contracts separately.
+  compatibility or all hostile-input bounds. Number, parser, hostile-input
+  and code-generation tests exercise those contracts separately.
 - Mathematical acceptance and native projection differ on purpose: Erlang
   bignums, JavaScript safe integers and binary64 rounding have different native
   contracts even when exact JSON values compare equal.
-- The frozen 1.x renderer labels its schema Draft-07 although some keywords come
-  from later drafts, so it is not compared against the Draft 2020-12 validator
-  ([ADR 0007](adr/0007-freeze-legacy-source-and-wire-contracts.md)).
 - An earlier implementation snapshot used a 61-case, 13-family corpus and
   intermediate API names; its all-green status is historical execution
   evidence and cannot certify current coverage. The
@@ -185,6 +181,5 @@ Use the focused checks when only schema agreement is at issue.
 
 [ADR 0002](adr/0002-exact-numbers-and-native-projection.md) records the
 numerical choices and the source attribution,
-[ADR 0007](adr/0007-freeze-legacy-source-and-wire-contracts.md) the
-compatibility decisions, and [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md)
+[ADR 0020](adr/0020-remove-the-1x-api.md) the removal of the 1.x API, and [ADR 0010](adr/0010-retain-benchmark-observations-as-non-asserting-evidence.md)
 why timing evidence stays separate from this corpus.

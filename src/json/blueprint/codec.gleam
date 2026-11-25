@@ -1923,8 +1923,8 @@ type Identity
 @external(javascript, "../../json_blueprint_ffi.mjs", "identity")
 fn new_identity() -> Identity
 
-@external(erlang, "gleam_dynamic", "identity")
-@external(javascript, "../../gleam_dynamic.mjs", "identity")
+@external(erlang, "json_blueprint_ffi", "coerce")
+@external(javascript, "../../json_blueprint_ffi.mjs", "coerce")
 fn coerce(item: a) -> b
 
 /// A codec for a sum type. Each case is a `variant` with a payload or a

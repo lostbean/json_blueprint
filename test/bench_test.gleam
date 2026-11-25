@@ -188,7 +188,7 @@ pub fn run_all_benchmarks() -> List(BenchResult) {
 pub fn print_benchmark_report(results: List(BenchResult)) -> Nil {
   io.println("\n--- json_blueprint Benchmark Suite Results ---")
   io.println(
-    "order_*_complete_text cases include rendering or parsing (generated native_direct cases use gleam/json; strict and wrapper cases use the Blueprint parser); legacy_value_* cases exclude JSON text conversion; native_* diagnostics isolate parser/helper work.",
+    "order_*_complete_text cases include rendering or parsing (the generated native_direct encode renders with gleam/json; every decode uses the Blueprint parser); legacy_value_* cases exclude JSON text conversion; native_* diagnostics isolate parser/helper work.",
   )
   list.each(results, fn(r) {
     io.println(

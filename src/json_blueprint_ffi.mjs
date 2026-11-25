@@ -64,6 +64,11 @@ export function with_parser_capacity(work, capacityError) {
   }
 }
 
+// Reinterpret a value whose type the caller has established.
+export function coerce(x) {
+  return x;
+}
+
 // A union variant's identity: unique, compared by identity.
 export function identity() {
   return Symbol("json_blueprint variant");

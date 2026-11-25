@@ -1,6 +1,6 @@
 # Context map
 
-- [Contracts](./design/contracts/CONTEXT.typ) — exact numbers, strict wire values, typed codecs, schemas, runtime contracts, and the frozen 1.x compatibility surface.
+- [Contracts](./design/contracts/CONTEXT.typ) — exact numbers, strict wire values, typed codecs, schemas and runtime contracts.
 - [Generation](./design/generation/CONTEXT.typ) — development-time generators that return Gleam source for native types and codecs.
 
 ## Relationships

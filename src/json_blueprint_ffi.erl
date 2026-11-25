@@ -1,5 +1,7 @@
 -module(json_blueprint_ffi).
--export([null/0, utf8_byte_size_exceeds/2]).
+-export([coerce/1, null/0, utf8_byte_size_exceeds/2]).
+
+coerce(X) -> X.
 
 null() -> null.
 

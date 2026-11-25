@@ -6,8 +6,7 @@ token even when JavaScript's native numeric value has rounded it. A runtime
 without this capability cannot supply the strict exact-number contract through
 plain native parsing. Strict parsing returns `UnsupportedRuntime` on those
 runtimes. There is no portable parser fallback. This keeps one JavaScript
-parsing implementation without silently weakening exact numbers. The frozen
-legacy API retains its existing parser and compatibility behavior.
+parsing implementation without silently weakening exact numbers.
 
 The [MDN browser compatibility data](https://github.com/mdn/browser-compat-data/blob/main/javascript/builtins/JSON.json)
 records this feature from Chrome 114, Firefox 135, Safari 18.4 (including iOS),

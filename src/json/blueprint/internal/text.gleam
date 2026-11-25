@@ -13,6 +13,3 @@ pub fn exceeds_byte_limit(source: String, max_bytes: Int) -> Bool
 pub fn validate_scalars(_source: String) -> Result(Nil, Nil) {
   Ok(Nil)
 }
-
-/// The default byte bound of every parse: 1 MiB.
-pub const default_max_bytes = 1_048_576
