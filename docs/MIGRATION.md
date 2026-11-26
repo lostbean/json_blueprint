@@ -32,8 +32,10 @@ oracle dependency merely to make it match the application dependency.
 `json/blueprint/schema` are gone in 3.0. They parsed with `gleam/json` behind a
 1 MiB byte check only, so they admitted documents nested deeper than the
 default depth bound and repeated keys, which every other text decoder refuses,
-and they rounded a number such as `0.1` to a float, where every other text
-decoder keeps its exact decimal value. Generated modules lose `decode_<name>_json_native` for the
+and they converted each number to a native Int or Float while parsing. The strict
+parser keeps each number's exact value until a codec projects it, so
+`codec.number()` sees `0.1` exactly, while `codec.float()` still rounds it to
+the nearest float. Generated modules lose `decode_<name>_json_native` for the
 same reason. Code that still uses either does not compile against 3.0.
 
 | 1.x                                                | Replacement                                                                                                    |
