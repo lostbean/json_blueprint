@@ -1,7 +1,7 @@
 #let terms = (
   (slug: "term-json-value", title: [JSON value], body: [An immutable JSON algebra value with ordered object members and an exact number alternative. Duplicate object members remain representable until a checked boundary rejects them.]),
   (slug: "term-exact-number", title: [Exact number], body: [A finite mathematical JSON number represented by a normalized decimal coefficient and exponent, with one positive zero. Its value is independent of a target's native integer or binary64 representation.]),
-  (slug: "term-admission-limits", title: [Admission limits], body: [The caller-authored byte bound checked before text parsing. Consumers own policies for the decoded structure; explicit standalone number parsing can apply separate numeric limits. A value assembled without parsing carries no admission proof.]),
+  (slug: "term-admission-limits", title: [Admission limits], body: [The bounds checked during text admission: input bytes and nesting depth, 1 MiB and 128 levels by default. A trusted caller removes them explicitly. Consumers own further policies for the decoded structure; explicit standalone number parsing can apply separate numeric limits. A value assembled without parsing carries no admission proof.]),
   (slug: "term-codec", title: [Codec], body: [A typed definition joining native encoding, native decoding, a placeholder, and an available or unavailable schema. The native type parameter belongs to the caller's compiled program.]),
   (slug: "term-flat-size", title: [Flat size], body: [The size of a term with every shared subterm counted once per reference: `erts_debug:flat_size/1` in words. A BEAM process copy allocates at most this much, because a copy does not keep sharing and module literals are not copied.]),
   (slug: "term-in-heap-size", title: [In-heap size], body: [The size of a term with each shared subterm counted once: `erts_debug:size/1` in words, the memory the term occupies in one process.]),
@@ -19,7 +19,6 @@
   (slug: "term-tagged-union", title: [Tagged union], body: [A closed object sum selected by a string tag, with a payload exactly when that selected variant declares one.]),
   (slug: "term-definition-error", title: [Definition error], body: [A contradiction in a codec definition, distinct from invalid input or unavailable schema.]),
   (slug: "term-native-projection", title: [Native projection], body: [A checked conversion of an exact number into a target's Int or Float representation. Wire acceptance and successful projection are separate facts.]),
-  (slug: "term-legacy-decoder", title: [Legacy decoder], body: [The frozen 1.x one-way decoder with an independent legacy schema description. Its established data envelopes and acceptance rules differ from Codec.]),
   (slug: "term-oracle-corpus", title: [Oracle corpus], body: [The frozen manifest of finite-profile cases with stable identifiers, expected schemas, and instances. An independent checker compares package output with a Draft 2020-12 validator, and a missing, extra, repeated, or replaced case fails.]),
   (slug: "term-consumer", title: [Consumer], body: [A separate package or application that publishes, admits, or executes with codecs and schemas and owns its own protocol, provider, and business policy. A consumer imports only public modules of this package.]),
 )

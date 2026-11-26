@@ -57,7 +57,8 @@ IMPLEMENTATION_CASES = {
     "i_string_truncated-utf-8.json": "utf8",
     "i_string_utf16BE_no_BOM.json": "utf8",
     "i_string_utf16LE_no_BOM.json": "utf8",
-    "i_structure_500_nested_arrays.json": None,
+    # Deeper than the default depth bound of 128, as in serde_json.
+    "i_structure_500_nested_arrays.json": "depth",
     "i_structure_UTF-8_BOM_empty_object.json": "syntax",
 }
 
@@ -269,8 +270,11 @@ def boundary_cases() -> dict[str, bytes]:
     ]
     for index, token in enumerate(numbers):
         cases[f"number_boundary_{index}.json"] = ("[" + token + "]").encode()
-    for depth in (65, 100, 256, 500):
+    # The default depth bound admits 128 levels and refuses 129.
+    for depth in (65, 100, 128):
         cases[f"nested_valid_{depth}.json"] = b"[" * depth + b"0" + b"]" * depth
+    for depth in (129, 256, 500):
+        cases[f"nested_too_deep_{depth}.json"] = b"[" * depth + b"0" + b"]" * depth
     # Deliberately invalid, so every target must return an error (never crash).
     cases["n_generated_deep_unclosed.json"] = b"[" * 20000
     cases["n_generated_deep_trailing_comma.json"] = b"[" * 20000 + b"0," + b"]" * 20000
@@ -302,6 +306,8 @@ def check_case(name: str, raw: bytes, row: dict[str, object], target: str) -> No
     expected = STRICT_DIFFERENCES.get(name)
     if name.startswith("duplicate_equivalent_nested_"):
         expected = "duplicate"
+    elif name.startswith("nested_too_deep_"):
+        expected = "depth"
     elif name.startswith(("utf8_value_", "utf8_key_")):
         expected = "utf8"
     elif name.startswith(("surrogate_value_", "surrogate_key_")):

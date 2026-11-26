@@ -9,7 +9,7 @@ import json/blueprint/internal/schema_tree
 import json/blueprint/value
 
 pub const generated_fingerprint: String =
-  "ED55AE10DE0166122765D3AECF4873550AC87663"
+  "097D1202B01F66C70F62E23B7423D246570BA6EE"
 
 const dynamic_schema_value: schema_tree.Tree = schema_tree.IntSchema
 
@@ -31,12 +31,6 @@ fn dynamic_compiled_inner_native_encode(
   generated.encode_native_int(item)
 }
 
-fn dynamic_compiled_inner_native_decode(
-  raw: dynamic.Dynamic,
-) -> Result(Int, codec.DecodeError) {
-  generated.decode_native_int(raw)
-}
-
 fn dynamic_compiled_inner_strict_decode(
   raw: native.Raw,
 ) -> Result(Int, codec.DecodeError) {
@@ -56,11 +50,7 @@ fn dynamic_compiled_encode(
 fn dynamic_compiled_decode(
   raw: value.Value,
 ) -> Result(dynamic.Dynamic, codec.DecodeError) {
-  generated.decode_mapped(
-    dynamic_compiled_inner_decode,
-    generated_emitter_fixtures.from_dynamic,
-    raw,
-  )
+  generated.decode_mapped(dynamic_compiled_inner_decode, dynamic.int, raw)
 }
 
 fn dynamic_compiled_native_encode(
@@ -71,20 +61,11 @@ fn dynamic_compiled_native_encode(
   ))
 }
 
-fn dynamic_compiled_native_decode(
-  raw: dynamic.Dynamic,
-) -> Result(dynamic.Dynamic, codec.DecodeError) {
-  case dynamic_compiled_inner_native_decode(raw) {
-    Ok(item) -> Ok(generated_emitter_fixtures.from_dynamic(item))
-    Error(error) -> Error(error)
-  }
-}
-
 fn dynamic_compiled_strict_decode(
   raw: native.Raw,
 ) -> Result(dynamic.Dynamic, codec.DecodeError) {
   case dynamic_compiled_inner_strict_decode(raw) {
-    Ok(item) -> Ok(generated_emitter_fixtures.from_dynamic(item))
+    Ok(item) -> Ok(dynamic.int(item))
     Error(error) -> Error(error)
   }
 }
@@ -116,16 +97,6 @@ pub fn decode_dynamic_json(
   codec.decode_json(dynamic_codec(), source)
 }
 
-pub fn decode_dynamic_json_native(
-  source: String,
-) -> Result(dynamic.Dynamic, json.DecodeError) {
-  generated.decode_json_native(
-    source,
-    dynamic_compiled_native_decode,
-    generated_emitter_fixtures.from_dynamic(0),
-  )
-}
-
 pub fn dynamic_schema() -> codec.Schema {
   generated.schema(dynamic_schema_value)
 }
@@ -137,6 +108,6 @@ pub fn dynamic_codec() -> codec.Codec(dynamic.Dynamic) {
     strict_decode: dynamic_compiled_strict_decode,
     text_encode: encode_dynamic_json,
     schema: dynamic_schema(),
-    placeholder: fn() { generated_emitter_fixtures.from_dynamic(0) },
+    placeholder: fn() { dynamic.int(0) },
   )
 }

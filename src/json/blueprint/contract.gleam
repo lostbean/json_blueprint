@@ -12,12 +12,19 @@
 //// `UnsupportedDocument`, including default-open objects and one-sided numeric
 //// bounds. Wrong keyword types return `MalformedDocument`. These are first
 //// error diagnostics, not general JSON Schema meta-schema validation.
+//// Annotation keywords, which never constrain a value (`title`,
+//// `description`, `default`, `examples`, `deprecated`, `readOnly`,
+//// `writeOnly`, `$comment` and `$id`), are accepted anywhere a schema object
+//// appears and do not affect validation; `description` is kept where the codec
+//// model holds one. Every keyword that constrains a value outside the profile,
+//// including `format`, is refused.
 ////
 //// `validate` checks a `Value` and returns a `ValidatedValue` or a
 //// `ValidationError` with the path of the first failure; validation uses the
 //// same `codec.Reason` vocabulary as decoding. `decode` decodes a validated
 //// value with a codec whose schema matches the contract, and fails with
-//// `ContractMismatch` otherwise. `value_codec` is a `Codec(Value)` that
+//// `ContractMismatch` otherwise; `decoder` does that match once for many
+//// values. `value_codec` is a `Codec(Value)` that
 //// validates while encoding and decoding, for passing schema-checked JSON
 //// through without changing its representation.
 ////
@@ -56,21 +63,135 @@ import json/blueprint/codec.{
   type Codec, type DecodeError, type DefinitionError, type PathSegment,
   type Schema, Field, Index,
 }
-import json/blueprint/internal/schema_tree.{
-  type PropertySchema, type Tree, type VariantSchema,
-} as tree
+import json/blueprint/internal/schema_tree.{type Tree, type VariantSchema} as tree
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
 /// A schema accepted for validation, normalized so that member and label
 /// order does not matter.
 pub opaque type Contract {
-  Contract(schema: Tree)
+  Contract(plan: Plan)
 }
 
 /// A value that passed `validate`, with the schema it passed.
 pub opaque type ValidatedValue {
-  ValidatedValue(value: Value, schema: Tree)
+  ValidatedValue(value: Value, plan: Plan)
+}
+
+/// A normalized schema in the form validation walks. It holds what the
+/// normalized `Tree` holds, except that an enum or a union with more than
+/// `index_above` alternatives keeps them in a set or a dictionary, so checking
+/// one value does not scan every alternative. The index replaces the list and
+/// is not kept beside it; `plan_tree` rebuilds the sorted list.
+type Plan {
+  PlanDescribed(description: String, inner: Plan)
+  PlanString
+  PlanLabels(labels: List(String))
+  PlanIndexedLabels(labels: Set(String))
+  PlanInt
+  PlanNumber
+  PlanBool
+  PlanPair(left: Plan, right: Plan)
+  PlanList(items: Plan)
+  PlanNullable(inner: Plan)
+  PlanObject(properties: List(PlanProperty))
+  PlanUnion(variants: List(#(String, Option(Plan))))
+  PlanIndexedUnion(variants: Dict(String, Option(Plan)))
+  PlanIntegerRange(minimum: Int, maximum: Int)
+  PlanNumberRange(minimum: Number, maximum: Number)
+  PlanAny
+}
+
+type PlanProperty {
+  PlanProperty(name: String, required: Bool, plan: Plan)
+}
+
+/// Enums and unions with more alternatives than this are indexed. Below it a
+/// scan of the list is as fast and allocates nothing when a contract is built.
+const index_above = 8
+
+/// The plan of a normalized schema.
+fn plan(schema: Tree) -> Plan {
+  case schema {
+    tree.DescribedSchema(description, inner) ->
+      PlanDescribed(description, plan(inner))
+    tree.StringSchema -> PlanString
+    tree.StringEnumSchema(labels) ->
+      case list.drop(labels, index_above) {
+        [] -> PlanLabels(labels)
+        _ -> PlanIndexedLabels(set.from_list(labels))
+      }
+    tree.IntSchema -> PlanInt
+    tree.NumberSchema -> PlanNumber
+    tree.BoolSchema -> PlanBool
+    tree.PairSchema(left, right) -> PlanPair(plan(left), plan(right))
+    tree.ListSchema(items) -> PlanList(plan(items))
+    tree.NullableSchema(inner) -> PlanNullable(plan(inner))
+    tree.ObjectSchema(properties) ->
+      PlanObject(
+        list.map(properties, fn(property) {
+          PlanProperty(property.name, property.required, plan(property.schema))
+        }),
+      )
+    tree.UnionSchema(variants) -> {
+      let planned =
+        list.map(variants, fn(variant) {
+          #(variant.tag, option.map(variant.payload, plan))
+        })
+      case list.drop(planned, index_above) {
+        [] -> PlanUnion(planned)
+        _ -> PlanIndexedUnion(dict.from_list(planned))
+      }
+    }
+    tree.IntegerRangeSchema(minimum, maximum) ->
+      PlanIntegerRange(minimum, maximum)
+    tree.NumberRangeSchema(minimum, maximum) ->
+      PlanNumberRange(minimum, maximum)
+    tree.AnySchema -> PlanAny
+  }
+}
+
+/// The normalized schema a plan was made from.
+fn plan_tree(plan: Plan) -> Tree {
+  case plan {
+    PlanDescribed(description, inner) ->
+      tree.DescribedSchema(description, plan_tree(inner))
+    PlanString -> tree.StringSchema
+    PlanLabels(labels) -> tree.StringEnumSchema(labels)
+    PlanIndexedLabels(labels) ->
+      tree.StringEnumSchema(list.sort(set.to_list(labels), string.compare))
+    PlanInt -> tree.IntSchema
+    PlanNumber -> tree.NumberSchema
+    PlanBool -> tree.BoolSchema
+    PlanPair(left, right) -> tree.PairSchema(plan_tree(left), plan_tree(right))
+    PlanList(items) -> tree.ListSchema(plan_tree(items))
+    PlanNullable(inner) -> tree.NullableSchema(plan_tree(inner))
+    PlanObject(properties) ->
+      tree.ObjectSchema(
+        list.map(properties, fn(property) {
+          tree.PropertySchema(
+            property.name,
+            property.required,
+            plan_tree(property.plan),
+          )
+        }),
+      )
+    PlanUnion(variants) -> tree.UnionSchema(list.map(variants, variant_tree))
+    PlanIndexedUnion(variants) ->
+      dict.to_list(variants)
+      |> list.sort(fn(a, b) { string.compare(a.0, b.0) })
+      |> list.map(variant_tree)
+      |> tree.UnionSchema
+    PlanIntegerRange(minimum, maximum) ->
+      tree.IntegerRangeSchema(minimum, maximum)
+    PlanNumberRange(minimum, maximum) ->
+      tree.NumberRangeSchema(minimum, maximum)
+    PlanAny -> tree.AnySchema
+  }
+}
+
+fn variant_tree(variant: #(String, Option(Plan))) -> VariantSchema {
+  tree.VariantSchema(variant.0, option.map(variant.1, plan_tree))
 }
 
 /// The first failure of `validate`, at `path`. Read fields by label.
@@ -91,18 +212,18 @@ pub fn from_codec(codec: Codec(a)) -> Result(Contract, codec.SchemaError) {
 /// Every `Schema` comes from a codec, a contract or a checked mapping of one
 /// and is already checked, so this cannot fail.
 pub fn from_schema(schema: Schema) -> Contract {
-  Contract(normalize(codec.to_tree(schema)))
+  Contract(plan(normalize(codec.to_tree(schema))))
 }
 
 /// The contract's schema, normalized.
 pub fn schema(contract: Contract) -> Schema {
-  codec.from_tree(contract.schema)
+  codec.from_tree(plan_tree(contract.plan))
 }
 
 /// Whether two contracts have the same normalized schema structure.
 /// Descriptions and property, label, and variant order do not affect matching.
 pub fn same_schema(left: Contract, right: Contract) -> Bool {
-  shape(left.schema) == shape(right.schema)
+  shape(plan_tree(left.plan)) == shape(plan_tree(right.plan))
 }
 
 fn normalize(schema: Tree) -> Tree {
@@ -171,8 +292,8 @@ pub fn validate(
   contract: Contract,
   item: Value,
 ) -> Result(ValidatedValue, ValidationError) {
-  use Nil <- result.map(validate_at(contract.schema, item, []))
-  ValidatedValue(item, contract.schema)
+  use Nil <- result.map(validate_at(contract.plan, item, []))
+  ValidatedValue(item, contract.plan)
 }
 
 /// The value that passed validation.
@@ -183,18 +304,61 @@ pub fn value(validated: ValidatedValue) -> Value {
 /// Decode a validated value with a codec whose normalized schema structure
 /// matches the validating contract. A codec with another schema, or none,
 /// fails with `DecodeError([], ContractMismatch)`.
+///
+/// Each call discovers and compares the codec's schema. To decode many
+/// values with one codec, prepare it once with `decoder`.
 pub fn decode(
   codec: Codec(a),
   validated: ValidatedValue,
 ) -> Result(a, DecodeError) {
   case codec.schema(codec) {
     Ok(found) ->
-      case shape(normalize(codec.to_tree(found))) == shape(validated.schema) {
+      case
+        shape(normalize(codec.to_tree(found)))
+        == shape(plan_tree(validated.plan))
+      {
         True -> codec.decode(codec, validated.value)
         False -> Error(codec.DecodeError([], codec.ContractMismatch))
       }
     Error(codec.UnknownSchema) ->
       Error(codec.DecodeError([], codec.ContractMismatch))
+  }
+}
+
+/// Check once that `codec` matches `contract`, and return a function that
+/// decodes values validated by that contract. Use it where the same codec
+/// decodes many validated values: `decode` discovers, normalizes and compares
+/// the codec's schema on every call, and the returned function does not.
+///
+/// A codec with another schema, or none, fails here with
+/// `DecodeError([], ContractMismatch)`. The returned function fails with the
+/// same error for a value validated by a contract of another normalized schema
+/// structure, and otherwise returns what `codec.decode` returns.
+pub fn decoder(
+  codec: Codec(a),
+  for contract: Contract,
+) -> Result(fn(ValidatedValue) -> Result(a, DecodeError), DecodeError) {
+  let mismatch = codec.DecodeError([], codec.ContractMismatch)
+  let expected = shape(plan_tree(contract.plan))
+  case codec.schema(codec) {
+    Ok(found) ->
+      case shape(normalize(codec.to_tree(found))) == expected {
+        True ->
+          Ok(fn(validated: ValidatedValue) {
+            // A value validated by this very contract holds the same plan
+            // term, which equality settles without walking it. Another
+            // contract of the same structure may differ in descriptions.
+            case
+              validated.plan == contract.plan
+              || shape(plan_tree(validated.plan)) == expected
+            {
+              True -> codec.decode(codec, validated.value)
+              False -> Error(mismatch)
+            }
+          })
+        False -> Error(mismatch)
+      }
+    Error(codec.UnknownSchema) -> Error(mismatch)
   }
 }
 
@@ -226,7 +390,7 @@ pub fn value_codec(contract: Contract) -> Codec(Value) {
           Error(codec.DecodeError(path, reason))
       }
     },
-    schema: Some(codec.from_tree(contract.schema)),
+    schema: Some(codec.from_tree(plan_tree(contract.plan))),
     placeholder: value.Null,
   )
 }
@@ -246,59 +410,67 @@ fn invalid(
 
 /// `path` is reversed.
 fn validate_at(
-  schema: Tree,
+  schema: Plan,
   item: Value,
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
   case schema, item {
-    tree.DescribedSchema(_, inner), _ -> validate_at(inner, item, path)
-    tree.StringSchema, value.String(_) -> Ok(Nil)
-    tree.StringSchema, _ -> invalid(path, codec.ExpectedString)
+    PlanDescribed(_, inner), _ -> validate_at(inner, item, path)
+    PlanString, value.String(_) -> Ok(Nil)
+    PlanString, _ -> invalid(path, codec.ExpectedString)
 
-    tree.StringEnumSchema(labels), value.String(label) ->
-      case list.contains(labels, label) {
+    PlanLabels(labels), value.String(label) ->
+      case contains_name(labels, label) {
         True -> Ok(Nil)
         False -> invalid(path, codec.UnknownEnumLabel)
       }
-    tree.StringEnumSchema(_), _ -> invalid(path, codec.ExpectedString)
+    PlanIndexedLabels(labels), value.String(label) ->
+      case set.contains(labels, label) {
+        True -> Ok(Nil)
+        False -> invalid(path, codec.UnknownEnumLabel)
+      }
+    PlanLabels(_), _ | PlanIndexedLabels(_), _ ->
+      invalid(path, codec.ExpectedString)
 
-    tree.IntSchema, value.Number(found) ->
+    PlanInt, value.Number(found) ->
       case number.is_integer(found) {
         True -> Ok(Nil)
         False -> invalid(path, codec.ExpectedInt)
       }
-    tree.IntSchema, _ -> invalid(path, codec.ExpectedInt)
+    PlanInt, _ -> invalid(path, codec.ExpectedInt)
 
-    tree.NumberSchema, value.Number(_) -> Ok(Nil)
-    tree.NumberSchema, _ -> invalid(path, codec.ExpectedNumber)
+    PlanNumber, value.Number(_) -> Ok(Nil)
+    PlanNumber, _ -> invalid(path, codec.ExpectedNumber)
 
-    tree.BoolSchema, value.Bool(_) -> Ok(Nil)
-    tree.BoolSchema, _ -> invalid(path, codec.ExpectedBool)
+    PlanBool, value.Bool(_) -> Ok(Nil)
+    PlanBool, _ -> invalid(path, codec.ExpectedBool)
 
-    tree.PairSchema(left, right), value.Array([first, second]) -> {
+    PlanPair(left, right), value.Array([first, second]) -> {
       use Nil <- result.try(validate_at(left, first, [Index(0), ..path]))
       validate_at(right, second, [Index(1), ..path])
     }
-    tree.PairSchema(_, _), value.Array(items) ->
+    PlanPair(_, _), value.Array(items) ->
       invalid(path, codec.WrongLength(2, list.length(items)))
-    tree.PairSchema(_, _), _ -> invalid(path, codec.ExpectedArray)
+    PlanPair(_, _), _ -> invalid(path, codec.ExpectedArray)
 
-    tree.ListSchema(inner), value.Array(items) ->
-      validate_items(inner, items, 0, path)
-    tree.ListSchema(_), _ -> invalid(path, codec.ExpectedArray)
+    PlanList(inner), value.Array(items) -> validate_items(inner, items, 0, path)
+    PlanList(_), _ -> invalid(path, codec.ExpectedArray)
 
-    tree.NullableSchema(_), value.Null -> Ok(Nil)
-    tree.NullableSchema(inner), _ -> validate_at(inner, item, path)
+    PlanNullable(_), value.Null -> Ok(Nil)
+    PlanNullable(inner), _ -> validate_at(inner, item, path)
 
-    tree.ObjectSchema(properties), value.Object(members) ->
+    PlanObject(properties), value.Object(members) ->
       validate_object(properties, members, path)
-    tree.ObjectSchema(_), _ -> invalid(path, codec.ExpectedObject)
+    PlanObject(_), _ -> invalid(path, codec.ExpectedObject)
 
-    tree.UnionSchema(variants), value.Object(members) ->
-      validate_union(variants, members, path)
-    tree.UnionSchema(_), _ -> invalid(path, codec.ExpectedObject)
+    PlanUnion(variants), value.Object(members) ->
+      validate_union(members, path, find_variant(variants, _))
+    PlanIndexedUnion(variants), value.Object(members) ->
+      validate_union(members, path, dict.get(variants, _))
+    PlanUnion(_), _ | PlanIndexedUnion(_), _ ->
+      invalid(path, codec.ExpectedObject)
 
-    tree.IntegerRangeSchema(minimum, maximum), value.Number(found) ->
+    PlanIntegerRange(minimum, maximum), value.Number(found) ->
       case number.is_integer(found) {
         False -> invalid(path, codec.ExpectedInt)
         True ->
@@ -307,16 +479,30 @@ fn validate_at(
             False -> invalid(path, codec.IntegerOutsideRange(minimum, maximum))
           }
       }
-    tree.IntegerRangeSchema(_, _), _ -> invalid(path, codec.ExpectedInt)
+    PlanIntegerRange(_, _), _ -> invalid(path, codec.ExpectedInt)
 
-    tree.NumberRangeSchema(minimum, maximum), value.Number(found) ->
+    PlanNumberRange(minimum, maximum), value.Number(found) ->
       case within(found, minimum, maximum) {
         True -> Ok(Nil)
         False -> invalid(path, codec.NumberOutsideRange(minimum, maximum))
       }
-    tree.NumberRangeSchema(_, _), _ -> invalid(path, codec.ExpectedNumber)
+    PlanNumberRange(_, _), _ -> invalid(path, codec.ExpectedNumber)
 
-    tree.AnySchema, _ -> Ok(Nil)
+    PlanAny, _ -> Ok(Nil)
+  }
+}
+
+fn find_variant(
+  variants: List(#(String, Option(Plan))),
+  wanted: String,
+) -> Result(Option(Plan), Nil) {
+  case variants {
+    [] -> Error(Nil)
+    [#(tag, payload), ..rest] ->
+      case tag == wanted {
+        True -> Ok(payload)
+        False -> find_variant(rest, wanted)
+      }
   }
 }
 
@@ -333,7 +519,7 @@ fn within_integers(found: Number, minimum: Int, maximum: Int) -> Bool {
 }
 
 fn validate_items(
-  schema: Tree,
+  schema: Plan,
   items: List(Value),
   index: Int,
   path: List(PathSegment),
@@ -449,7 +635,7 @@ fn check_members_prefix(
 }
 
 fn validate_object(
-  properties: List(PropertySchema),
+  properties: List(PlanProperty),
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
@@ -469,7 +655,7 @@ fn validate_object(
 }
 
 fn validate_object_linear(
-  properties: List(PropertySchema),
+  properties: List(PlanProperty),
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
@@ -478,7 +664,7 @@ fn validate_object_linear(
   list.try_each(properties, fn(property) {
     let at = [Field(property.name), ..path]
     case find_member(members, property.name), property.required {
-      Ok(found), _ -> validate_at(property.schema, found, at)
+      Ok(found), _ -> validate_at(property.plan, found, at)
       Error(Nil), True -> invalid(at, codec.MissingField)
       Error(Nil), False -> Ok(Nil)
     }
@@ -486,7 +672,7 @@ fn validate_object_linear(
 }
 
 fn validate_object_indexed(
-  properties: List(PropertySchema),
+  properties: List(PlanProperty),
   members: List(#(String, Value)),
   path: List(PathSegment),
 ) -> Result(Nil, ValidationError) {
@@ -501,7 +687,7 @@ fn validate_object_indexed(
   list.try_each(properties, fn(property) {
     let at = [Field(property.name), ..path]
     case dict.get(index, property.name), property.required {
-      Ok(Some(found)), _ -> validate_at(property.schema, found, at)
+      Ok(Some(found)), _ -> validate_at(property.plan, found, at)
       _, True -> invalid(at, codec.MissingField)
       _, False -> Ok(Nil)
     }
@@ -509,9 +695,9 @@ fn validate_object_indexed(
 }
 
 fn validate_union(
-  variants: List(VariantSchema),
   members: List(#(String, Value)),
   path: List(PathSegment),
+  find: fn(String) -> Result(Option(Plan), Nil),
 ) -> Result(Nil, ValidationError) {
   use Nil <- result.try(check_members(members, ["tag", "value"], [], path))
   let tag_path = [Field("tag"), ..path]
@@ -519,10 +705,10 @@ fn validate_union(
   case list.key_find(members, "tag") {
     Error(Nil) -> invalid(tag_path, codec.MissingField)
     Ok(value.String(tag)) ->
-      case list.find(variants, fn(variant) { variant.tag == tag }) {
+      case find(tag) {
         Error(Nil) -> invalid(tag_path, codec.UnknownTag)
-        Ok(variant) ->
-          case variant.payload, list.key_find(members, "value") {
+        Ok(payload) ->
+          case payload, list.key_find(members, "value") {
             Some(payload), Ok(found) -> validate_at(payload, found, value_path)
             Some(_), Error(Nil) -> invalid(value_path, codec.MissingField)
             None, Ok(_) -> invalid(value_path, codec.UnknownField)
@@ -603,11 +789,12 @@ pub fn parse(
 
 /// Load a Draft 2020-12 schema document. Its `$schema` must be the Draft
 /// 2020-12 URI, and it must stay inside the codec profile; `description`
-/// keywords are kept. The root must be an object with that dialect declaration.
+/// keywords are kept and the other annotation keywords are ignored. The root
+/// must be an object with that dialect declaration.
 /// An otherwise empty object schema, or nested boolean `true`, accepts any
 /// value, like `codec.value()`.
 /// Missing profile-required keywords and otherwise valid unsupported forms
-/// return `UnsupportedDocument`; no constraints are silently discarded.
+/// return `UnsupportedDocument`; no constraint is silently discarded.
 pub fn load(document: Value) -> Result(Contract, DocumentError) {
   use members <- result.try(schema_members(document, []))
   use dialect <- result.try(required_member(members, "$schema", []))
@@ -616,7 +803,7 @@ pub fn load(document: Value) -> Result(Contract, DocumentError) {
       let schema_members = without_member(members, "$schema")
       use parsed <- result.try(parse_schema(value.Object(schema_members), []))
       case codec.validate_tree(parsed.schema) {
-        Ok(Nil) -> Ok(Contract(normalize(parsed.schema)))
+        Ok(Nil) -> Ok(Contract(plan(normalize(parsed.schema))))
         Error(error) ->
           Error(InvalidDefinition(
             invariant_path(error, parsed.invariants),
@@ -709,12 +896,30 @@ type ParsedSchema {
 }
 
 /// Where a definition mistake found by `from_schema` sits in the document.
+/// `path` is reversed, innermost segment first.
 type InvariantLocation {
   InvariantLocation(error: DefinitionError, path: List(PathSegment))
 }
 
+/// Loading keeps each path reversed, innermost segment first, so entering a
+/// level is one list cell. `malformed`, `unsupported` and `invariant_path`
+/// reverse it when an error is reported.
 fn at(path: List(PathSegment), segment: PathSegment) -> List(PathSegment) {
-  list.append(path, [segment])
+  [segment, ..path]
+}
+
+fn malformed(
+  path: List(PathSegment),
+  reason: MalformedReason,
+) -> DocumentError {
+  MalformedDocument(list.reverse(path), reason)
+}
+
+fn unsupported(
+  path: List(PathSegment),
+  reason: UnsupportedReason,
+) -> DocumentError {
+  UnsupportedDocument(list.reverse(path), reason)
 }
 
 fn parse_schema(
@@ -724,7 +929,7 @@ fn parse_schema(
   case document {
     // The boolean schema `true` accepts every value, like `{}`.
     value.Bool(True) -> Ok(ParsedSchema(tree.AnySchema, []))
-    value.Bool(False) -> Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+    value.Bool(False) -> Error(unsupported(path, UnsupportedSchemaForm))
     _ -> parse_schema_object(document, path)
   }
 }
@@ -733,7 +938,7 @@ fn parse_schema_object(
   document: Value,
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
-  use members <- result.try(object_members(document, path))
+  use members <- result.try(schema_members(document, path))
   let description = list.key_find(members, "description")
   let schema_members = without_member(members, "description")
   use parsed <- result.try(parse_schema_members(schema_members, path))
@@ -744,8 +949,7 @@ fn parse_schema_object(
         tree.DescribedSchema(text, parsed.schema),
         parsed.invariants,
       ))
-    Ok(_) ->
-      Error(MalformedDocument(at(path, Field("description")), ExpectedText))
+    Ok(_) -> Error(malformed(at(path, Field("description")), ExpectedText))
   }
 }
 
@@ -754,7 +958,7 @@ fn parse_schema_members(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   case members {
-    // `{}`, or only a description: any value.
+    // `{}`, or only annotations: any value.
     [] -> Ok(ParsedSchema(tree.AnySchema, []))
     _ -> parse_constrained(members, path)
   }
@@ -788,14 +992,10 @@ fn parse_constrained(
           parse_primitive(members, path, tree.BoolSchema)
         value.String("object") -> parse_object_or_union(members, path)
         value.String("array") -> parse_array(members, path)
-        value.String(_) ->
-          Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+        value.String(_) -> Error(unsupported(path, UnsupportedSchemaForm))
         value.Array(_) ->
-          Error(UnsupportedDocument(
-            at(path, Field("type")),
-            UnsupportedSchemaForm,
-          ))
-        _ -> Error(MalformedDocument(at(path, Field("type")), ExpectedText))
+          Error(unsupported(at(path, Field("type")), UnsupportedSchemaForm))
+        _ -> Error(malformed(at(path, Field("type")), ExpectedText))
       }
     }
   }
@@ -840,13 +1040,10 @@ fn enum_labels(
         case pair.0 {
           value.String(text) -> Ok(text)
           _ ->
-            Error(UnsupportedDocument(
-              at(path, Index(pair.1)),
-              UnsupportedSchemaForm,
-            ))
+            Error(unsupported(at(path, Index(pair.1)), UnsupportedSchemaForm))
         }
       })
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -860,10 +1057,10 @@ fn text_items(
       |> list.try_map(fn(pair) {
         case pair.0 {
           value.String(text) -> Ok(text)
-          _ -> Error(MalformedDocument(at(path, Index(pair.1)), ExpectedText))
+          _ -> Error(malformed(at(path, Index(pair.1)), ExpectedText))
         }
       })
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -967,7 +1164,7 @@ fn unsupported_bound(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   use _ <- result.try(expect_number(bound, at(path, Field(name))))
-  Error(UnsupportedDocument(path, UnsupportedSchemaForm))
+  Error(unsupported(path, UnsupportedSchemaForm))
 }
 
 fn parse_object_or_union(
@@ -1059,8 +1256,8 @@ fn parse_array(
       ParsedSchema(tree.ListSchema(parsed.schema), parsed.invariants)
     }
     Error(Nil), Ok(prefix_items) -> parse_tuple(members, prefix_items, path)
-    Error(Nil), Error(Nil) -> Error(UnsupportedDocument(path, UnboundedArray))
-    Ok(_), Ok(_) -> Error(UnsupportedDocument(path, UnsupportedTupleForm))
+    Error(Nil), Error(Nil) -> Error(unsupported(path, UnboundedArray))
+    Ok(_), Ok(_) -> Error(unsupported(path, UnsupportedTupleForm))
   }
 }
 
@@ -1094,11 +1291,9 @@ fn parse_tuple(
         list.append(left.invariants, right.invariants),
       )
     }
-    value.Array([]), _, _ ->
-      Error(MalformedDocument(items_path, InvalidTupleShape))
-    value.Array(_), _, _ ->
-      Error(UnsupportedDocument(path, UnsupportedTupleForm))
-    _, _, _ -> Error(MalformedDocument(items_path, ExpectedArray))
+    value.Array([]), _, _ -> Error(malformed(items_path, InvalidTupleShape))
+    value.Array(_), _, _ -> Error(unsupported(path, UnsupportedTupleForm))
+    _, _, _ -> Error(malformed(items_path, ExpectedArray))
   }
 }
 
@@ -1111,7 +1306,15 @@ fn parse_nullable(
       let left_path = at(path, Index(0))
       let right_path = at(path, Index(1))
       use left_members <- result.try(schema_members(left, left_path))
+      use left_members <- result.try(without_description(
+        left_members,
+        left_path,
+      ))
       use right_members <- result.try(schema_members(right, right_path))
+      use right_members <- result.try(without_description(
+        right_members,
+        right_path,
+      ))
       case is_null_schema(left_members), is_null_schema(right_members) {
         True, False -> {
           use parsed <- result.map(parse_schema(right, right_path))
@@ -1121,13 +1324,12 @@ fn parse_nullable(
           use parsed <- result.map(parse_schema(left, left_path))
           ParsedSchema(tree.NullableSchema(parsed.schema), parsed.invariants)
         }
-        _, _ -> Error(UnsupportedDocument(path, ArbitraryUnion))
+        _, _ -> Error(unsupported(path, ArbitraryUnion))
       }
     }
-    value.Array([]) ->
-      Error(MalformedDocument(path, InvalidNullableAlternatives))
-    value.Array(_) -> Error(UnsupportedDocument(path, ArbitraryUnion))
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    value.Array([]) -> Error(malformed(path, InvalidNullableAlternatives))
+    value.Array(_) -> Error(unsupported(path, ArbitraryUnion))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -1143,7 +1345,7 @@ fn parse_union(
   path: List(PathSegment),
 ) -> Result(ParsedSchema, DocumentError) {
   case alternatives {
-    value.Array([]) -> Error(MalformedDocument(path, InvalidTaggedAlternatives))
+    value.Array([]) -> Error(malformed(path, InvalidTaggedAlternatives))
     value.Array(items) -> {
       use parsed <- result.try(
         list.index_map(items, fn(item, index) { #(item, index) })
@@ -1169,7 +1371,7 @@ fn parse_union(
         list.append(duplicate, list.flat_map(parsed, fn(variant) { variant.1 })),
       ))
     }
-    _ -> Error(MalformedDocument(path, ExpectedArray))
+    _ -> Error(malformed(path, ExpectedArray))
   }
 }
 
@@ -1178,6 +1380,7 @@ fn parse_variant(
   path: List(PathSegment),
 ) -> Result(#(VariantSchema, List(InvariantLocation)), DocumentError) {
   use members <- result.try(schema_members(alternative, path))
+  use members <- result.try(without_description(members, path))
   use Nil <- result.try(only_members(
     members,
     ["type", "properties", "required", "additionalProperties"],
@@ -1187,15 +1390,14 @@ fn parse_variant(
   use Nil <- result.try(case kind {
     value.String("object") -> Ok(Nil)
     value.String(_) | value.Array(_) ->
-      Error(UnsupportedDocument(at(path, Field("type")), UnsupportedTaggedShape))
-    _ -> Error(MalformedDocument(at(path, Field("type")), ExpectedText))
+      Error(unsupported(at(path, Field("type")), UnsupportedTaggedShape))
+    _ -> Error(malformed(at(path, Field("type")), ExpectedText))
   })
   use #(properties, required) <- result.try(closed_object_parts(members, path))
   let properties_path = at(path, Field("properties"))
   use tag <- result.try(case list.key_find(properties, "tag") {
     Ok(tag_schema) -> parse_tag(tag_schema, at(properties_path, Field("tag")))
-    Error(Nil) ->
-      Error(UnsupportedDocument(properties_path, UnsupportedTaggedShape))
+    Error(Nil) -> Error(unsupported(properties_path, UnsupportedTaggedShape))
   })
   let names = list.map(properties, fn(property) { property.0 })
   let required_path = at(path, Field("required"))
@@ -1203,7 +1405,7 @@ fn parse_variant(
     Ok(payload), 2 -> {
       use Nil <- result.try(case list.sort(required, string.compare) {
         ["tag", "value"] -> Ok(Nil)
-        _ -> Error(UnsupportedDocument(required_path, UnsupportedTaggedShape))
+        _ -> Error(unsupported(required_path, UnsupportedTaggedShape))
       })
       use parsed <- result.map(parse_schema(
         payload,
@@ -1214,9 +1416,9 @@ fn parse_variant(
     Error(Nil), 1 ->
       case required {
         ["tag"] -> Ok(#(tree.VariantSchema(tag, None), []))
-        _ -> Error(UnsupportedDocument(required_path, UnsupportedTaggedShape))
+        _ -> Error(unsupported(required_path, UnsupportedTaggedShape))
       }
-    _, _ -> Error(UnsupportedDocument(path, UnsupportedTaggedShape))
+    _, _ -> Error(unsupported(path, UnsupportedTaggedShape))
   }
 }
 
@@ -1225,15 +1427,12 @@ fn parse_tag(
   path: List(PathSegment),
 ) -> Result(String, DocumentError) {
   use members <- result.try(schema_members(tag_schema, path))
+  use members <- result.try(without_description(members, path))
   use Nil <- result.try(only_members(members, ["const"], path))
   use tag <- result.try(required_member(members, "const", path))
   case tag {
     value.String(text) -> Ok(text)
-    _ ->
-      Error(UnsupportedDocument(
-        at(path, Field("const")),
-        UnsupportedTaggedShape,
-      ))
+    _ -> Error(unsupported(at(path, Field("const")), UnsupportedTaggedShape))
   }
 }
 
@@ -1243,9 +1442,9 @@ fn check_closed_object(
 ) -> Result(Nil, DocumentError) {
   case additional {
     value.Bool(False) -> Ok(Nil)
-    value.Bool(True) -> Error(UnsupportedDocument(path, OpenObject))
-    value.Object(_) -> Error(UnsupportedDocument(path, UnsupportedSchemaForm))
-    _ -> Error(MalformedDocument(path, ExpectedBoolean))
+    value.Bool(True) -> Error(unsupported(path, OpenObject))
+    value.Object(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+    _ -> Error(malformed(path, ExpectedBoolean))
   }
 }
 
@@ -1256,10 +1455,7 @@ fn required_names(
   use names <- result.try(text_items(raw, path))
   case repeated_at(names, set.new(), 0) {
     Some(#(name, index)) ->
-      Error(MalformedDocument(
-        at(path, Index(index)),
-        DuplicateRequiredName(name),
-      ))
+      Error(malformed(at(path, Index(index)), DuplicateRequiredName(name)))
     None -> Ok(names)
   }
 }
@@ -1276,10 +1472,7 @@ fn check_declared_required(
       case set.contains(declared, name) {
         True -> check_declared_required(rest, declared, path, index + 1)
         False ->
-          Error(UnsupportedDocument(
-            at(path, Index(index)),
-            UnsupportedSchemaForm,
-          ))
+          Error(unsupported(at(path, Index(index)), UnsupportedSchemaForm))
       }
   }
 }
@@ -1292,16 +1485,15 @@ fn expect_array_length(
   case raw {
     value.Number(found) ->
       case number.is_integer(found), number.compare(found, zero) {
-        False, _ -> Error(MalformedDocument(path, ExpectedInteger))
-        True, order.Lt -> Error(MalformedDocument(path, InvalidTupleShape))
+        False, _ -> Error(malformed(path, ExpectedInteger))
+        True, order.Lt -> Error(malformed(path, InvalidTupleShape))
         True, _ ->
-          number.to_int(found, 2000)
-          |> result.replace_error(UnsupportedDocument(
-            path,
-            UnsupportedSchemaForm,
-          ))
+          case number.to_int(found, 2000) {
+            Ok(length) -> Ok(length)
+            Error(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+          }
       }
-    _ -> Error(MalformedDocument(path, ExpectedInteger))
+    _ -> Error(malformed(path, ExpectedInteger))
   }
 }
 
@@ -1311,17 +1503,84 @@ fn expect_integer_bound(
 ) -> Result(Int, DocumentError) {
   use found <- result.try(expect_number(raw, path))
   // Numeric bounds are valid even when the integer codec cannot represent them.
-  number.to_int(found, 2000)
-  |> result.replace_error(UnsupportedDocument(path, UnsupportedSchemaForm))
+  case number.to_int(found, 2000) {
+    Ok(bound) -> Ok(bound)
+    Error(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+  }
 }
 
+/// The members of a schema object without its annotation keywords.
 fn schema_members(
   raw: Value,
   path: List(PathSegment),
 ) -> Result(List(#(String, Value)), DocumentError) {
   case raw {
-    value.Bool(_) -> Error(UnsupportedDocument(path, UnsupportedSchemaForm))
-    _ -> object_members(raw, path)
+    value.Bool(_) -> Error(unsupported(path, UnsupportedSchemaForm))
+    _ -> {
+      use members <- result.try(object_members(raw, path))
+      without_annotations(members, path)
+    }
+  }
+}
+
+/// Drop the Draft 2020-12 keywords that annotate an instance and never
+/// constrain it: the meta-data vocabulary (`title`, `default`, `examples`,
+/// `deprecated`, `readOnly`, `writeOnly`) and the core `$comment` and `$id`.
+/// `description` is also an annotation; `parse_schema_object` keeps it where
+/// the codec model holds one, and `without_description` drops it elsewhere.
+/// `format` and the content keywords are annotations by default in Draft
+/// 2020-12 too, but they state a constraint the schema author expects to
+/// hold, so they stay refused. Each annotation must have the type the
+/// meta-schema gives it.
+fn without_annotations(
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(List(#(String, Value)), DocumentError) {
+  list.try_fold(members, [], fn(kept, member) {
+    case annotation(member.0, member.1) {
+      Ok(True) -> Ok(kept)
+      Ok(False) -> Ok([member, ..kept])
+      Error(reason) -> Error(malformed(at(path, Field(member.0)), reason))
+    }
+  })
+  |> result.map(list.reverse)
+}
+
+/// Whether `name` is an annotation keyword to drop, and its value has the
+/// right type. `description` is checked but kept.
+fn annotation(name: String, raw: Value) -> Result(Bool, MalformedReason) {
+  case name, raw {
+    "title", value.String(_)
+    | "$comment", value.String(_)
+    | "$id", value.String(_)
+    -> Ok(True)
+    "title", _ | "$comment", _ | "$id", _ -> Error(ExpectedText)
+    "deprecated", value.Bool(_)
+    | "readOnly", value.Bool(_)
+    | "writeOnly", value.Bool(_)
+    -> Ok(True)
+    "deprecated", _ | "readOnly", _ | "writeOnly", _ -> Error(ExpectedBoolean)
+    "examples", value.Array(_) -> Ok(True)
+    "examples", _ -> Error(ExpectedArray)
+    "default", _ -> Ok(True)
+    // `description` is kept for the schema it describes, but its type is
+    // checked here so annotation errors follow document order.
+    "description", value.String(_) -> Ok(False)
+    "description", _ -> Error(ExpectedText)
+    _, _ -> Ok(False)
+  }
+}
+
+/// Drop a `description` where the codec model has no place for one: a union
+/// variant, its tag, and the null alternative of a nullable schema.
+fn without_description(
+  members: List(#(String, Value)),
+  path: List(PathSegment),
+) -> Result(List(#(String, Value)), DocumentError) {
+  case list.key_find(members, "description") {
+    Error(Nil) -> Ok(members)
+    Ok(value.String(_)) -> Ok(without_member(members, "description"))
+    Ok(_) -> Error(malformed(at(path, Field("description")), ExpectedText))
   }
 }
 
@@ -1331,7 +1590,7 @@ fn expect_number(
 ) -> Result(Number, DocumentError) {
   case raw {
     value.Number(found) -> Ok(found)
-    _ -> Error(MalformedDocument(path, ExpectedNumber))
+    _ -> Error(malformed(path, ExpectedNumber))
   }
 }
 
@@ -1345,10 +1604,10 @@ fn object_members(
         repeated_at(list.map(members, fn(member) { member.0 }), set.new(), 0)
       {
         Some(#(name, _)) ->
-          Error(MalformedDocument(at(path, Field(name)), DuplicateKey(name)))
+          Error(malformed(at(path, Field(name)), DuplicateKey(name)))
         None -> Ok(members)
       }
-    _ -> Error(MalformedDocument(path, ExpectedObject))
+    _ -> Error(malformed(path, ExpectedObject))
   }
 }
 
@@ -1359,16 +1618,12 @@ fn only_members(
 ) -> Result(Nil, DocumentError) {
   list.try_each(members, fn(member) {
     case member.0 {
-      "$schema" ->
-        Error(UnsupportedDocument(at(path, Field("$schema")), NestedDialect))
+      "$schema" -> Error(unsupported(at(path, Field("$schema")), NestedDialect))
       name ->
         case list.contains(allowed, name) {
           True -> Ok(Nil)
           False ->
-            Error(UnsupportedDocument(
-              at(path, Field(name)),
-              UnsupportedKeyword(name),
-            ))
+            Error(unsupported(at(path, Field(name)), UnsupportedKeyword(name)))
         }
     }
   })
@@ -1379,11 +1634,11 @@ fn required_member(
   name: String,
   path: List(PathSegment),
 ) -> Result(Value, DocumentError) {
-  list.key_find(members, name)
-  |> result.replace_error(UnsupportedDocument(
-    at(path, Field(name)),
-    UnsupportedSchemaForm,
-  ))
+  case list.key_find(members, name) {
+    Ok(found) -> Ok(found)
+    Error(Nil) ->
+      Error(unsupported(at(path, Field(name)), UnsupportedSchemaForm))
+  }
 }
 
 fn without_member(
@@ -1398,7 +1653,7 @@ fn invariant_path(
   locations: List(InvariantLocation),
 ) -> List(PathSegment) {
   case list.find(locations, fn(location) { location.error == error }) {
-    Ok(location) -> location.path
+    Ok(location) -> list.reverse(location.path)
     Error(Nil) -> []
   }
 }

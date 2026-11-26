@@ -70,12 +70,12 @@
 //// fields reports its path when the dependent field's codec is built from
 //// the fields before it; see `try_map`.
 ////
-//// `decode_json` applies a 1 MiB byte bound and rejects duplicate keys.
-//// `decode_json_with_limits` takes a different byte bound. Both targets decode
+//// `decode_json` applies `value.default_limits()`, a 1 MiB byte bound and a
+//// nesting-depth bound of 128, and rejects duplicate keys.
+//// `decode_json_with_limits` takes other bounds. Both targets decode
 //// built-in codecs directly from the native parse tree; custom codecs and
 //// `value()` materialize their requested `Value` subtree. JavaScript uses
 //// JSON.parse with exact source retention and strict duplicate/Unicode checks.
-//// Neither target applies a depth or value-count limit.
 //// `to_json` and `decoder` bridge to `gleam/json` and
 //// `gleam/dynamic/decode`.
 ////
@@ -608,7 +608,7 @@ pub fn encode_json(codec: Codec(a), item: a) -> Result(String, EncodeError) {
   }
 }
 
-/// Parse JSON text within the default byte bound and decode it.
+/// Parse JSON text within `value.default_limits()` and decode it.
 /// Duplicate keys are rejected; numeric projection follows the selected codec.
 /// A parse failure is
 /// `DecodeError([], InvalidJson(error))`.
@@ -616,7 +616,7 @@ pub fn decode_json(codec: Codec(a), text: String) -> Result(a, DecodeError) {
   decode_json_with_limits(codec, text, value.default_limits())
 }
 
-/// Like `decode_json`, with a caller-selected byte bound.
+/// Like `decode_json`, with caller-selected byte and depth bounds.
 pub fn decode_json_with_limits(
   codec: Codec(a),
   text: String,
@@ -1923,8 +1923,8 @@ type Identity
 @external(javascript, "../../json_blueprint_ffi.mjs", "identity")
 fn new_identity() -> Identity
 
-@external(erlang, "gleam_dynamic", "identity")
-@external(javascript, "../../gleam_dynamic.mjs", "identity")
+@external(erlang, "json_blueprint_ffi", "coerce")
+@external(javascript, "../../json_blueprint_ffi.mjs", "coerce")
 fn coerce(item: a) -> b
 
 /// A codec for a sum type. Each case is a `variant` with a payload or a

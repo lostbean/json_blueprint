@@ -1,20 +1,21 @@
-# Migrating JSON Blueprint from 1.7.1 to 2.0
+# Migrating JSON Blueprint from 1.x
 
-JSON Blueprint 2.0 includes the legacy decoder and schema modules alongside
-typed codecs, exact JSON values, finite runtime contracts, and source generators.
-Upgrading the package can retain your legacy wire format. Moving an application
-to codecs requires a separate review of its accepted and emitted JSON.
+JSON Blueprint 3.0 removes the 1.x decoder and schema modules. Typed codecs,
+exact JSON values, finite runtime contracts and source generators replace them.
+Moving an application from 1.x to codecs requires a review of its accepted and
+emitted JSON.
 
-This guide compares published 1.7.1 with published 2.0.0. It does not claim
-complete equivalence for every legacy schema, error path, or numeric boundary.
+This guide compares published 1.7.1 with the current codec API. It does not
+claim complete equivalence for every 1.x schema, error path, or numeric
+boundary.
 
 ## Update the dependency
 
-Update the application to JSON Blueprint 2 from Hex and retain the resolved
+Update the application to the current JSON Blueprint from Hex and retain the resolved
 version in `manifest.toml`:
 
 ```sh
-gleam add json_blueprint@2
+gleam add json_blueprint
 gleam build --warnings-as-errors
 gleam test
 ```
@@ -23,35 +24,39 @@ Run every target your application supports. Update each independently resolved
 example, adapter, and consumer through Gleam as well. Do not replace a historical
 oracle dependency merely to make it match the application dependency.
 
-## Keep the legacy API first
+## The 1.x API is removed
 
-The `json/blueprint` combinators and `json/blueprint/schema` remain available.
-They are frozen, not formally deprecated, and have no `@deprecated` annotations.
-Existing legacy union, enum, optional, tuple, and recursive forms can stay on
-that API while you review a codec migration. Address these package-upgrade
-changes before changing the application's wire format:
+`json/blueprint` (`Decoder`, `FieldDecoder`, `decode0`..`decode9`, `field`,
+`optional_field`, the tuple, union and enum helpers, `self_decoder`,
+`reuse_decoder`, `decode` and `decode_with_max_bytes`) and
+`json/blueprint/schema` are gone in 3.0. They parsed with `gleam/json` behind a
+1 MiB byte check only, so they admitted documents nested deeper than the
+default depth bound and repeated keys, which every other text decoder refuses,
+and they converted each number to a native Int or Float while parsing. The strict
+parser keeps each number's exact value until a codec projects it, so
+`codec.number()` sees `0.1` exactly, while `codec.float()` still rounds it to
+the nearest float. Generated modules lose `decode_<name>_json_native` for the
+same reason. Code that still uses either does not compile against 3.0.
 
-| Change in 2.0                                                          | Application action                                                                                                                                                                                                                                                      |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Decoder` and `FieldDecoder` are opaque                                | Replace constructor calls, pattern matches, and field access with supported combinators and accessors. Use `get_dynamic_decoder` to obtain the decoding function and `generate_json_schema` to render a decoder's schema.                                               |
-| `json/blueprint/dynamic` has been removed from the public module paths | Move dynamic decoding and error types to `gleam/dynamic/decode`. Its API is not a mechanical module-name replacement for every old helper.                                                                                                                              |
-| `get_dynamic_decoder` returns standard-library decode errors           | Update error annotations and constructor matches to `gleam/dynamic/decode.DecodeError`. The fields remain `expected`, `found`, and `path`. The return value is still `fn(Dynamic) -> Result(t, List(decode.DecodeError))`, rather than a standard-library `Decoder(t)`. |
-| `blueprint.decode` has a UTF-8 byte precheck                           | Text above 1,048,576 bytes returns `json.UnableToDecode` before native parsing. Use `blueprint.decode_with_max_bytes(using:, from:, max_bytes:)` with an application-selected bound for larger inputs.                                                                  |
+| 1.x                                                | Replacement                                                                                                    |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `blueprint.decode(using:, from:)`                  | `codec.decode_json(codec, text)`                                                                               |
+| `blueprint.decode_with_max_bytes`                  | `codec.decode_json_with_limits(codec, text, value.default_limits() \|> value.with_max_bytes(n))`               |
+| `decode1`..`decode9` with `field`                  | `codec.field(name, child, get:)` chained with `use`, finished by `codec.success`                               |
+| `optional_field`                                   | `codec.optional_field`; wrap the child in `codec.nullable` to accept `null`                                    |
+| `list`, `tuple2`, `map`                            | `codec.list`, `codec.pair`, `codec.map` / `codec.try_map`                                                      |
+| `union_type_encoder` / `union_type_decoder`        | `codec.union` with `variant` and `unit_variant`; the envelope changes (below)                                  |
+| `enum_type_encoder` / `enum_type_decoder`          | `codec.string_enum`; the label is no longer wrapped in an object                                               |
+| `generate_json_schema`, `json/blueprint/schema`    | `codec.schema_json` and `codec.schema`, Draft 2020-12                                                          |
+| `get_dynamic_decoder`                              | `codec.decoder(codec)`, a `gleam/dynamic/decode` decoder for data another parser produced                      |
+| `self_decoder`, `reuse_decoder` (recursive types)  | No codec form: `value.parse(text, value.default_limits())`, then walk the `Value` with your own function       |
+| generated `decode_<name>_json_native`              | generated `decode_<name>_json`                                                                                 |
 
-Custom code that constructed raw decoder records may need redesign. There is
-no promised one-for-one replacement for those constructors. Prefer a supported
-composition of legacy combinators, or review a codec conversion for that boundary.
-
-The legacy path continues to use `gleam/json` for parsing. Raising its byte
-bound does not add strict duplicate-key, nesting, value-count, or exact-number
-guarantees. Keep `self_decoder` and `reuse_decoder` for recursive types; the
-finite codec and runtime-contract profile does not support recursive schemas.
-
-Applications feeding JavaScript objects directly to a Dynamic decoder should
-also replay their object-lookup fixtures. Lookup now handles Gleam Dicts,
-Maps, WeakMaps, null-prototype objects, and present `undefined` entries more
-consistently. These corrections affect direct Dynamic input; the retained
-legacy JSON union and enum encoders keep their wire forms.
+Recursive data loses its derived schema. Read it from a parsed `Value`, as the
+migration example's `parse_category` does: the depth bound then applies before
+your function recurses. Data stored in the 1.x union envelope
+(`{"type":...,"data":...}`) or enum object (`{"enum":...}`) needs an
+application reader or a data migration before a codec reads it.
 
 ## Adopt codecs one boundary at a time
 
@@ -62,10 +67,10 @@ with a native getter for each record member, and finish the record with
 `codec.schema_json` at the boundary.
 
 The [compiled migration example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/test/migration_test.gleam)
-converts one legacy `Decoder(Person)` to a `Codec(Person)` and checks both
-implementations. It also exercises these intentional differences:
+converts one 1.x `Decoder(Person)` to a `Codec(Person)`. It also exercises
+these intentional differences:
 
-| Boundary                   | Retained legacy API                                                                 | Codec API                                                                                                                       |
+| Boundary                   | 1.x API                                                                             | Codec API                                                                                                                       |
 | -------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Record members             | Nonempty record decoders ignore unknown members                                     | Built-in record codecs reject unknown members                                                                                   |
 | Optional string property   | Missing and `null` both decode to `None`                                            | A plain `optional_field` accepts absence and rejects `null`                                                                     |
@@ -76,20 +81,21 @@ implementations. It also exercises these intentional differences:
 Capture representative stored values and protocol messages before changing a
 boundary. Include missing, null, extra, malformed, and recursive cases. Check
 both decoding and emitted JSON against those fixtures. If stored data or peers
-still use the old form, retain a legacy reader or implement an explicit
-application migration before switching writers. There is no automatic conversion
-between arbitrary legacy decoders and codecs.
+still use the old form, write an application reader for it or migrate the data
+before switching writers. There is no automatic conversion from 1.x decoders to
+codecs.
 
 The [optional-field example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/src/examples/optional_fields.gleam)
 shows the three-state representation and its encoding behavior.
 
 ## Review parser and number policy
 
-`codec.decode_json` admits at most 1 MiB of UTF-8 by default and rejects
-repeated object keys. Use `codec.decode_json_with_limits` and
-`value.with_max_bytes` to select another byte limit. Depth, value-count and
-global numeric admission limits and their setters have been removed. Consumers
-that require those policies must inspect their decoded data. Explicit
+`codec.decode_json` admits at most 1 MiB of UTF-8 nested at most 128 levels
+deep by default, and rejects repeated object keys. Use
+`codec.decode_json_with_limits` with `value.with_max_bytes` or
+`value.with_max_depth` to select other bounds, or `value.unlimited()` for
+trusted text. Value-count and global numeric admission limits and their
+setters have been removed; the byte bound also bounds the number of values. Explicit
 `number.parse(token, limits)` still supports caller-selected numeric limits.
 On JavaScript, raising those limits cannot bypass exact integer representation:
 unrepresentable written or normalized exponents and comparison magnitudes
@@ -107,8 +113,7 @@ the JavaScript native tree is allocated before duplicate-key rejection.
 JavaScript strict parsing requires reviver `context.source` support. The old
 portable parser fallback has been removed. Runtimes without this capability
 return `UnsupportedRuntime`, not a syntax error or rounded values. This applies
-to strict text/byte parsing and codec JSON decoding; the frozen legacy API is
-unchanged. See [browser/runtime requirements and executed checks](https://github.com/gleam-dream/json_blueprint/blob/main/docs/BROWSER-SUPPORT.md).
+to strict text/byte parsing and codec JSON decoding. See [browser/runtime requirements and executed checks](https://github.com/gleam-dream/json_blueprint/blob/main/docs/BROWSER-SUPPORT.md).
 
 ### Diagnostics and object order
 
@@ -151,14 +156,12 @@ for explicit limits. Run large-number fixtures on each intended target.
 
 ## Review schemas and runtime contracts
 
-Legacy schema rendering remains in `json/blueprint/schema`. Its declared
-Draft-07 label does not prove that every emitted keyword belongs to that dialect
-or that the decoder enforces every described constraint. Keep schema snapshots
-when retaining that API.
+The 1.x Draft-07 schema renderer is removed. Compare a codec's schema with the
+schema snapshots you kept from 1.x before publishing it.
 
 Modern codecs render Draft 2020-12 schemas through an opaque `codec.Schema`.
 Use `codec.view` and its opaque children to inspect a schema. Runtime contracts
-admit only the finite profile of supported shapes; a broader legacy description
+admit only the finite profile of supported shapes; a broader 1.x description
 cannot be passed through as an equivalent contract. References, recursive
 definitions, and other unsupported forms are refused. Review provider-specific
 schema restrictions in the application as well.
@@ -178,7 +181,7 @@ was an unpublished checkout package; remove that dependency if you used it.
 Keep the same generator imports and depend on `json_blueprint` alone.
 
 Generation returns source. Your build task writes, formats, compiles, and reviews
-that source for each target. Regenerate checked-in modules with the 2.0
+that source for each target. Regenerate checked-in modules with the 3.0
 generator, review the diff, and rerun parity and application tests before
 committing the output. The schema generator's attribution header now names
 JSON Blueprint. Do not edit generator output by hand to make a drift check pass.
@@ -187,8 +190,9 @@ Typed-definition output now registers specialized text encoding and direct
 strict decoding on its codec accessor. Ordinary `codec.encode_json` and
 `codec.decode_json` therefore use those functions. Strict decoding shares the
 runtime parser and its duplicate-key, Unicode, exact-number and byte guarantees;
-it no longer constructs an intermediate complete `Value` tree. The explicitly
-named `decode_<name>_json_native` remains the weaker standard-JSON entry point.
+it no longer constructs an intermediate complete `Value` tree. From 3.0,
+`decode_<name>_json` is the only generated text decoder; regenerate checked-in
+modules to drop `decode_<name>_json_native`.
 
 Two observable details now align with runtime codecs. The shared generated
 Value decoder checks declared fields before unknown or repeated members, including

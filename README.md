@@ -9,8 +9,8 @@ Define a JSON codec in Gleam to encode native values, decode JSON strictly, and
 publish a Draft 2020-12 schema from the same definition.
 
 JSON Blueprint 2.0 includes typed codecs, exact JSON values, runtime schema
-contracts, and build-time source generators in one package. The legacy decoder
-and schema modules remain available for applications upgrading from 1.x.
+contracts, and build-time source generators in one package. Every text
+decoder parses within a byte bound and a nesting-depth bound by default.
 
 ## When to use it
 
@@ -19,7 +19,7 @@ and schema modules remain available for applications upgrading from 1.x.
 - Validate arguments against a schema received at runtime, such as a tool
   declaration, when the schema fits the supported profile below.
 - Admit untrusted JSON text with duplicate-key rejection, exact numbers, and
-  a configurable byte limit. Applications own additional structural limits.
+  byte and nesting-depth limits that are on by default.
 
 For ordinary serialization, `gleam/json` is enough. Applications own HTTP,
 authorization, protocol policy, and effects in custom callbacks.
@@ -73,16 +73,10 @@ Install JSON Blueprint 2 from Hex:
 gleam add json_blueprint@2
 ```
 
-Published 1.7.1 provides the legacy `json/blueprint` and
-`json/blueprint/schema` modules. To stay on that API:
-
-```sh
-gleam add json_blueprint@1.7.1
-```
-
-Before upgrading an existing application, follow the
-[2.0 migration guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/MIGRATION.md).
-The package upgrade and adopting codecs are separate changes.
+The 1.x `json/blueprint` and `json/blueprint/schema` modules are removed in
+3.0; 2.x releases still include them. Before upgrading an existing
+application, follow the
+[migration guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/MIGRATION.md).
 
 ## Choosing a codec
 
@@ -211,11 +205,13 @@ Gleam checks that the `case` covers every constructor.
 
 ## Parsing and runtime requirements
 
-`value.default_limits()` admits at most 1 MiB of UTF-8 text. Change this with
-`value.with_max_bytes` and pass the result to `codec.decode_json_with_limits`,
-`value.parse`, or `contract.parse`. There are no global depth, value-count or
-numeric-token limits. Consumers own structural admission policies; a byte
-limit is not a heap quota.
+`value.default_limits()` admits at most 1 MiB of UTF-8 text nested at most 128
+levels deep, the recursion limit `serde_json` uses. Change either bound with
+`value.with_max_bytes` or `value.with_max_depth` and pass the result to
+`codec.decode_json_with_limits`, `value.parse`, or `contract.parse`. A deeper
+document fails with `DepthLimitExceeded`. `value.unlimited()` removes both
+bounds; use it only for trusted text. The byte limit also bounds the number of
+values. There is no numeric-token limit, and a byte limit is not a heap quota.
 
 Both targets decode built-in codecs directly from native parser output, avoiding
 an intermediate `Value` tree. Erlang/OTP 27+ uses JSON parser hooks; JavaScript
@@ -242,27 +238,26 @@ behavior.
 
 ## Upgrading from 1.x
 
-Follow the [2.0 migration guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/MIGRATION.md) when upgrading from
-published 1.7.1. You can keep using `json/blueprint` and
-`json/blueprint/schema`; adopting the codec API is a separate application
-change. Keep the legacy decoder for recursive types. The legacy API is frozen,
-not formally deprecated; it has no `@deprecated` annotations.
+The 1.x `Decoder` API (`json/blueprint` and `json/blueprint/schema`) has been
+removed: it parsed with `gleam/json` behind a byte check only, which let deeply
+nested input past the default depth bound. The
+[migration guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/MIGRATION.md#the-1x-api-is-removed)
+maps each 1.x form to its replacement:
 
-1. Build `Decoder` and `FieldDecoder` with the published combinators. Their
-   constructors and record fields are now opaque.
-2. Replace imports of the removed `json/blueprint/dynamic` module with the
-   appropriate `gleam/dynamic/decode` API. `get_dynamic_decoder` still returns
-   a function, and its errors now use that module's `DecodeError` type.
-3. Check large inputs: `blueprint.decode` now rejects text above 1 MiB of UTF-8
-   before parsing. Use `blueprint.decode_with_max_bytes` for an explicit larger
-   bound.
-4. Run your stored JSON and schema fixtures before adopting codecs. Codec
-   records reject unknown fields, optional fields distinguish absence from
-   `null`, and union/enum wire forms differ from the legacy encoders.
+1. Record, list, optional, tuple, union and enum decoders become codecs built
+   with `codec.field`, `codec.optional_field`, `codec.list`, `codec.pair`,
+   `codec.union` and `codec.string_enum`. Codec records reject unknown fields,
+   optional fields distinguish absence from `null`, and union/enum wire forms
+   differ from the 1.x encoders: replay stored JSON before switching.
+2. `blueprint.decode` becomes `codec.decode_json`, and
+   `decode_with_max_bytes` becomes `codec.decode_json_with_limits` with
+   `value.with_max_bytes`.
+3. Recursive types (`self_decoder`, `reuse_decoder`) have no codec form. Parse
+   with `value.parse(text, value.default_limits())` and walk the `Value` with
+   your own function; no schema is derived for them.
 
-The [compiled migration example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/test/migration_test.gleam) exercises
-both APIs and their wire differences on Erlang and JavaScript. The guide covers
-parser limits, schema support, exact numbers, and source generation as well.
+The [compiled migration example](https://github.com/gleam-dream/json_blueprint/blob/main/examples/test/migration_test.gleam)
+shows each replacement and wire difference on Erlang and JavaScript.
 
 ## Build-time generation
 
@@ -315,13 +310,12 @@ pub fn example() {
   again and compares, as the [compiled fixture test](https://github.com/gleam-dream/json_blueprint/blob/main/test/compiled_codec_test.gleam)
   does here. Generation does not write files or start a process.
 - A generated module exports `encode_<name>`, `decode_<name>`,
-  `encode_<name>_json`, `decode_<name>_json` (strict parser),
-  `decode_<name>_json_native` (`gleam/json`, 1 MiB pre-check),
-  `<name>_schema()` and `<name>_codec()`.
+  `encode_<name>_json`, `decode_<name>_json` (the strict parser with the
+  default limits), `<name>_schema()` and `<name>_codec()`.
 - The generated codec accessor uses specialized text encoding and direct typed
   decoding through ordinary `codec.encode_json` and `codec.decode_json` calls.
   Strict decoding shares the runtime parser, including duplicate-key rejection,
-  exact numeric conversion, Unicode checks, and byte limits. No extra parser or
+  exact numeric conversion, Unicode checks, and byte and depth limits. No extra parser or
   global cache is installed.
 - Generated schema structures avoid rediscovering the definition; schema JSON
   still renders on demand. Wrapping a generated codec in an ordinary container

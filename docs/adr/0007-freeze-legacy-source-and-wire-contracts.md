@@ -2,6 +2,8 @@
 
 <a id="adr-0007"></a>
 
+- **Status.** Superseded by [ADR-0020](0020-remove-the-1x-api.md#adr-0020), which removes the 1.x API.
+
 - **Decision.** The root module and legacy schema module retain the frozen 1.x combinator surface. New schema-aware work uses Codec. Existing legacy envelopes and recursive decoder paths remain accessible without silently converting stored data.
 - **Rationale.** Legacy decoders are one-way and can be permissive where generated descriptions are closed. Their union/enum formats and null/absence semantics differ from the strict codec language. Recursive 1.x references are not implemented by the finite modern profile.
 - **Alternatives.** Removing legacy access forces stored data migration without a proved contract. Claiming a complete automatic adapter masks schema/decoder disagreements. Merely relabeling the legacy dialect cannot fix descriptions using later keywords under a Draft-07 label.

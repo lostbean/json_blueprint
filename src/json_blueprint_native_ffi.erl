@@ -1,7 +1,7 @@
 % Native JSON representation and accessors for json/blueprint/internal/native.
 -module(json_blueprint_native_ffi).
 -export([
-    parse/1,
+    parse/2,
     kind/1,
     string/1,
     boolean/1,
@@ -15,17 +15,29 @@
     floating/1
 ]).
 
-parse(Source) ->
+% MaxDepth is none or {some, N}. Each container accumulator is {Items, State}:
+% State is the container's depth while it is admitted, or the refusal that
+% replaced its contents. The depth check is one comparison when a container
+% opens; pushes keep the two-element accumulator of the unbounded parser.
+parse(Source, MaxDepth) ->
+    % Without a bound, the largest small integer stands in: no document within
+    % memory nests that deep, and the comparison stays between small integers,
+    % which an atom such as infinity would slow down.
+    Max =
+        case MaxDepth of
+            {some, N} -> N;
+            none -> 1 bsl 59 - 1
+        end,
     Decoders = #{
-        object_start => fun(_) -> {#{}, none} end,
+        object_start => fun(Outer) -> open(#{}, Outer, Max) end,
         object_push => fun object_push/3,
         object_finish => fun object_finish/2,
-        array_start => fun(_) -> {[], none} end,
+        array_start => fun(Outer) -> open([], Outer, Max) end,
         array_push => fun array_push/2,
         array_finish => fun array_finish/2,
         float => fun(Token) -> {json_blueprint_decimal, Token} end
     },
-    try json:decode(Source, nil, Decoders) of
+    try json:decode(Source, {root, 0}, Decoders) of
         {Value, _, Rest} ->
             case whitespace(Rest) of
                 false ->
@@ -45,31 +57,40 @@ parse(Source) ->
             {error, {syntax, <<"unexpected end">>}}
     end.
 
+% A container opened inside a refused one stays refused, so nothing is
+% retained below a refusal.
+open(Empty, {_, Depth}, Max) when is_integer(Depth), Depth < Max ->
+    {Empty, Depth + 1};
+open(Empty, {_, Depth}, Max) when is_integer(Depth) ->
+    {Empty, {depth_limit, Max}};
+open(Empty, {_, Error}, _) ->
+    {Empty, Error}.
+
 % OTP's float path catches exceptions across downstream callbacks. Carry
-% duplicate failures through container results instead of throwing them.
-% Syntax validation therefore completes before a duplicate error is returned.
-object_push(K, V, {Map, none}) ->
+% duplicate and depth failures through container results instead of throwing
+% them. Syntax validation therefore completes before a refusal is returned.
+object_push(K, V, {Map, Depth}) when is_integer(Depth) ->
     Error =
         case maps:is_key(K, Map) of
             true -> {duplicate_key, K};
             false -> admission(V)
         end,
     case Error of
-        none -> {Map#{K => V}, none};
+        none -> {Map#{K => V}, Depth};
         _ -> {#{}, Error}
     end;
 object_push(_, _, {_, Error}) ->
     {#{}, Error}.
-object_finish({Map, none}, Old) -> {Map, Old};
+object_finish({Map, Depth}, Old) when is_integer(Depth) -> {Map, Old};
 object_finish({_, Error}, Old) -> {{json_blueprint_parse_error, Error}, Old}.
-array_push(V, {Items, none}) ->
+array_push(V, {Items, Depth}) when is_integer(Depth) ->
     case admission(V) of
-        none -> {[V | Items], none};
+        none -> {[V | Items], Depth};
         Error -> {[], Error}
     end;
 array_push(_, {_, Error}) ->
     {[], Error}.
-array_finish({Items, none}, Old) -> {lists:reverse(Items), Old};
+array_finish({Items, Depth}, Old) when is_integer(Depth) -> {lists:reverse(Items), Old};
 array_finish({_, Error}, Old) -> {{json_blueprint_parse_error, Error}, Old}.
 admission({json_blueprint_parse_error, Error}) -> Error;
 admission(_) -> none.

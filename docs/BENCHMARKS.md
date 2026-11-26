@@ -16,6 +16,11 @@ states the verification model, and [AGENTS.md](../AGENTS.md#references) points h
 | `scripts/contract_encoding_benchmark.py` | Contract validation and encoding costs |
 | `scripts/schema_generation_benchmark.py` | Generated, handwritten and dynamic schema-consumer operations |
 | `gleam run -m copy_cost_profile_runner` | Copied, serialized and in-heap size of record-heavy codecs on the BEAM |
+| `gleam run -m render_benchmark_runner` | `value.to_string` on deeply nested and wide values, on either target |
+| `gleam run -m limit_benchmark_runner` | Strict native parsing with the default byte and depth bounds and with `value.unlimited()`, on either target |
+| `gleam run -m contract_load_benchmark_runner` | `contract.load` on deeply nested schema documents, on either target |
+| `gleam run -m contract_decode_benchmark_runner` | `contract.decode` against a function prepared with `contract.decoder`, on either target |
+| `gleam run -m contract_validate_benchmark_runner` | `contract.validate` against large enums and unions, with ordinary controls, on either target |
 
 Native parsing does not enforce the same duplicate-key, exact-number or schema
 contracts. Compare equivalent successful values, and report these differences
@@ -452,6 +457,161 @@ build):
 | Short enums scanned for repeats | yes | Node construction 0.87 → 0.25, encode 0.89 → 0.73 |
 | A record step yields only its fields | yes | Erlang `codec_encode_decode_roundtrip` 1.70 → 0.96; in-field encode 0.98 → 0.94; words 0.94–0.96 → 0.87–0.91 on records |
 | Direct JSON text for `encode_json` | no | Erlang encode 0.98 → 1.06, union encode 1.00 → 1.22; decode slower on both targets |
+
+### Value rendering, 2026-11-24
+
+`value.to_string` built the text of every array and object by string
+concatenation, so each enclosing level copied the text of all its descendants
+again and the cost grew with the square of the nesting depth on Erlang. It now
+collects tokens in one list and assembles the text once. `gleam run -m
+render_benchmark_runner` renders each value once untimed and then five times;
+a cell is the median of those five, with the minimum and maximum in brackets,
+in milliseconds. One VM per build on a shared ten-core Apple silicon machine
+with other builds running, Erlang/OTP 29 and Node 24.21.0.
+
+| Value | Target | Before | After |
+| --- | --- | ---: | ---: |
+| Arrays nested 12,500 deep | Erlang | 17.3 [17.3–17.4] | 0.31 [0.23–0.34] |
+| Arrays nested 25,000 deep | Erlang | 112 [112–112] | 0.75 [0.47–1.28] |
+| Arrays nested 50,000 deep | Erlang | 1,027 [1,020–1,041] | 1.04 [0.96–1.37] |
+| Arrays nested 100,000 deep | Erlang | 7,369 [7,025–7,567] | 2.17 [1.97–3.02] |
+| Objects nested 12,500 deep | Erlang | 250 [118–284] | 1.04 [0.86–1.19] |
+| Objects nested 25,000 deep | Erlang | 1,749 [954–1,864] | 1.97 [1.59–2.71] |
+| Objects nested 50,000 deep | Erlang | 10,037 [7,115–10,976] | 5.08 [4.08–5.83] |
+| Array of 250,000 integers | Erlang | 18.3 [14.3–20.9] | 13.7 [11.8–14.5] |
+| Object of 50,000 string members | Erlang | 26.7 [17.6–31.8] | 7.06 [6.33–7.56] |
+| Arrays nested 4,000 deep | Node | 0.35 [0.27–0.75] | 0.29 [0.19–0.68] |
+| Objects nested 2,000 deep | Node | 0.25 [0.24–0.27] | 0.28 [0.26–0.73] |
+| Array of 250,000 integers | Node | 41.7 [39.8–43.7] | 33.6 [31.8–43.7] |
+| Object of 50,000 string members | Node | 6.61 [5.33–14.9] | 6.63 [5.85–13.5] |
+
+Doubling the depth multiplied the Erlang time by six to nine before and by
+about two after. Node was already linear, because V8 concatenates strings
+lazily; its deep cases stay shallow because rendering recurses on the host
+stack.
+
+### Default depth bound, 2026-11-25
+
+[ADR 0019](adr/0019-bound-nesting-depth-by-default.md) bounds nesting depth to
+128 by default. `gleam run -m limit_benchmark_runner` parses each document to
+the native tree, without building a `Value`, in seven batches of five parses
+after one untimed batch, and prints the median batch mean. "Before" is the
+parent `main` commit, whose default is bytes only, run from a copy of the same
+runner. Before and after ran back to back in three rounds, one VM per run. A
+cell is the median of the three run medians in milliseconds, with the lowest
+and highest run median in brackets. Every document passes both bounds. Shared
+ten-core Apple silicon machine with other builds running, Erlang/OTP 29 and
+Node 24.21.0.
+
+| Document | Target | Before | Default limits | `unlimited()` |
+| --- | --- | ---: | ---: | ---: |
+| 15,000 records, 1 MiB | Erlang | 14.2 [14.2–14.5] | 9.5 [9.4–9.8] | 9.9 [9.5–11.9] |
+| 250,000 integers, 0.5 MiB | Erlang | 9.4 [9.3–9.4] | 9.0 [8.9–9.1] | 9.3 [9.1–9.4] |
+| 2,000 chains nested 100 deep, 0.4 MiB | Erlang | 8.8 [8.7–12.4] | 9.7 [9.6–9.8] | 9.8 [9.8–11.2] |
+| 15,000 records, 1 MiB | Node | 27.8 [27.7–28.2] | 28.4 [27.7–28.6] | 25.9 [25.9–26.0] |
+| 250,000 integers, 0.5 MiB | Node | 63.7 [61.9–67.0] | 65.3 [63.6–68.5] | 61.1 [60.7–66.3] |
+| 2,000 chains nested 100 deep, 0.4 MiB | Node | 43.6 [43.0–44.0] | 45.0 [43.4–45.2] | 43.5 [43.4–43.7] |
+
+On Erlang the default limits cost about a tenth on the document made only of
+nested arrays, where the earlier opt-in design that also counted values cost
+about two thirds (9.9 to 16.8 ms on the same machine, 2026-11-24). The record
+row was faster than before in every round, also with `unlimited()`, and two
+further rounds in the reverse order agreed (before 16.1 and 14.2, after 10.0
+and 9.4); the cause was not investigated. The Erlang `unlimited()` column
+comes from three later runs of the final build. An earlier build marked the
+absent bound with an atom, and its comparison with an integer depth made the
+unlimited chain row slower than the bounded one (10.9 ms); the final build
+uses the largest small integer. On Node the rows overlap.
+
+### Schema loading by nesting depth, 2026-11-24
+
+`contract.load` extended the document path with `list.append` at every
+keyword it entered, on the success path too, so a schema nested `d` levels
+allocated on the order of `d` squared list cells. It now keeps the path
+reversed and reverses it only when an error is reported. `gleam run -m
+contract_load_benchmark_runner` loads `{"type":"array","items":…}` nested to
+each depth once untimed and then five times; a cell is the median in
+milliseconds, with the minimum and maximum in brackets. One VM per build on a
+shared ten-core Apple silicon machine with other builds running, Erlang/OTP
+29 and Node 24.21.0.
+
+| List schemas nested | Target | Before | After |
+| --- | --- | ---: | ---: |
+| 2,500 deep | Erlang | 28.9 [15.8–47.4] | 0.84 [0.81–0.96] |
+| 5,000 deep | Erlang | 110 [81.7–119] | 1.71 [1.63–1.81] |
+| 10,000 deep | Erlang | 477 [434–502] | 3.28 [3.08–3.77] |
+| 20,000 deep | Erlang | 3,663 [1,712–7,498] | 6.85 [6.57–7.79] |
+| 125 deep | Node | 0.91 [0.53–1.04] | 0.54 [0.44–0.82] |
+| 250 deep | Node | 1.76 [1.47–1.79] | 0.69 [0.52–0.75] |
+| 500 deep | Node | 5.15 [4.25–11.0] | 1.15 [1.11–1.24] |
+| 1,000 deep | Node | 19.6 [13.0–20.2] | 2.31 [2.29–2.84] |
+
+Doubling the depth multiplied the time by about four or more before and by
+about two after. The Node cases stay shallow because loading recurses on the
+host stack.
+
+### Decoding validated values, 2026-11-24
+
+`contract.decode` discovers the codec's schema, normalizes it and compares it
+with the validating contract on every call. `contract.decoder` does that once
+and returns a function. `gleam run -m contract_decode_benchmark_runner` times
+seven batches of 2,000 calls after one untimed batch; a cell is the median
+batch mean in nanoseconds per call, with the minimum and maximum in
+brackets. The last column is `codec.decode` with no contract check. One VM on
+a shared ten-core Apple silicon machine with other builds running, Erlang/OTP
+29 and Node 24.21.0.
+
+| Value | Target | `contract.decode` | Prepared decoder | `codec.decode` alone |
+| --- | --- | ---: | ---: | ---: |
+| Two-field record | Erlang | 473 [457–484] | 274 [273–278] | 253 [253–257] |
+| List of 20 two-field records | Erlang | 3,278 [3,184–3,312] | 3,032 [3,016–3,045] | 2,956 [2,952–2,970] |
+| Enum of 200 labels | Erlang | 10,534 [10,405–10,722] | 863 [863–870] | 865 [863–866] |
+| Two-field record | Node | 3,716 [3,416–4,468] | 987 [956–1,119] | 944 [923–964] |
+| List of 20 two-field records | Node | 20,417 [20,206–20,863] | 17,262 [17,011–17,485] | 16,965 [16,821–17,091] |
+| Enum of 200 labels | Node | 47,577 [45,000–48,796] | 7,020 [6,956–7,047] | 6,913 [6,896–6,970] |
+
+The per-call check costs about as much as the schema is large, so it dominates
+a small value under a large schema and disappears under a large value. The
+prepared function is within a few percent of decoding alone.
+
+### Validation against large enums and unions, 2026-11-24
+
+`contract.validate` scanned the label list of an enum, or the variant list of
+a union, for every value, so an array of `n` values against `m` alternatives
+cost `n × m` comparisons. A contract now holds an enum or union of more than
+eight alternatives as a set or a dictionary. `gleam run -m
+contract_validate_benchmark_runner` validates an array of 20,000 values that
+all match the alternative sorted last, once untimed and then five times; a
+cell is the median in milliseconds, with the minimum and maximum in brackets.
+The last three rows are controls with no large enum or union. One VM per
+build on a shared ten-core Apple silicon machine with other builds running,
+Erlang/OTP 29 and Node 24.21.0.
+
+| 20,000 values against | Target | Before | After |
+| --- | --- | ---: | ---: |
+| Enum of 1,000 labels | Erlang | 130 [128–134] | 0.37 [0.37–0.38] |
+| Enum of 2,000 labels | Erlang | 250 [242–256] | 0.43 [0.43–0.44] |
+| Enum of 4,000 labels | Erlang | 463 [461–474] | 0.37 [0.37–0.38] |
+| Enum of 8,000 labels | Erlang | 912 [901–944] | 0.50 [0.50–0.51] |
+| Union of 1,000 tags | Erlang | 185 [176–186] | 1.01 [0.99–1.03] |
+| Union of 8,000 tags | Erlang | 1,325 [1,315–1,351] | 1.21 [1.20–1.22] |
+| Enum of 1,000 labels | Node | 217 [201–219] | 3.67 [3.40–4.27] |
+| Enum of 8,000 labels | Node | 1,565 [1,558–1,618] | 3.41 [3.38–3.86] |
+| Union of 1,000 tags | Node | 118 [117–123] | 9.48 [9.48–9.85] |
+| Union of 8,000 tags | Node | 930 [920–940] | 9.66 [9.64–9.69] |
+| Two-field records (control) | Erlang | 2.43 [2.38–2.46] | 1.22 [1.22–1.30] |
+| Enum of 3 labels (control) | Erlang | 0.68 [0.68–0.68] | 0.48 [0.48–0.49] |
+| 1,000 `contract.decode` calls (control) | Erlang | 0.58 [0.57–0.58] | 0.29 [0.29–0.29] |
+| Two-field records (control) | Node | 10.2 [10.2–10.2] | 9.79 [9.74–9.80] |
+| Enum of 3 labels (control) | Node | 1.94 [1.93–2.02] | 1.57 [1.57–1.80] |
+| 1,000 `contract.decode` calls (control) | Node | 3.49 [3.33–3.65] | 3.37 [3.33–3.62] |
+
+Before, the time doubled with the number of alternatives; after, it does not
+depend on it. The controls show no slowdown. Their Erlang "before" cells ran
+while the machine was busier, so the apparent halving is not a claim. The
+`contract.decode` rows were measured with the codec built inside each call;
+the runner now builds it once before timing, and those rows were not measured
+again.
 
 ## Limits of these claims
 

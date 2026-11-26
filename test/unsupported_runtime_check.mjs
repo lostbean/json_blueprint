@@ -52,11 +52,6 @@ assert.ok(
   v.parse("null", v.with_max_bytes(limits, 1))[0].reason instanceof
     v.ByteLimitExceeded,
 );
-const legacy =
-  await import("../build/dev/javascript/json_blueprint/json/blueprint.mjs");
-const legacyResult = legacy.decode(legacy.int(), "42");
-assert.equal(legacyResult.isOk(), true);
-assert.equal(legacyResult[0], 42);
 assert.ok(
   v.parse_bits(b.from_string("null"), v.with_max_bytes(limits, 1))[0]
     .reason instanceof v.ByteLimitExceeded,

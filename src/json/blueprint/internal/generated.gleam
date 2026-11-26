@@ -6,15 +6,12 @@
 //// `json/blueprint/codec` instead.
 ////
 //// The `encode_*` and `decode_*` functions mirror the codec combinators over
-//// `Value`; the `*_native_*` functions do the same over `gleam/json` values
-//// and the `Dynamic` data that `json.parse` produces. The `decode_strict_*`
-//// helpers consume the shared strict parser's retained native evidence,
-//// preserving its exact numbers and duplicate-key rejection without a Value
-//// conversion. These decoder families have distinct input guarantees.
+//// `Value`; the `encode_native_*` functions encode to `gleam/json` values.
+//// Text is decoded only by the shared strict parser, behind
+//// `codec.decode_json`: the `decode_strict_*` helpers consume its retained
+//// native evidence, preserving its limits, exact numbers and duplicate-key
+//// rejection without a Value conversion.
 
-import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode
 import gleam/int
 import gleam/json
 import gleam/list
@@ -27,7 +24,6 @@ import json/blueprint/codec.{
 }
 import json/blueprint/internal/native
 import json/blueprint/internal/schema_tree.{type Tree}
-import json/blueprint/internal/text
 import json/blueprint/number.{type Number}
 import json/blueprint/value.{type Value}
 
@@ -494,186 +490,6 @@ pub fn encode_native_object(
   item: a,
 ) -> Result(json.Json, EncodeError) {
   encode_fields(item) |> result.map(json.object)
-}
-
-pub fn decode_native_string(raw: Dynamic) -> Result(String, DecodeError) {
-  decode.run(raw, decode.string)
-  |> result.replace_error(DecodeError([], codec.ExpectedString))
-}
-
-/// Decode a native JSON number with the same exact 24-digit projection as
-/// `codec.int()`. The native parser normalizes number tokens first; on
-/// JavaScript it may round a fractional token to an integer.
-pub fn decode_native_int(raw: Dynamic) -> Result(Int, DecodeError) {
-  case native_number(raw) {
-    Ok(item) ->
-      number.to_int(item, 24)
-      |> result.replace_error(DecodeError([], codec.ExpectedInt))
-    Error(Nil) -> fail(codec.ExpectedInt)
-  }
-}
-
-/// Decode a native JSON number with the same range check and projection as
-/// `decode_integer_between`, so every integer within the bounds decodes, even
-/// one longer than `codec.int()` accepts.
-pub fn decode_native_integer_between(
-  minimum: Int,
-  maximum: Int,
-  raw: Dynamic,
-) -> Result(Int, DecodeError) {
-  case native_number(raw) {
-    Ok(item) -> decode_bounded_integer(minimum, maximum, item)
-    Error(Nil) -> fail(codec.ExpectedInt)
-  }
-}
-
-/// The exact number of a native integer or float. Fails for other data, and
-/// on JavaScript for an integer outside the safe range.
-fn native_number(raw: Dynamic) -> Result(Number, Nil) {
-  case decode.run(raw, decode.int) {
-    Ok(item) -> number.from_int(item) |> result.replace_error(Nil)
-    Error(_) ->
-      case decode.run(raw, decode.float) {
-        Ok(item) -> number.from_float(item) |> result.replace_error(Nil)
-        Error(_) -> Error(Nil)
-      }
-  }
-}
-
-pub fn decode_native_bool(raw: Dynamic) -> Result(Bool, DecodeError) {
-  decode.run(raw, decode.bool)
-  |> result.replace_error(DecodeError([], codec.ExpectedBool))
-}
-
-pub fn decode_native_pair(
-  decode_left: fn(Dynamic) -> Result(a, DecodeError),
-  decode_right: fn(Dynamic) -> Result(b, DecodeError),
-  raw: Dynamic,
-) -> Result(#(a, b), DecodeError) {
-  case decode.run(raw, decode.list(decode.dynamic)) {
-    Error(_) -> fail(codec.ExpectedArray)
-    Ok([left, right]) -> {
-      use left <- result.try(decode_left(left) |> at_decode(Index(0)))
-      use right <- result.map(decode_right(right) |> at_decode(Index(1)))
-      #(left, right)
-    }
-    Ok(items) -> fail(codec.WrongLength(2, list.length(items)))
-  }
-}
-
-pub fn decode_native_list(
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-  raw: Dynamic,
-) -> Result(List(a), DecodeError) {
-  case decode.run(raw, decode.list(decode.dynamic)) {
-    Error(_) -> fail(codec.ExpectedArray)
-    Ok(items) ->
-      list.index_map(items, fn(item, index) { #(index, item) })
-      |> list.try_map(fn(pair) {
-        decode_item(pair.1) |> at_decode(Index(pair.0))
-      })
-  }
-}
-
-pub fn decode_native_nullable(
-  decode_inner: fn(Dynamic) -> Result(a, DecodeError),
-  raw: Dynamic,
-) -> Result(Option(a), DecodeError) {
-  case decode.run(raw, decode.optional(decode.dynamic)) {
-    Ok(None) -> Ok(None)
-    Ok(Some(inner)) -> decode_inner(inner) |> result.map(Some)
-    Error(_) -> decode_inner(raw) |> result.map(Some)
-  }
-}
-
-pub fn decode_native_required(
-  name: String,
-  members: Dict(String, Dynamic),
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-) -> Result(a, DecodeError) {
-  case dict.get(members, name) {
-    Error(Nil) -> Error(DecodeError([Field(name)], codec.MissingField))
-    Ok(raw) -> decode_item(raw) |> at_decode(Field(name))
-  }
-}
-
-pub fn decode_native_optional(
-  name: String,
-  members: Dict(String, Dynamic),
-  decode_item: fn(Dynamic) -> Result(a, DecodeError),
-) -> Result(Option(a), DecodeError) {
-  case dict.get(members, name) {
-    Error(Nil) -> Ok(None)
-    Ok(raw) -> decode_item(raw) |> at_decode(Field(name)) |> result.map(Some)
-  }
-}
-
-pub fn decode_native_fields_pair(
-  decode_left: fn(Dict(String, Dynamic)) -> Result(a, DecodeError),
-  decode_right: fn(Dict(String, Dynamic)) -> Result(b, DecodeError),
-  members: Dict(String, Dynamic),
-) -> Result(#(a, b), DecodeError) {
-  use left <- result.try(decode_left(members))
-  use right <- result.map(decode_right(members))
-  #(left, right)
-}
-
-pub fn decode_native_object(
-  names: List(String),
-  decode_fields: fn(Dict(String, Dynamic)) -> Result(a, DecodeError),
-  raw: Dynamic,
-) -> Result(a, DecodeError) {
-  case decode.run(raw, decode.dict(decode.string, decode.dynamic)) {
-    Error(_) -> fail(codec.ExpectedObject)
-    Ok(members) ->
-      case
-        list.find(dict.keys(members), fn(key) { !list.contains(names, key) })
-      {
-        Ok(key) -> Error(DecodeError([Field(key)], codec.UnknownField))
-        Error(Nil) -> decode_fields(members)
-      }
-  }
-}
-
-/// A `gleam/dynamic/decode` decoder from a generated native decoder. A
-/// failure's `expected` is the `codec.describe_decode_error` text.
-pub fn native_decoder(
-  decode_native: fn(Dynamic) -> Result(a, DecodeError),
-  placeholder: a,
-) -> decode.Decoder(a) {
-  decode.dynamic
-  |> decode.then(fn(raw) {
-    case decode_native(raw) {
-      Ok(item) -> decode.success(item)
-      Error(error) ->
-        decode.failure(placeholder, codec.describe_decode_error(error))
-    }
-  })
-}
-
-/// Parse text with `gleam/json` and decode it natively. Text above 1 MiB is
-/// rejected before parsing, with one error naming the limit.
-pub fn decode_json_native(
-  source: String,
-  decode_native: fn(Dynamic) -> Result(a, DecodeError),
-  placeholder: a,
-) -> Result(a, json.DecodeError) {
-  let limit = text.default_max_bytes
-  case text.exceeds_byte_limit(source, limit) {
-    True ->
-      Error(
-        json.UnableToDecode([
-          decode.DecodeError(
-            expected: "JSON text of at most "
-              <> int.to_string(limit)
-              <> " bytes",
-            found: "more than " <> int.to_string(limit) <> " bytes",
-            path: [],
-          ),
-        ]),
-      )
-    False -> json.parse(source, native_decoder(decode_native, placeholder))
-  }
 }
 
 // Strict decoder helpers consume evidence admitted by the shared parser.

@@ -3,6 +3,7 @@
 //// `describe_validation_error`. Schema documents are in
 //// `contract_document_test`.
 
+import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -746,6 +747,70 @@ pub fn decode_contract_mismatch_test() {
   contract.decode(other, deferred) |> should.equal(mismatch())
 }
 
+pub fn prepared_decoder_decodes_values_validated_by_its_contract_test() {
+  let assert Ok(people) = contract.from_codec(person_codec())
+  let assert Ok(decode) = contract.decoder(person_codec(), for: people)
+  let ada = object([#("age", int_value(36)), #("name", value.String("Ada"))])
+  let assert Ok(validated) = contract.validate(people, ada)
+  decode(validated) |> should.equal(Ok(#("Ada", 36)))
+  decode(validated) |> should.equal(contract.decode(person_codec(), validated))
+
+  // The same structure from another contract value, with a description and
+  // another property order, is the same contract match as `decode` uses.
+  let described =
+    tree_contract(
+      tree.ObjectSchema([
+        tree.PropertySchema("age", True, tree.IntSchema),
+        tree.PropertySchema(
+          "name",
+          True,
+          tree.DescribedSchema("Full name", tree.StringSchema),
+        ),
+      ]),
+    )
+  let assert Ok(validated_elsewhere) = contract.validate(described, ada)
+  decode(validated_elsewhere) |> should.equal(Ok(#("Ada", 36)))
+
+  // The codec's own decoding still runs and reports its own failures.
+  let assert Ok(small) =
+    contract.decoder(codec.integer_between(0, 10), for: {
+      contract.from_schema(codec.from_tree(tree.IntegerRangeSchema(0, 10)))
+    })
+  let assert Ok(ranged) = contract.from_codec(codec.integer_between(0, 10))
+  let assert Ok(five) = contract.validate(ranged, int_value(5))
+  small(five) |> should.equal(Ok(5))
+}
+
+pub fn prepared_decoder_refuses_a_mismatch_test() {
+  let assert Ok(pairs) =
+    contract.from_codec(codec.pair(codec.string(), codec.int()))
+
+  // The codec does not match the contract it is prepared for.
+  let assert Error(error) =
+    contract.decoder(codec.pair(codec.string(), codec.number()), for: pairs)
+  error |> should.equal(codec.DecodeError([], codec.ContractMismatch))
+  let unknown =
+    codec.custom(
+      encode: fn(_: Int) { Ok(value.Null) },
+      decode: fn(_) { Ok(0) },
+      schema: None,
+      placeholder: 0,
+    )
+  let assert Error(error) = contract.decoder(unknown, for: pairs)
+  error |> should.equal(codec.DecodeError([], codec.ContractMismatch))
+
+  // A value validated by a contract of another structure is refused on each
+  // call, even when the codec would accept the value.
+  let assert Ok(decode) =
+    contract.decoder(codec.int(), for: {
+      let assert Ok(ints) = contract.from_codec(codec.int())
+      ints
+    })
+  let assert Ok(ranged) = contract.from_codec(codec.integer_between(0, 10))
+  let assert Ok(five) = contract.validate(ranged, int_value(5))
+  decode(five) |> should.equal(mismatch())
+}
+
 // --- value_codec -------------------------------------------------------------
 
 fn limit_contract() -> contract.Contract {
@@ -946,4 +1011,139 @@ pub fn describe_validation_error_omits_input_values_test() {
     text |> should.equal(expected)
     string.contains(text, secret) |> should.be_false
   })
+}
+
+// --- enums and unions with many alternatives ---------------------------------
+
+/// `count` distinct labels, deliberately not in sorted order.
+fn many_labels(count: Int) -> List(String) {
+  int.range(from: 0, to: count, with: [], run: fn(done, index) {
+    ["label-" <> int.to_string(index), ..done]
+  })
+}
+
+pub fn enum_with_many_labels_validates_like_a_small_one_test() {
+  // Below, at and above the size at which labels are indexed.
+  list.each([1, 8, 9, 500], fn(count) {
+    let labels = many_labels(count)
+    let levels = tree_contract(tree.StringEnumSchema(labels))
+    list.each(labels, fn(label) {
+      contract.validate(levels, value.String(label)) |> should.be_ok
+    })
+    contract.validate(levels, value.String("label-"))
+    |> should.equal(Error(contract.ValidationError([], codec.UnknownEnumLabel)))
+    contract.validate(levels, int_value(1))
+    |> should.equal(Error(contract.ValidationError([], codec.ExpectedString)))
+
+    // The contract still reports its normalized schema, labels sorted.
+    contract_tree(levels)
+    |> should.equal(tree.StringEnumSchema(list.sort(labels, string.compare)))
+    contract.same_schema(
+      levels,
+      tree_contract(tree.StringEnumSchema(list.reverse(labels))),
+    )
+    |> should.be_true
+    contract.same_schema(
+      levels,
+      tree_contract(tree.StringEnumSchema(["other", ..labels])),
+    )
+    |> should.be_false
+
+    // Inside a list the failing index is kept.
+    let listed = tree_contract(tree.ListSchema(tree.StringEnumSchema(labels)))
+    contract.validate(
+      listed,
+      value.Array([value.String("label-0"), value.String("missing")]),
+    )
+    |> should.equal(
+      Error(contract.ValidationError([Index(1)], codec.UnknownEnumLabel)),
+    )
+  })
+}
+
+pub fn union_with_many_tags_validates_like_a_small_one_test() {
+  list.each([2, 8, 9, 300], fn(count) {
+    let tags = many_labels(count)
+    // Every other variant carries an integer payload.
+    let variants =
+      list.index_map(tags, fn(tag, index) {
+        case index % 2 {
+          0 -> tree.VariantSchema(tag, None)
+          _ -> tree.VariantSchema(tag, Some(tree.IntSchema))
+        }
+      })
+    let choices = tree_contract(tree.UnionSchema(variants))
+    list.each(variants, fn(variant) {
+      let tag = #("tag", value.String(variant.tag))
+      case variant.payload {
+        None -> {
+          contract.validate(choices, object([tag])) |> should.be_ok
+          contract.validate(choices, object([tag, #("value", int_value(1))]))
+          |> should.equal(
+            Error(contract.ValidationError([Field("value")], codec.UnknownField)),
+          )
+        }
+        Some(_) -> {
+          contract.validate(choices, object([tag, #("value", int_value(1))]))
+          |> should.be_ok
+          contract.validate(choices, object([tag]))
+          |> should.equal(
+            Error(contract.ValidationError([Field("value")], codec.MissingField)),
+          )
+          contract.validate(
+            choices,
+            object([tag, #("value", value.String("x"))]),
+          )
+          |> should.equal(
+            Error(contract.ValidationError([Field("value")], codec.ExpectedInt)),
+          )
+        }
+      }
+    })
+    contract.validate(choices, object([#("tag", value.String("label-"))]))
+    |> should.equal(
+      Error(contract.ValidationError([Field("tag")], codec.UnknownTag)),
+    )
+    contract.validate(choices, object([]))
+    |> should.equal(
+      Error(contract.ValidationError([Field("tag")], codec.MissingField)),
+    )
+
+    contract_tree(choices)
+    |> should.equal(
+      tree.UnionSchema(
+        list.sort(variants, fn(a, b) { string.compare(a.tag, b.tag) }),
+      ),
+    )
+    contract.same_schema(
+      choices,
+      tree_contract(tree.UnionSchema(list.reverse(variants))),
+    )
+    |> should.be_true
+  })
+}
+
+pub fn value_validated_against_many_labels_decodes_with_a_matching_codec_test() {
+  let labels = many_labels(40)
+  let levels =
+    codec.string_enum(
+      list.index_map(labels, fn(label, index) { #(label, index) }),
+    )
+  let assert Ok(accepted) = contract.from_codec(levels)
+  let assert Ok(validated) =
+    contract.validate(accepted, value.String("label-7"))
+  let assert Ok(decoded) = contract.decode(levels, validated)
+  list.contains([decoded], decoded) |> should.be_true
+  codec.encode(levels, decoded) |> should.equal(Ok(value.String("label-7")))
+
+  // One label fewer is another schema.
+  let fewer =
+    codec.string_enum(
+      list.index_map(list.drop(labels, 1), fn(label, index) { #(label, index) }),
+    )
+  contract.decode(fewer, validated) |> should.equal(mismatch())
+
+  // The adapter codec still publishes the contract's schema.
+  codec.schema(contract.value_codec(accepted))
+  |> should.equal(Ok(contract.schema(accepted)))
 }

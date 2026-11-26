@@ -100,7 +100,7 @@ pub fn native_custom_codec_materializes_only_its_value_test() {
   |> should.equal(Ok(#("exact", expected)))
 }
 
-pub fn native_text_parsing_has_no_depth_admission_limit_test() {
+pub fn native_text_parsing_reports_a_mismatch_inside_nested_arrays_test() {
   let text = string.repeat("[", 80) <> "null" <> string.repeat("]", 80)
   codec.decode_json(codec.string(), text)
   |> should.equal(Error(codec.DecodeError([], codec.ExpectedString)))

@@ -853,3 +853,67 @@ pub fn describe_load_error_test() {
   |> should.equal(contract.describe_document_error(document_error))
   contract.describe_load_error(error) |> should.equal("$: array without items")
 }
+
+/// `{"type":"array","items":…}` nested `depth` times around `inner`.
+fn nested_list_schemas(depth: Int, inner: Value) -> Value {
+  case depth {
+    0 -> inner
+    _ ->
+      nested_list_schemas(
+        depth - 1,
+        value.Object([#("type", value.String("array")), #("items", inner)]),
+      )
+  }
+}
+
+fn rooted(schema: Value) -> Value {
+  let assert value.Object(members) = schema
+  value.Object([
+    #("$schema", value.String("https://json-schema.org/draft/2020-12/schema")),
+    ..members
+  ])
+}
+
+pub fn document_errors_deep_in_a_schema_keep_root_to_leaf_paths_test() {
+  let depth = 200
+  let items = list.repeat(Field("items"), depth)
+  let load = fn(inner) {
+    contract.load(rooted(nested_list_schemas(depth, value.Object(inner))))
+  }
+
+  load([#("type", value.String("string"))]) |> should.be_ok
+
+  load([#("type", value.String("string")), #("format", value.String("x"))])
+  |> should.equal(
+    Error(contract.UnsupportedDocument(
+      list.append(items, [Field("format")]),
+      contract.UnsupportedKeyword("format"),
+    )),
+  )
+  load([#("type", value.Bool(True))])
+  |> should.equal(
+    Error(contract.MalformedDocument(
+      list.append(items, [Field("type")]),
+      contract.ExpectedText,
+    )),
+  )
+  // A missing profile-required member and an unrepresentable bound.
+  load([#("type", value.String("object"))])
+  |> should.equal(
+    Error(contract.UnsupportedDocument(
+      list.append(items, [Field("properties")]),
+      contract.UnsupportedSchemaForm,
+    )),
+  )
+  // A definition mistake is located after the whole document has loaded.
+  load([
+    #("type", value.String("string")),
+    #("enum", value.Array([value.String("a"), value.String("a")])),
+  ])
+  |> should.equal(
+    Error(contract.InvalidDefinition(
+      list.append(items, [Field("enum"), Index(1)]),
+      codec.DuplicateEnumLabel("a"),
+    )),
+  )
+}

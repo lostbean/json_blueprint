@@ -2,6 +2,8 @@
 
 <a id="adr-0016"></a>
 
+- **Status.** Partly superseded by [ADR-0020](0020-remove-the-1x-api.md#adr-0020), which removes the standard-native generated decoder.
+
 - **Decision.** The typed-definition generator emits specialized text encoders,
   strict native-tree decoders and schema structures. Its codec accessor registers
   the specialized functions so ordinary codec operations use them. Emit directly
