@@ -1,21 +1,99 @@
-# Migrating JSON Blueprint from 1.x
+# Migrating to JSON Blueprint 3.0
 
-JSON Blueprint 3.0 removes the 1.x decoder and schema modules. Typed codecs,
-exact JSON values, finite runtime contracts and source generators replace them.
-Moving an application from 1.x to codecs requires a review of its accepted and
-emitted JSON.
+JSON Blueprint 3.0 is a breaking release. Every text decoder now refuses input
+nested deeper than 128 levels unless you raise the bound, the 1.x decoder and
+schema modules are removed, and generated codecs no longer export
+`decode_<name>_json_native`. This guide has two parts: [from 2.x](#from-2x-to-30)
+for applications on a 2.x release, and [from 1.x](#from-1x), which maps each
+removed 1.x function to its codec replacement.
 
-This guide compares published 1.7.1 with the current codec API. It does not
+The 1.x part compares published 1.7.1 with the current codec API. It does not
 claim complete equivalence for every 1.x schema, error path, or numeric
 boundary.
 
+## From 2.x to 3.0
+
+Change the dependency range to `>= 3.0.0 and < 4.0.0`, then run `gleam build
+--warnings-as-errors` and `gleam test` on every target. The steps below are
+ordered by how many applications they affect.
+
+### 1. Text decoders refuse nesting deeper than 128 levels
+
+In 2.x, `value.default_limits()` bounded input to 1 MiB and nothing else. In 3.0
+it also bounds nesting depth to 128 levels, so a deeper document fails with
+`DepthLimitExceeded(128)`. This reaches `value.parse`, `value.parse_bits`,
+`codec.decode_json`, `codec.decode_json_with_limits` and `contract.parse`, and the
+generated `decode_<name>_json`. The bound protects every recursive walk over a
+parsed value, which on JavaScript otherwise exhausts the host stack with a
+thrown error.
+
+```gleam
+// 2.x: Ok(_) for 129 nested arrays. 3.0: Error(InvalidJson(DepthLimitExceeded(128)))
+codec.decode_json(codec.value(), text)
+
+// Deeper data you expect:
+let limits = value.default_limits() |> value.with_max_depth(512)
+codec.decode_json_with_limits(my_codec, text, limits)
+
+// Text you ship yourself and trust (removes the byte bound as well):
+codec.decode_json_with_limits(my_codec, text, value.unlimited())
+```
+
+`value.with_max_bytes` and `value.with_max_depth` each change one bound and keep
+the other, so `default_limits() |> with_max_bytes(n)` still refuses nesting
+beyond 128. Data nested deeper than 128 levels is rare; if yours is not, set the
+bound you need.
+
+`value.ParseReason` gains the constructor `DepthLimitExceeded(max: Int)`. An
+exhaustive `case` over it needs a new branch (the type already asks for a `_`
+branch). `value.is_limit_exceeded` is true for it.
+
+### 2. The 1.x modules are removed
+
+`json/blueprint` and `json/blueprint/schema` no longer exist. An import of
+either fails to compile. See [From 1.x](#from-1x) for the replacement of each
+function and the wire differences.
+
+### 3. Generated modules lose `decode_<name>_json_native`
+
+The function parsed with `gleam/json` behind a byte check only, so it admitted
+deep nesting and repeated keys. Call `decode_<name>_json`, which uses the strict
+parser with the default limits and returns `codec.DecodeError` instead of
+`json.DecodeError`. Regenerate each checked-in generated module with the 3.0
+generator and review the diff.
+
+A generated module no longer imports `gleam/dynamic`. A `named_mapping` whose
+output type comes from that module must name one of its functions as a source
+reference (for example `"gleam/dynamic.int"`), so the generator derives the
+import.
+
+### 4. Schemas with annotation keywords now load
+
+`contract.parse` used to refuse `title`, `default`, `examples`, `deprecated`,
+`readOnly`, `writeOnly`, `$comment` and `$id` with `UnsupportedKeyword`. It now
+accepts and ignores them, with their meta-schema types checked, and accepts
+`description` on union variants, tags and null alternatives. Keywords that
+constrain a value (`format`, `pattern`, the content keywords, `$ref`, `$defs`)
+are still refused. Code that treated `UnsupportedKeyword("title")` as an
+expected failure no longer sees it. A contract loaded from an annotated schema
+equals the contract of the same schema without annotations.
+
+### Not breaking
+
+`contract.decoder(codec, for: contract)` is new: it compares a codec with a
+contract once and returns a function that decodes many validated values. Loading
+nested schemas, validating large enums and unions, and rendering nested JSON text
+no longer cost time quadratic in size or breadth. No result changes.
+
+## From 1.x
+
 ## Update the dependency
 
-Update the application to the current JSON Blueprint from Hex and retain the resolved
+Update the application to JSON Blueprint 3 from Hex and retain the resolved
 version in `manifest.toml`:
 
 ```sh
-gleam add json_blueprint
+gleam add json_blueprint@3
 gleam build --warnings-as-errors
 gleam test
 ```
@@ -94,8 +172,8 @@ shows the three-state representation and its encoding behavior.
 deep by default, and rejects repeated object keys. Use
 `codec.decode_json_with_limits` with `value.with_max_bytes` or
 `value.with_max_depth` to select other bounds, or `value.unlimited()` for
-trusted text. Value-count and global numeric admission limits and their
-setters have been removed; the byte bound also bounds the number of values. Explicit
+trusted text. There is no value-count or global numeric admission limit; the
+byte bound also bounds the number of values. Explicit
 `number.parse(token, limits)` still supports caller-selected numeric limits.
 On JavaScript, raising those limits cannot bypass exact integer representation:
 unrepresentable written or normalized exponents and comparison magnitudes

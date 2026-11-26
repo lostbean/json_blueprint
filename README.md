@@ -1,5 +1,20 @@
 # JSON Blueprint
 
+> **Version 3.0.0 is a breaking release.** Read the
+> [migration guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/MIGRATION.md)
+> before upgrading from 2.x or 1.x.
+>
+> - Every text decoder now refuses input nested deeper than 128 levels (and
+>   larger than 1 MiB) by default. Raise the bound with `value.with_max_depth`,
+>   or use `value.unlimited()` for trusted text.
+> - The 1.x modules `json/blueprint` and `json/blueprint/schema` are removed.
+>   Use codecs.
+> - Generated codecs no longer export `decode_<name>_json_native`. Call
+>   `decode_<name>_json` and regenerate checked-in modules.
+> - `contract.parse` now accepts and ignores annotation keywords such as
+>   `title` and `default`.
+> - Dependents move their range to `>= 3.0.0 and < 4.0.0`.
+
 [![CI](https://github.com/gleam-dream/json_blueprint/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/gleam-dream/json_blueprint/actions/workflows/test.yml)
 [![json_blueprint on Hex](https://img.shields.io/hexpm/v/json_blueprint?label=Hex%3A%20json_blueprint)](https://hex.pm/packages/json_blueprint)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
@@ -8,7 +23,7 @@
 Define a JSON codec in Gleam to encode native values, decode JSON strictly, and
 publish a Draft 2020-12 schema from the same definition.
 
-JSON Blueprint 2.0 includes typed codecs, exact JSON values, runtime schema
+JSON Blueprint includes typed codecs, exact JSON values, runtime schema
 contracts, and build-time source generators in one package. Every text
 decoder parses within a byte bound and a nesting-depth bound by default.
 
@@ -67,24 +82,22 @@ acceptance, while a `Codec(a)` owns conversion to and from an application type.
 
 ## Installation
 
-Install JSON Blueprint 2 from Hex:
+Install JSON Blueprint 3 from Hex:
 
 ```sh
-gleam add json_blueprint@2
+gleam add json_blueprint@3
 ```
 
 The 1.x `json/blueprint` and `json/blueprint/schema` modules are removed in
 3.0; 2.x releases still include them. Before upgrading an existing
-application, follow the
+application from 2.x or 1.x, follow the
 [migration guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/MIGRATION.md).
 
 ## Choosing a codec
 
-Prefer `json_blueprint >= 2.2.0`: from 2.2.0 a codec holds each of its inputs
-once, so sending it to another BEAM process copies about its own size (a codec
-value you use in several places is still copied once per place). Never
-go below 2.1.1: earlier releases multiply a nested codec's size when it is
-sent.
+A codec holds each of its inputs once, so sending it to another BEAM process
+copies about its own size (a codec value you use in several places is still
+copied once per place).
 
 - Generate the codec from a typed definition when its JSON shape is fixed at
   build time and the codec is hot, long-lived, or sent to or held by other
@@ -96,12 +109,6 @@ sent.
   tagged unions, shared definitions or recursion, uses `custom`, `value` or
   arbitrary `try_map`, or is used once. For a fixed shape that is neither hot
   nor held by other processes, default to combinators.
-- While your package still allows 2.1.x, build each child codec in the field
-  that uses it in a combinator codec. There, a child codec bound with `let`
-  before a `use … <- codec.field` chain, or passed in as a parameter and used
-  by a later field, is copied once per callback when the codec is sent to
-  another process; from 2.2.0 it is copied once.
-
 The [codec practice guide](https://github.com/gleam-dream/json_blueprint/blob/main/docs/CODEC-PRACTICE.md) gives the measurements, the rules for
 combinator codecs with examples, a copy-size test, and the generator's current
 gaps.
